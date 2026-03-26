@@ -1,4 +1,10 @@
+
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 
 * {
   margin: 0;
@@ -15,3 +21,4 @@ body {
 h1, h2, h3 {
   font-family: 'Playfair Display', serif;
 }
+
