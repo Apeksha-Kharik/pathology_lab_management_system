@@ -2,11 +2,11 @@ const mongoose = require('mongoose');
 
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGO_URI);
-    console.log(`✅ MongoDB Connected: ${conn.connection.name}`);
-  } catch (error) {
-    console.error(`❌ Database Connection Error: ${error.message}`);
-    process.exit(1);
+    // This line "grabs" the link from your .env file
+    await mongoose.connect(process.env.MONGO_URI);
+    console.log("✅ Team Cloud Database Connected!");
+  } catch (err) {
+    console.log("❌ Connection Failed:", err.message);
   }
 };
 
