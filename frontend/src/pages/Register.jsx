@@ -2,7 +2,11 @@ import React, { useState } from "react";
 
 function RegisterPage() {
   const [formData, setFormData] = useState({
-    name: "", email: "", password: "", mobile: "", address: ""
+    name: "",
+    email: "",
+    password: "",
+    mobile: "",
+    address: ""
   });
 
   const handleChange = (e) => {
@@ -11,7 +15,7 @@ function RegisterPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Validation
     if (!formData.name || !formData.email || !formData.password || !formData.mobile || !formData.address) {
       alert("Please fill all fields ❌");
@@ -35,12 +39,29 @@ function RegisterPage() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f0f4f8' }}>
-      <div style={{ backgroundColor: '#fff', padding: '40px', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', width: '100%', maxWidth: '400px' }}>
-        
-        <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-          <h2 style={{ color: '#1a365d', margin: '0', fontSize: '24px' }}>Patient Registration</h2>
-          <p style={{ color: '#718096', fontSize: '14px' }}>Join INDIPATH Super Speciality Lab</p>
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: 'linear-gradient(135deg, #1a365d 0%, #2b6cb0 100%)', // Dark blue gradient like website
+      fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif'
+    }}>
+      <div style={{
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        padding: '50px',
+        borderRadius: '15px',
+        boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+        width: '100%',
+        maxWidth: '450px'
+      }}>
+        <div style={{ textAlign: 'center', marginBottom: '35px' }}>
+          <h2 style={{ color: '#1a365d', fontSize: '28px', fontWeight: '700', margin: '0 0 10px 0' }}>
+            User Registration
+          </h2>
+          <p style={{ color: '#4a5568', fontSize: '15px', margin: 0 }}>
+            Join INDIPATH Super Speciality Lab
+          </p>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -51,14 +72,41 @@ function RegisterPage() {
               type={field === 'password' ? 'password' : 'text'}
               placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
               onChange={handleChange}
-              style={{ width: '100%', padding: '12px', marginBottom: '15px', borderRadius: '6px', border: '1px solid #e2e8f0', boxSizing: 'border-box' }}
+              style={{
+                width: '100%',
+                padding: '14px 16px',
+                marginBottom: '18px',
+                borderRadius: '8px',
+                border: '1px solid #cbd5e0',
+                boxSizing: 'border-box',
+                fontSize: '14px',
+                color: '#2d3748'
+              }}
             />
           ))}
 
-          <button type="submit" style={{ width: '100%', padding: '12px', backgroundColor: '#2b6cb0', color: 'white', border: 'none', borderRadius: '6px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>
+          <button type="submit" style={{
+            width: '100%',
+            padding: '14px 0',
+            backgroundColor: '#2b6cb0',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '8px',
+            fontSize: '16px',
+            fontWeight: '600',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease'
+          }}
+          onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#1a365d'}
+          onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#2b6cb0'}
+          >
             Create Account
           </button>
         </form>
+
+        <div style={{ textAlign: 'center', marginTop: '20px', fontSize: '13px', color: '#718096' }}>
+          Already have an account? <a href="/login" style={{ color: '#2b6cb0', textDecoration: 'none', fontWeight: '500' }}>Login</a>
+        </div>
       </div>
     </div>
   );
