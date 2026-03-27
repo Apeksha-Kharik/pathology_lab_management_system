@@ -1,125 +1,63 @@
 import React, { useState } from "react";
 
 function RegisterPage() {
-
   const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    password: "",
-    mobile: "",
-    address: ""
+    name: "", email: "", password: "", mobile: "", address: ""
   });
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = async (e) => {
-  e.preventDefault();
+    e.preventDefault();
+    
+    // Validation
+    if (!formData.name || !formData.email || !formData.password || !formData.mobile || !formData.address) {
+      alert("Please fill all fields ❌");
+      return;
+    }
 
-  // ✅ Check empty fields
-  if (
-    !formData.name ||
-    !formData.email ||
-    !formData.password ||
-    !formData.mobile ||
-    !formData.address
-  ) {
-    alert("All fields are required ❌");
-    return;
-  }
+    try {
+      const res = await fetch("http://localhost:5000/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData)
+      });
 
-  // ✅ Email format check (better regex)
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const data = await res.json();
+      alert(data.message);
+      if (res.status === 201) window.location.href = "/login"; // Redirect after success
 
-  if (!emailRegex.test(formData.email)) {
-    alert("Enter valid email format ❌");
-    return;
-  }
+    } catch (error) {
+      alert("Cannot connect to server. Is your backend running? ❌");
+    }
+  };
 
-  // ✅ Mobile validation (10 digits)
-  if (formData.mobile.length !== 10) {
-    alert("Enter valid 10-digit mobile number ❌");
-    return;
-  }
-
-  try {
-    const res = await fetch("http://localhost:5000/register", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(formData)
-    });
-
-    const data = await res.json();
-    alert(data.message);
-
-  } catch (error) {
-    alert("Server error ❌");
-  }
-};
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500">
-
-      <div className="backdrop-blur-lg bg-white/20 p-10 rounded-3xl shadow-2xl w-[380px] border border-white/30">
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f0f4f8' }}>
+      <div style={{ backgroundColor: '#fff', padding: '40px', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)', width: '100%', maxWidth: '400px' }}>
         
-        <h2 className="text-3xl font-bold text-white text-center mb-6">
-          Pathology Lab 🧪
-        </h2>
-
-        <p className="text-center text-white/80 mb-6">
-          Create your account
-        </p>
+        <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+          <h2 style={{ color: '#1a365d', margin: '0', fontSize: '24px' }}>Patient Registration</h2>
+          <p style={{ color: '#718096', fontSize: '14px' }}>Join INDIPATH Super Speciality Lab</p>
+        </div>
 
         <form onSubmit={handleSubmit}>
+          {['name', 'email', 'password', 'mobile', 'address'].map((field) => (
+            <input
+              key={field}
+              name={field}
+              type={field === 'password' ? 'password' : 'text'}
+              placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
+              onChange={handleChange}
+              style={{ width: '100%', padding: '12px', marginBottom: '15px', borderRadius: '6px', border: '1px solid #e2e8f0', boxSizing: 'border-box' }}
+            />
+          ))}
 
-          <input
-            name="name"
-            placeholder="Full Name"
-            onChange={handleChange}
-            className="w-full p-3 mb-4 rounded-lg bg-white/80"
-          />
-
-          <input
-            name="email"
-            placeholder="Email Address"
-            onChange={handleChange}
-            className="w-full p-3 mb-4 rounded-lg bg-white/80"
-          />
-
-          <input
-            name="password"
-            type="password"
-            placeholder="Password"
-            onChange={handleChange}
-            className="w-full p-3 mb-4 rounded-lg bg-white/80"
-          />
-
-          <input
-            name="mobile"
-            placeholder="Mobile Number"
-            onChange={handleChange}
-            className="w-full p-3 mb-4 rounded-lg bg-white/80"
-          />
-
-          <input
-            name="address"
-            placeholder="Address"
-            onChange={handleChange}
-            className="w-full p-3 mb-6 rounded-lg bg-white/80"
-          />
-
-          <button
-            type="submit"
-            className="w-full bg-white text-purple-600 font-semibold p-3 rounded-lg hover:bg-gray-100"
-          >
-            Register
+          <button type="submit" style={{ width: '100%', padding: '12px', backgroundColor: '#2b6cb0', color: 'white', border: 'none', borderRadius: '6px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>
+            Create Account
           </button>
-
         </form>
       </div>
     </div>
