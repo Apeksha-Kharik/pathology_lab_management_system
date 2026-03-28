@@ -5,6 +5,8 @@ const app = express();
 const cors = require("cors");
 const mongoose = require("mongoose");
 const User = require("./models/User");
+const Booking = require("./models/Booking");
+const Report = require("./models/Report");
 
 app.use(cors());
 app.use(express.json());
@@ -14,6 +16,26 @@ mongoose.connect("mongodb://kharikapeksha01_db_user:admin%40123@ac-nqyhccq-shard
 
 mongoose.connection.on("connected", () => {
     console.log("MongoDB Connected ✅");
+});
+
+
+app.get("/my-bookings/:userId", async (req, res) => {
+  try {
+    const data = await Booking.find({ userId: req.params.userId });
+    res.json(data);
+  } catch (error) {
+    res.json([]);
+  }
+});
+
+
+app.get("/my-reports/:userId", async (req, res) => {
+  try {
+    const reports = await Report.find({ userId: req.params.userId });
+    res.json(reports);
+  } catch (error) {
+    res.json([]);
+  }
 });
 
 // TEST
@@ -30,6 +52,19 @@ app.post("/register", async (req, res) => {
     if (!name || !email || !password || !mobile || !address) {
       return res.json({ message: "All fields are required ❌" });
     }
+
+app.post("/book-test", async (req, res) => {
+  try {
+    const booking = new Booking(req.body);
+    await booking.save();
+
+    res.json({ message: "Test booked successfully ✅" });
+
+  } catch (error) {
+    console.log(error);
+    res.json({ message: "Error ❌" });
+  }
+});
 
     // ✅ Email format check
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
