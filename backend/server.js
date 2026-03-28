@@ -1,3 +1,5 @@
+require('dns').setDefaultResultOrder('ipv4first');
+
 const express = require("express");
 const app = express();
 const cors = require("cors");
@@ -8,7 +10,7 @@ app.use(cors());
 app.use(express.json());
 
 // ✅ CONNECT DATABASE
-mongoose.connect("mongodb://127.0.0.1:27017/pathology_lab");
+mongoose.connect("mongodb://kharikapeksha01_db_user:admin%40123@ac-nqyhccq-shard-00-00.nm2joai.mongodb.net:27017,ac-nqyhccq-shard-00-01.nm2joai.mongodb.net:27017,ac-nqyhccq-shard-00-02.nm2joai.mongodb.net:27017/?ssl=true&replicaSet=atlas-n10f2s-shard-0&authSource=admin&retryWrites=true&w=majority");
 
 mongoose.connection.on("connected", () => {
     console.log("MongoDB Connected ✅");
