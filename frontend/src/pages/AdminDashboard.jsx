@@ -244,6 +244,7 @@ const AdminDashboard = () => {
                                             <option value="Technician">Technician</option>
                                             <option value="Pathologist">Pathologist</option>
                                             <option value="Admin">Admin</option>
+                                            <option value="Receptionist">Receptionist</option>
                                         </select>
                                     </div>
                                 </div>
