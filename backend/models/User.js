@@ -15,10 +15,7 @@ const userSchema = new mongoose.Schema({
   // We can handle the logic in the frontend or backend route
   dateOfJoining: { 
       type: Date, 
-      required: function() {
-          // This makes the field required ONLY if the role is a staff role
-          return ['Pathologist', 'Technician', 'Receptionist'].includes(this.role);
-      }
+      required: false
   }
 }, { timestamps: true });
 

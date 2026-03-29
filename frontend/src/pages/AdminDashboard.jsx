@@ -10,7 +10,6 @@ const AdminDashboard = () => {
     const [users, setUsers] = useState([]);
     const [tests, setTests] = useState([]);
 
-    // Form States
     const [testForm, setTestForm] = useState({
         testName: '', price: '', category: '', conditions: '', description: ''
     });
@@ -21,24 +20,40 @@ const AdminDashboard = () => {
         password: '', 
         mobile: '', 
         address: '', 
-        dateOfJoining: new Date().toISOString().split('T'),
+        // FIX: Changed to a single string value instead of an array
+        dateOfJoining: new Date().toISOString().split('T'), 
         role: 'Technician'
     });
 
     const fetchData = async () => {
         try {
             const userRes = await axios.get('http://localhost:5000/api/admin/users');
-            setUsers(userRes.data);
+            setUsers(userRes.data || []);
             const testRes = await axios.get('http://localhost:5000/api/admin/tests');
-            setTests(testRes.data); 
+            setTests(testRes.data || []); 
         } catch (err) {
             console.error("Error loading dashboard data:", err);
         }
     };
 
-    useEffect(() => { 
-        fetchData(); 
-    }, []);
+    useEffect(() => { fetchData(); }, []);
+
+    const handleAddUser = async (e) => {
+        e.preventDefault();
+        try {
+            const response = await axios.post('http://localhost:5000/register', userForm);
+            alert(response.data.message);
+            // Reset form to default
+            setUserForm({
+                name: '', email: '', password: '', mobile: '', address: '', 
+                dateOfJoining: new Date().toISOString().split('T'), role: 'Technician'
+            });
+            setView('dashboard');
+            fetchData();
+        } catch (err) {
+            alert(err.response?.data?.message || "Registration failed.");
+        }
+    };
 
     const handleAddTest = async (e) => {
         e.preventDefault();
@@ -53,17 +68,6 @@ const AdminDashboard = () => {
         }
     };
 
-    const handleAddUser = async (e) => {
-        e.preventDefault();
-        try {
-            const response = await axios.post('http://localhost:5000/register', userForm);
-            alert(response.data.message);
-            setView('dashboard');
-            fetchData();
-        } catch (err) {
-            alert(err.response?.data?.message || "Registration failed.");
-        }
-    };
 
     const deleteUser = async (id) => {
         if (window.confirm("Delete this staff member?")) {
@@ -121,15 +125,14 @@ const AdminDashboard = () => {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <StatsCard title="Total Personnel" value={users.length} icon={<Users />} color="bg-blue-600" />
+                            <StatsCard title="Total Users" value={users.length} icon={<Users />} color="bg-blue-600" />
                             <StatsCard title="Lab Tests" value={tests.length} icon={<TestTube2 />} color="bg-[#2c5282]" />
-                            {/* Filtered for Active Staff (Non-Admins) */}
-                            <StatsCard title="Active Staff" value={users.filter(u => u.role !== 'Admin' && u.role !== 'Patient').length} icon={<Shield />} color="bg-blue-400" />
+                            <StatsCard title="Staff Members" value={users.filter(u => u.role !== 'Patient').length} icon={<Shield />} color="bg-blue-400" />
                         </div>
 
                         <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                             <div className="p-6 border-b border-slate-100">
-                                <h3 className="text-lg font-bold text-[#1e3a5f]">Staff Directory</h3>
+                                <h3 className="text-lg font-bold text-[#1e3a5f]">User Directory</h3>
                             </div>
                             <table className="w-full text-left">
                                 <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
@@ -141,11 +144,16 @@ const AdminDashboard = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {users.filter(u => u.role !== 'Patient').map((u) => (
+                                    {/* FIX: Removed the .filter() so Patients are now visible */}
+                                    {users.map((u) => (
                                         <tr key={u._id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
                                             <td className="p-4 font-medium">{u.name}</td>
                                             <td className="p-4">
-                                                <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${u.role === 'Admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-50 text-blue-700'}`}>
+                                                <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${
+                                                    u.role === 'Admin' ? 'bg-purple-100 text-purple-700' : 
+                                                    u.role === 'Patient' ? 'bg-green-100 text-green-700' : 
+                                                    'bg-blue-50 text-blue-700'
+                                                }`}>
                                                     {u.role}
                                                 </span>
                                             </td>
