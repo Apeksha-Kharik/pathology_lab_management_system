@@ -22,14 +22,9 @@
   },
   "homepage": "https://github.com/Apeksha-Kharik/pathology_lab_management_system#readme",
   "dependencies": {
-<<<<<<< Updated upstream
     "express": "^5.2.1"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"
-=======
-    "concurrently": "^9.2.1",
-    "express": "^5.2.1"
->>>>>>> Stashed changes
   }
 }
