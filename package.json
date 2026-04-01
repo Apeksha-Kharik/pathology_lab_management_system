@@ -22,7 +22,10 @@
   },
   "homepage": "https://github.com/Apeksha-Kharik/pathology_lab_management_system#readme",
   "dependencies": {
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "framer-motion": "^12.38.0",
+    "lucide-react": "^1.7.0",
+    "react-router-dom": "^7.13.2"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

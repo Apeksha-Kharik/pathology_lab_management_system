@@ -1,43 +1,87 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 import { Microscope, FileCheck, Users2, ShieldCheck } from 'lucide-react';
 
 const StatsGrid = () => {
   const stats = [
-    { label: 'Tests Conducted', val: '5,000+', icon: <Microscope size={22} />, color: '#60A5FA' },
-    { label: 'Reports Generated', val: '12,000+', icon: <FileCheck size={22} />, color: '#34D399' },
-    { label: 'Happy Patients', val: '8,000+', icon: <Users2 size={22} />, color: '#818CF8' },
-    { label: 'Expert Pathologists', val: '50+', icon: <ShieldCheck size={22} />, color: '#FBBF24' }
+    { label: 'Tests Conducted', val: '5,000+', icon: <Microscope size={32} />, color: '#0ea5e9', bg: 'rgba(14, 165, 233, 0.12)' },
+    { label: 'Reports Generated', val: '12,000+', icon: <FileCheck size={32} />, color: '#2dd4bf', bg: 'rgba(45, 212, 191, 0.12)' },
+    { label: 'Happy Patients', val: '8,000+', icon: <Users2 size={32} />, color: '#6366f1', bg: 'rgba(99, 102, 241, 0.12)' },
+    { label: 'Expert Pathologists', val: '50+', icon: <ShieldCheck size={32} />, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.12)' }
   ];
 
   return (
-    <div className="bg-[#0f172a] py-12"> 
-      <section className="relative z-30 px-4 md:px-[10%]">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-0 rounded-3xl overflow-hidden bg-[#1e293b] border border-white/5 shadow-2xl">
-          
-          {stats.map((stat, i) => (
-            <div 
-              key={i} 
-              className={`relative p-10 flex flex-col items-center lg:items-start text-center lg:text-left transition-all duration-500 hover:bg-white/[0.03] group
-                ${i !== stats.length - 1 ? 'lg:border-r border-white/5' : ''}
-                ${i < 2 ? 'border-b lg:border-b-0 border-white/5' : ''}`}
-            >
-              <div className="mb-4" style={{ color: stat.color }}>
-                {stat.icon}
-              </div>
-
-              <div className="space-y-1">
-                <h3 className="text-3xl font-light text-white tracking-tight">
-                  {stat.val}
-                </h3>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">
-                  {stat.label}
-                </p>
-              </div>
+    <section style={{ 
+      padding: '0 5%', 
+      marginTop: '-70px', 
+      position: 'relative', 
+      zIndex: 20 
+    }}>
+      <div style={{ 
+        display: 'grid', 
+        // STRICT 4-COLUMN LAYOUT
+        gridTemplateColumns: 'repeat(4, 1fr)', 
+        gap: '20px',
+        maxWidth: '1400px',
+        margin: '0 auto'
+      }}>
+        {stats.map((stat, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, y: 40 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            whileHover={{ y: -15 }}
+            style={{
+              backgroundColor: '#ffffff',
+              padding: '45px 20px',
+              borderRadius: '28px',
+              textAlign: 'center',
+              boxShadow: '0 20px 40px rgba(26, 54, 93, 0.08)',
+              border: '1px solid #f1f5f9',
+              transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+            }}
+          >
+            {/* ICON CONTAINER - VIBRANT CONTRAST */}
+            <div style={{
+              width: '75px',
+              height: '75px',
+              borderRadius: '20px',
+              backgroundColor: stat.bg,
+              color: stat.color,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 25px auto',
+              border: `1px solid ${stat.color}20` // Very faint border of the same icon color
+            }}>
+              {stat.icon}
             </div>
-          ))}
-        </div>
-      </section>
-    </div>
+
+            <h3 style={{ 
+              fontSize: '2.4rem', 
+              fontWeight: '900', 
+              color: '#1a365d', 
+              margin: '0 0 8px 0',
+              letterSpacing: '-1px'
+            }}>
+              {stat.val}
+            </h3>
+
+            <p style={{ 
+              fontSize: '0.75rem', 
+              fontWeight: '800', 
+              color: '#64748b', 
+              textTransform: 'uppercase', 
+              letterSpacing: '1.2px',
+              lineHeight: '1.4'
+            }}>
+              {stat.label}
+            </p>
+          </motion.div>
+        ))}
+      </div>
+    </section>
   );
 };
 

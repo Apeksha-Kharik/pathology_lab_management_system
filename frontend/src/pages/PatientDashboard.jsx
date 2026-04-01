@@ -5,9 +5,8 @@ function PatientDashboard() {
   const [active, setActive] = useState("book");
   const [tests, setTests] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedTest, setSelectedTest] = useState(null); // Track test selection
+  const [selectedTest, setSelectedTest] = useState(null);
 
-  // Fetch tests from your backend
   useEffect(() => {
     const fetchTests = async () => {
       try {
@@ -21,24 +20,23 @@ function PatientDashboard() {
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem("userId");
+    localStorage.clear(); // Clear everything to prevent role ghosting
     window.location.href = "/";
   };
 
-  // Filter tests based on search input
-  const filteredTests = tests.filter(test => 
-    test.testName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    test.category.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // FIXED: Added safety checks to prevent "toLowerCase of undefined" crash
+  const filteredTests = tests.filter(test => {
+    const name = test?.testName?.toLowerCase() || "";
+    const cat = test?.category?.toLowerCase() || "";
+    const search = searchTerm.toLowerCase();
+    return name.includes(search) || cat.includes(search);
+  });
 
   return (
     <div className="relative min-h-screen bg-gradient-to-br from-[#E0ECFF] via-[#F8FAFF] to-[#EEF2FF] overflow-x-hidden">
-
-      {/* 🌊 BACKGROUND GLOW */}
       <div className="absolute top-[-100px] left-[-100px] w-[300px] h-[300px] bg-blue-300 opacity-30 rounded-full blur-3xl"></div>
       <div className="absolute bottom-[-120px] right-[-100px] w-[350px] h-[350px] bg-indigo-300 opacity-30 rounded-full blur-3xl"></div>
 
-      {/* NAVBAR */}
       <div className="flex justify-between items-center px-10 py-5 bg-white/70 backdrop-blur-xl shadow-md border-b border-white/40 relative z-50 sticky top-0">
         <h1 className="text-2xl font-bold text-[#1E3A8A]">🧪 IndiPath</h1>
         <div className="flex gap-8 items-center font-medium">
@@ -51,7 +49,6 @@ function PatientDashboard() {
         </div>
       </div>
 
-      {/* SEARCH BAR (Only visible in 'book' view when no test is selected) */}
       {active === "book" && !selectedTest && (
         <div className="px-10 pt-10 relative z-10 max-w-4xl mx-auto">
           <input 
@@ -64,7 +61,6 @@ function PatientDashboard() {
         </div>
       )}
 
-      {/* HEADER */}
       <div className="px-10 py-8 relative z-10">
         <h2 className="text-4xl font-extrabold text-gray-800 mb-2 tracking-tight">
           {selectedTest ? `Booking ${selectedTest.testName}` : "Welcome back 👋"}
@@ -74,19 +70,16 @@ function PatientDashboard() {
         </p>
       </div>
 
-      {/* MAIN CONTENT */}
       <div className="px-10 pb-20 relative z-10">
         <div className="bg-white/60 backdrop-blur-xl p-8 rounded-3xl shadow-xl border border-white/40">
           
           {active === "book" && (
             selectedTest ? (
-              // SHOW FORM IF TEST SELECTED
               <div>
                 <button onClick={() => setSelectedTest(null)} className="mb-4 text-blue-600 font-bold hover:underline">← Back to available tests</button>
                 <BookTest prefilledTest={selectedTest.testName} onComplete={() => { setSelectedTest(null); setActive("history"); }} />
               </div>
             ) : (
-              // SHOW CARDS IF NO TEST SELECTED
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredTests.length > 0 ? (
                   filteredTests.map((test) => (
@@ -116,26 +109,20 @@ function PatientDashboard() {
 
           {active === "history" && <History />}
           {active === "reports" && <Reports />}
-
         </div>
       </div>
     </div>
   );
 }
 
-/* NAV BUTTON */
 function NavBtn({ text, setActive }) {
   return (
-    <button
-      onClick={() => setActive(text.toLowerCase())}
-      className="text-gray-600 hover:text-blue-600 transition hover:scale-105"
-    >
+    <button onClick={() => setActive(text.toLowerCase())} className="text-gray-600 hover:text-blue-600 transition hover:scale-105">
       {text}
     </button>
   );
 }
 
-/* BOOK TEST COMPONENT */
 function BookTest({ prefilledTest, onComplete }) {
   const [form, setForm] = useState({
     name: "", testName: prefilledTest || "", age: "", phone: "", email: "", date: "", homeSample: false
@@ -152,11 +139,9 @@ function BookTest({ prefilledTest, onComplete }) {
       alert("Please fill all required fields ❌");
       return;
     }
-
     let history = JSON.parse(localStorage.getItem("history")) || [];
     history.push({ ...form, status: "Pending" });
     localStorage.setItem("history", JSON.stringify(history));
-
     alert("Test Booked Successfully ✅");
     onComplete();
   };
@@ -167,18 +152,15 @@ function BookTest({ prefilledTest, onComplete }) {
         <label className="text-xs font-bold text-blue-400 uppercase">Selected Test</label>
         <p className="text-lg font-bold text-blue-900">{form.testName}</p>
       </div>
-
       <Input name="name" placeholder="Patient Full Name" value={form.name} onChange={handleChange} />
       <Input name="age" placeholder="Age" type="number" value={form.age} onChange={handleChange} />
       <Input name="phone" placeholder="Phone Number" value={form.phone} onChange={handleChange} />
       <Input name="email" placeholder="Email (Optional)" value={form.email} onChange={handleChange} />
       <Input type="date" name="date" value={form.date} onChange={handleChange} className="col-span-2 p-3 rounded-xl border border-gray-300" />
-
       <label className="col-span-2 flex gap-2 text-gray-600 items-center bg-white/50 p-3 rounded-xl">
         <input type="checkbox" name="homeSample" checked={form.homeSample} onChange={handleChange} className="w-5 h-5" />
         Request Home Sample Collection
       </label>
-
       <button className="col-span-2 bg-gradient-to-r from-[#2563EB] to-[#1E3A8A] text-white p-4 rounded-xl shadow-lg hover:shadow-2xl hover:scale-105 transition duration-300 font-bold text-lg">
         Confirm Appointment
       </button>
@@ -186,25 +168,16 @@ function BookTest({ prefilledTest, onComplete }) {
   );
 }
 
-/* INPUT COMPONENT */
 function Input({ className, ...props }) {
-  return (
-    <input
-      {...props}
-      className={`p-3 rounded-xl border border-gray-300 bg-white/80 focus:ring-2 focus:ring-blue-400 outline-none shadow-sm transition ${className}`}
-    />
-  );
+  return <input {...props} className={`p-3 rounded-xl border border-gray-300 bg-white/80 focus:ring-2 focus:ring-blue-400 outline-none shadow-sm transition ${className}`} />;
 }
 
-/* HISTORY */
 function History() {
   const history = JSON.parse(localStorage.getItem("history")) || [];
   return (
     <div>
       <h2 className="text-xl font-bold text-[#1E3A8A] mb-5">Your Booking History</h2>
-      {history.length === 0 ? (
-        <p className="text-gray-500">No previous bookings found.</p>
-      ) : (
+      {history.length === 0 ? <p className="text-gray-500">No previous bookings found.</p> : (
         <div className="space-y-4">
           {history.map((item, i) => (
             <div key={i} className="p-4 bg-white/80 rounded-2xl border shadow-sm flex justify-between items-center">
@@ -221,13 +194,11 @@ function History() {
   );
 }
 
-/* REPORTS */
 function Reports() {
   return (
     <div className="text-center py-10">
       <h2 className="text-xl font-bold text-[#1E3A8A] mb-5">Medical Reports</h2>
       <p className="text-gray-500 italic text-lg">No reports generated yet 📄</p>
-      <p className="text-sm text-gray-400 mt-2">Reports will appear here once the lab results are ready.</p>
     </div>
   );
 }
