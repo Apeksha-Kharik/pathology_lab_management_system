@@ -14,7 +14,7 @@ const app = express();
 // Middleware
 app.use(cors({
   origin: "http://localhost:5173", // Allow your Vite React app
-  methods: ["GET", "POST", "DELETE"], // Added DELETE for the delete button
+  methods: ["GET", "POST", "DELETE", "OPTIONS"], // Added OPTIONS for pre-flight checks
   credentials: true
 }));
 app.use(express.json());
@@ -24,22 +24,20 @@ app.use(express.json());
 // 1. Test Route
 app.get('/', (req, res) => res.send('Pathology Lab Server Running... 🚀'));
 
-// 2. Registration API - UPDATED with mobile, address, and dateOfJoining
+// 2. Registration API
 app.post('/register', async (req, res) => {
   try {
     const { name, email, password, mobile, address, role, dateOfJoining } = req.body;
 
-    // 1. Check if user already exists
     const userExists = await User.findOne({ email });
     if (userExists) {
       return res.status(400).json({ message: "Email already registered! ❌" });
     }
 
-    // 2. Create new user with ALL fields
     const newUser = new User({ 
       name, 
       email, 
-      password, // Note: In a real project, use bcrypt to hash this!
+      password, 
       mobile, 
       address, 
       role, 
@@ -54,7 +52,7 @@ app.post('/register', async (req, res) => {
   }
 });
 
-// 3. Login API (Basic Version)
+// 3. Login API
 app.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -83,16 +81,15 @@ app.get('/api/admin/users', async (req, res) => {
     }
 });
 
-// 5. Add a New Test - UPDATED with conditions
+// 5. Add a New Test
 app.post('/api/admin/add-test', async (req, res) => {
     try {
         const { testName, category, price, description, conditions } = req.body;
         
-        // Added conditions to the new Test object
         const newTest = new Test({ 
             testName, 
             category, 
-            price: Number(price), // Ensuring price is a number
+            price: Number(price), 
             description,
             conditions 
         });
@@ -122,6 +119,20 @@ app.delete('/api/admin/user/:id', async (req, res) => {
         res.json({ message: "User deleted successfully" });
     } catch (err) {
         res.status(500).json({ message: "Error deleting user" });
+    }
+});
+
+// 8. Delete Test (ADDED THIS MISSING ROUTE)
+app.delete('/api/admin/test/:id', async (req, res) => {
+    try {
+        const deletedTest = await Test.findByIdAndDelete(req.params.id);
+        if (!deletedTest) {
+            return res.status(404).json({ message: "Test not found" });
+        }
+        res.json({ message: "Test deleted successfully ✅" });
+    } catch (err) {
+        console.error("Delete Test Error:", err);
+        res.status(500).json({ message: "Error deleting test from database" });
     }
 });
 
