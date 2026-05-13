@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import { 
     LayoutDashboard, TestTube2, UserPlus, LogOut, Trash2, X, 
     Shield, Activity, FlaskConical, Users, IndianRupee, Plus 
@@ -12,16 +12,14 @@ const AdminDashboard = () => {
 
     const [testForm, setTestForm] = useState({ testName: '', price: '', category: '', conditions: '', description: '' });
     const [userForm, setUserForm] = useState({
-        name: '', email: '', password: '', mobile: '', address: '', 
-        dateOfJoining: new Date().toISOString().split('T'), 
-        role: 'Technician'
+        name: '', email: '', password: '', phone: '', role: 'technician'
     });
 
     const fetchData = async () => {
         try {
-            const userRes = await axios.get('http://localhost:5000/api/admin/users');
+            const userRes = await api.get('/api/admin/users');
             setUsers(userRes.data || []);
-            const testRes = await axios.get('http://localhost:5000/api/admin/tests');
+            const testRes = await api.get('/api/admin/tests');
             setTests(testRes.data || []); 
         } catch (err) {
             console.error("Error loading dashboard data:", err);
@@ -38,9 +36,9 @@ const AdminDashboard = () => {
     const handleAddUser = async (e) => {
         e.preventDefault();
         try {
-            const response = await axios.post('http://localhost:5000/register', userForm);
+            const response = await api.post('/api/admin/users', userForm);
             alert(response.data.message);
-            setUserForm({ name: '', email: '', password: '', mobile: '', address: '', dateOfJoining: new Date().toISOString().split('T'), role: 'Technician' });
+            setUserForm({ name: '', email: '', password: '', phone: '', role: 'technician' });
             setView('dashboard');
             fetchData();
         } catch (err) {
@@ -51,7 +49,7 @@ const AdminDashboard = () => {
     const handleAddTest = async (e) => {
         e.preventDefault();
         try {
-            await axios.post('http://localhost:5000/api/admin/add-test', testForm);
+            await api.post('/api/admin/add-test', testForm);
             alert("Test added successfully! 🧪");
             setTestForm({ testName: '', price: '', category: '', conditions: '', description: '' });
             setView('availableTests');
@@ -64,7 +62,7 @@ const AdminDashboard = () => {
     const deleteUser = async (id) => {
         if (window.confirm("Delete this staff member?")) {
             try {
-                await axios.delete(`http://localhost:5000/api/admin/user/${id}`);
+                await api.delete(`/api/admin/user/${id}`);
                 setUsers(prev => prev.filter(user => user._id !== id));
             } catch (err) {
                 console.error("User delete error:", err);
@@ -89,7 +87,7 @@ const AdminDashboard = () => {
             setTests(prev => prev.filter(test => (test._id || test.id) !== id));
 
             // 2. Send request
-            await axios.delete(`http://localhost:5000/api/admin/test/${id}`);
+            await api.delete(`/api/admin/test/${id}`);
             alert("Deleted successfully!");
         } catch (err) {
             console.error("Server Error Detail:", err.response?.data || err.message);
@@ -141,7 +139,7 @@ const AdminDashboard = () => {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <StatsCard title="Total Users" value={users.length} icon={<Users />} color="bg-blue-600" />
                             <StatsCard title="Active Tests" value={tests.length} icon={<TestTube2 />} color="bg-[#2c5282]" />
-                            <StatsCard title="Staff Count" value={users.filter(u => u.role !== 'Patient').length} icon={<Shield />} color="bg-blue-400" />
+                            <StatsCard title="Staff Count" value={users.filter(u => u.role !== 'patient').length} icon={<Shield />} color="bg-blue-400" />
                         </div>
 
                         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
@@ -240,18 +238,18 @@ const AdminDashboard = () => {
                             </div>
                             <div className="grid grid-cols-2 gap-6">
                                 <FormInput label="Password" type="password" value={userForm.password} onChange={(e) => setUserForm({...userForm, password: e.target.value})} required />
-                                <FormInput label="Mobile" value={userForm.mobile} onChange={(e) => setUserForm({...userForm, mobile: e.target.value})} required />
+                                <FormInput label="Phone" value={userForm.phone} onChange={(e) => setUserForm({...userForm, phone: e.target.value})} required />
                             </div>
                             <div className="space-y-2">
                                 <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Role</label>
                                 <select className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none focus:ring-2 focus:ring-blue-500"
                                     value={userForm.role} onChange={(e) => setUserForm({...userForm, role: e.target.value})}>
-                                    <option value="Technician">Technician</option>
-                                    <option value="Pathologist">Pathologist</option>
-                                    <option value="Admin">Admin</option>
+                                    <option value="technician">Technician</option>
+                                    <option value="pathologist">Pathologist</option>
+                                    <option value="receptionist">Receptionist</option>
+                                    <option value="admin">Admin</option>
                                 </select>
                             </div>
-                            <FormInput label="Address" value={userForm.address} onChange={(e) => setUserForm({...userForm, address: e.target.value})} required />
                             <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold hover:bg-blue-700 transition-all">Register Staff</button>
                         </form>
                     </div>

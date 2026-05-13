@@ -2,21 +2,20 @@ const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
-  email: { type: String, required: true, unique: true },
+  email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+  phone: { type: String, required: true },
   password: { type: String, required: true },
-  mobile: { type: String, required: true },
-  address: { type: String, required: true },
   role: { 
       type: String, 
-      enum: ['Admin', 'Pathologist', 'Technician', 'Receptionist', 'Patient'], 
-      default: 'Patient' 
+      enum: ['admin', 'patient', 'receptionist', 'technician', 'pathologist'], 
+      default: 'patient',
+      lowercase: true
   },
-  // Date of joining is only for staff, so we don't make it 'required' here
-  // We can handle the logic in the frontend or backend route
-  dateOfJoining: { 
-      type: Date, 
-      required: false
-  }
+  isVerified: { type: Boolean, default: false },
+  otp: { type: String },
+  otpExpiry: { type: Date },
+  resetPasswordVerified: { type: Boolean, default: false },
+  resetPasswordExpiry: { type: Date }
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);

@@ -1,19 +1,17 @@
 import React from "react";
 import { Navigate } from "react-router-dom";
+import { roleRoutes, useAuth } from "../context/AuthContext";
 
-function ProtectedRoute({ children, role }) {
-  const user = JSON.parse(localStorage.getItem("user"));
+function ProtectedRoute({ children, allowedRoles }) {
+  const { user } = useAuth();
+  const token = localStorage.getItem("token");
 
-  if (!user) {
+  if (!user || !token) {
     return <Navigate to="/login" />;
   }
 
-  if (role && user.role !== role) {
-    if (user.role === "Admin") {
-      return <Navigate to="/admin" />;
-    } else {
-      return <Navigate to="/patient_dashboard" />;
-    }
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
+    return <Navigate to={roleRoutes[user.role] || "/login"} />;
   }
 
   return children;
