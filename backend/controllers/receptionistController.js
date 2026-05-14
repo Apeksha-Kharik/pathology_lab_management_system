@@ -27,7 +27,7 @@ const getAllBookings = async (req, res) => {
 const updateBookingStatus = async (req, res) => {
   try {
     const { status } = req.body;
-    const allowedStatuses = ["Confirmed", "Rejected", "Sample Collected", "Processing", "Completed", "Report Ready"];
+    const allowedStatuses = ["Confirmed", "Rejected", "Sample Collected", "Processing", "Completed"];
 
     if (!allowedStatuses.includes(status)) {
       return res.status(400).json({ message: "Invalid booking status" });

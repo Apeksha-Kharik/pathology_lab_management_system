@@ -20,6 +20,13 @@ export const getReports = async () => {
   return response.data;
 };
 
+export const downloadReport = async (reportId) => {
+  const response = await api.get(`/reports/${reportId}/download`, {
+    responseType: "blob"
+  });
+  return response.data;
+};
+
 export const downloadReceipt = async (bookingId) => {
   const response = await api.get(`/receipts/${bookingId}`, {
     responseType: "blob"

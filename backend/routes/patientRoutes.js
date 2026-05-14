@@ -4,6 +4,7 @@ const {
   createBooking,
   getBookings,
   getReports,
+  downloadReport,
   downloadReceipt
 } = require("../controllers/patientController");
 const { protect, allowRoles } = require("../middleware/authMiddleware");
@@ -15,6 +16,7 @@ router.post("/book-test", protect, allowRoles("patient"), createBooking);
 router.post("/bookings", protect, allowRoles("patient"), createBooking);
 router.get("/bookings", protect, allowRoles("patient"), getBookings);
 router.get("/reports", protect, allowRoles("patient"), getReports);
+router.get("/reports/:reportId/download", protect, allowRoles("patient"), downloadReport);
 router.get("/receipts/:bookingId", protect, allowRoles("patient"), downloadReceipt);
 
 module.exports = router;

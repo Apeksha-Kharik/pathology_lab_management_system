@@ -1,13 +1,15 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Download, FileText, LogOut, Search, TestTube2 } from "lucide-react";
+import { Download, FileText, LogOut, Search, TestTube2, User } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import {
   createBooking,
+  downloadReport,
   downloadReceipt,
   getBookings,
   getReports,
   getTests
 } from "../services/patientService";
+import { changePassword, updateProfile } from "../services/profileService";
 
 function PatientDashboard() {
   const { user, logout } = useAuth();
@@ -111,6 +113,7 @@ function PatientDashboard() {
           <TabButton active={active === "history"} onClick={() => setActive("history")}>Booking History</TabButton>
           <TabButton active={active === "payments"} onClick={() => setActive("payments")}>Payment Status</TabButton>
           <TabButton active={active === "reports"} onClick={() => setActive("reports")}>Reports & Receipts</TabButton>
+          <TabButton active={active === "profile"} onClick={() => setActive("profile")}>Profile</TabButton>
         </nav>
 
         {loading ? (
@@ -128,6 +131,7 @@ function PatientDashboard() {
             {active === "history" && <BookingHistory bookings={bookings} />}
             {active === "payments" && <PaymentStatus bookings={bookings} />}
             {active === "reports" && <ReportsAndReceipts bookings={bookings} reports={reports} />}
+            {active === "profile" && <ProfileSection user={user} />}
           </section>
         )}
       </main>
@@ -304,16 +308,8 @@ function ReportsAndReceipts({ bookings, reports }) {
       <div>
         <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-slate-800"><FileText size={20} /> Download Report</h2>
         {reports.length ? reports.map((report) => (
-          <a
-            key={report._id}
-            href={report.reportUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="mb-3 flex items-center justify-between rounded-md border border-slate-200 p-4 text-sm font-semibold text-blue-700"
-          >
-            {report.testName || "Lab report"} <Download size={16} />
-          </a>
-        )) : <EmptyState text="No reports uploaded yet." />}
+          <ReportButton key={report._id} report={report} />
+        )) : <EmptyState text="Download Report appears only when report status is ready." />}
       </div>
 
       <div>
@@ -322,6 +318,82 @@ function ReportsAndReceipts({ bookings, reports }) {
           <ReceiptButton key={booking._id} booking={booking} />
         )) : <EmptyState text="No receipts available yet." />}
       </div>
+    </div>
+  );
+}
+
+function ReportButton({ report }) {
+  const handleDownload = async () => {
+    try {
+      const blob = await downloadReport(report._id);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `report-${report._id}.pdf`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      alert(error.response?.data?.message || "Report download failed");
+    }
+  };
+
+  return (
+    <button onClick={handleDownload} className="mb-3 flex w-full items-center justify-between rounded-md border border-slate-200 p-4 text-left text-sm font-semibold text-blue-700">
+      {report.testName || "Lab report"} <Download size={16} />
+    </button>
+  );
+}
+
+function ProfileSection({ user }) {
+  const [profile, setProfile] = useState({
+    name: user?.name || "",
+    phone: user?.phone || ""
+  });
+  const [passwords, setPasswords] = useState({
+    currentPassword: "",
+    newPassword: ""
+  });
+
+  const saveProfile = async (e) => {
+    e.preventDefault();
+
+    try {
+      const data = await updateProfile(profile);
+      localStorage.setItem("user", JSON.stringify(data.user));
+      alert(data.message);
+    } catch (error) {
+      alert(error.response?.data?.message || "Profile update failed");
+    }
+  };
+
+  const savePassword = async (e) => {
+    e.preventDefault();
+
+    try {
+      const data = await changePassword(passwords);
+      setPasswords({ currentPassword: "", newPassword: "" });
+      alert(data.message);
+    } catch (error) {
+      alert(error.response?.data?.message || "Password change failed");
+    }
+  };
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-2">
+      <form onSubmit={saveProfile} className="rounded-lg border border-slate-200 p-5">
+        <h2 className="mb-4 flex items-center gap-2 text-lg font-bold"><User size={20} /> Patient Profile</h2>
+        <p className="mb-4 text-sm text-slate-500">Email: {user?.email}</p>
+        <Input value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} placeholder="Full name" className="mb-3 w-full" />
+        <Input value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} placeholder="Phone number" className="mb-3 w-full" />
+        <button className="rounded-md bg-blue-600 px-4 py-2 text-sm font-bold text-white">Update Profile</button>
+      </form>
+
+      <form onSubmit={savePassword} className="rounded-lg border border-slate-200 p-5">
+        <h2 className="mb-4 text-lg font-bold">Change Password</h2>
+        <Input type="password" value={passwords.currentPassword} onChange={(e) => setPasswords({ ...passwords, currentPassword: e.target.value })} placeholder="Current password" className="mb-3 w-full" />
+        <Input type="password" value={passwords.newPassword} onChange={(e) => setPasswords({ ...passwords, newPassword: e.target.value })} placeholder="New password" className="mb-3 w-full" />
+        <button className="rounded-md bg-slate-900 px-4 py-2 text-sm font-bold text-white">Change Password</button>
+      </form>
     </div>
   );
 }

@@ -83,10 +83,61 @@ const getBookings = async (req, res) => {
 
 const getReports = async (req, res) => {
   try {
-    const reports = await Report.find({ userId: req.user._id }).sort({ createdAt: -1 });
+    const reports = await Report.find({ userId: req.user._id, status: "Approved" }).sort({ approvedAt: -1 });
     res.json(reports);
   } catch (error) {
     res.status(500).json({ message: "Error fetching reports" });
+  }
+};
+
+const downloadReport = async (req, res) => {
+  try {
+    const report = await Report.findOne({
+      _id: req.params.reportId,
+      userId: req.user._id,
+      status: "Approved"
+    }).populate("bookingId");
+
+    if (!report) {
+      return res.status(404).json({ message: "Report not found or not ready" });
+    }
+
+    const doc = new PDFDocument({ margin: 50 });
+    const filename = `report-${report.bookingId.bookingCode || report._id}.pdf`;
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
+
+    doc.pipe(res);
+    doc.fontSize(20).text("INDIPATH Super Speciality Lab", { align: "center" });
+    doc.fontSize(10).text("Lab logo placeholder", { align: "center" });
+    doc.moveDown(1);
+    doc.fontSize(16).text("Diagnostic Report", { align: "center" });
+    doc.moveDown(1.5);
+    doc.fontSize(11);
+    doc.text(`Patient Name: ${report.bookingId.name}`);
+    doc.text(`Phone: ${report.bookingId.phone}`);
+    doc.text(`Booking ID: ${report.bookingId.bookingCode}`);
+    doc.text(`Test: ${report.testName}`);
+    doc.text(`Report Approved: ${report.approvedAt ? report.approvedAt.toLocaleString("en-IN") : "N/A"}`);
+    doc.moveDown(1);
+    doc.fontSize(13).text("Test Results", { underline: true });
+    doc.moveDown(0.5);
+
+    report.results.forEach((result, index) => {
+      doc.fontSize(11).text(`${index + 1}. ${result.parameter}`);
+      doc.text(`   Value: ${result.value}${result.unit ? ` ${result.unit}` : ""}`);
+      doc.text(`   Reference Range: ${result.referenceRange || "N/A"}`);
+      doc.moveDown(0.3);
+    });
+
+    doc.moveDown(0.5);
+    doc.text(`Technician Remarks: ${report.technicianRemarks || "N/A"}`);
+    doc.moveDown(1);
+    doc.text(`Pathologist Signature: ${report.pathologistSignature}`);
+    doc.end();
+  } catch (error) {
+    res.status(500).json({ message: "Report download failed" });
   }
 };
 
@@ -134,4 +185,4 @@ const downloadReceipt = async (req, res) => {
   }
 };
 
-module.exports = { getTests, createBooking, getBookings, getReports, downloadReceipt };
+module.exports = { getTests, createBooking, getBookings, getReports, downloadReport, downloadReceipt };

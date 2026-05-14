@@ -130,7 +130,6 @@ function ReceptionistDashboard() {
                         <option value="Sample Collected">Sample Collected</option>
                         <option value="Processing">Processing</option>
                         <option value="Completed">Completed</option>
-                        <option value="Report Ready">Report Ready</option>
                       </select>
                     )}
                   </div>
