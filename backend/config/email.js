@@ -1,7 +1,13 @@
 const nodemailer = require("nodemailer");
 
 const hasMailConfig = () => {
-  return Boolean(process.env.EMAIL_HOST && process.env.EMAIL_USER && process.env.EMAIL_PASS);
+  return Boolean(
+    process.env.EMAIL_HOST &&
+    process.env.EMAIL_USER &&
+    process.env.EMAIL_PASS &&
+    !process.env.EMAIL_USER.includes("your_") &&
+    !process.env.EMAIL_PASS.includes("your_")
+  );
 };
 
 const createTransporter = () => {
@@ -33,4 +39,21 @@ const sendOtpEmail = async ({ to, subject, otp }) => {
   return { sent: true };
 };
 
-module.exports = { sendOtpEmail };
+const sendEmail = async ({ to, subject, text }) => {
+  if (!hasMailConfig()) {
+    console.log(`Email to ${to}: ${subject}\n${text}`);
+    return { sent: false };
+  }
+
+  const transporter = createTransporter();
+  await transporter.sendMail({
+    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+    to,
+    subject,
+    text
+  });
+
+  return { sent: true };
+};
+
+module.exports = { sendOtpEmail, sendEmail };

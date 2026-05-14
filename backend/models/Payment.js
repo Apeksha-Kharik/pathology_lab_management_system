@@ -6,7 +6,7 @@ const paymentSchema = new mongoose.Schema({
   amount: { type: Number, required: true },
   method: {
     type: String,
-    enum: ["cash", "upi", "card", "online"],
+    enum: ["cash", "upi", "card"],
     default: "cash"
   },
   status: {
@@ -14,7 +14,9 @@ const paymentSchema = new mongoose.Schema({
     enum: ["pending", "paid", "failed", "refunded"],
     default: "pending"
   },
-  transactionId: { type: String }
+  transactionId: { type: String },
+  receiptNumber: { type: String },
+  paidAt: { type: Date }
 }, { timestamps: true });
 
 module.exports = mongoose.model("Payment", paymentSchema);

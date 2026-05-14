@@ -7,6 +7,7 @@ import LoginPage from "./pages/loginPage";
 import ForgotPassword from "./pages/ForgotPassword";
 import PatientDashboard from "./pages/PatientDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
+import ReceptionistDashboard from "./pages/ReceptionistDashboard";
 import RoleDashboard from "./pages/RoleDashboard";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./context/AuthContext";
@@ -23,7 +24,7 @@ function App() {
 
           <Route path="/patient_dashboard" element={<ProtectedRoute allowedRoles={["patient"]}><PatientDashboard /></ProtectedRoute>} />
           <Route path="/admin" element={<ProtectedRoute allowedRoles={["admin"]}><AdminDashboard /></ProtectedRoute>} />
-          <Route path="/receptionist" element={<ProtectedRoute allowedRoles={["receptionist"]}><RoleDashboard title="Receptionist Dashboard" /></ProtectedRoute>} />
+          <Route path="/receptionist" element={<ProtectedRoute allowedRoles={["receptionist"]}><ReceptionistDashboard /></ProtectedRoute>} />
           <Route path="/technician" element={<ProtectedRoute allowedRoles={["technician"]}><RoleDashboard title="Technician Dashboard" /></ProtectedRoute>} />
           <Route path="/pathologist" element={<ProtectedRoute allowedRoles={["pathologist"]}><RoleDashboard title="Pathologist Dashboard" /></ProtectedRoute>} />
         </Routes>

@@ -1,131 +1,202 @@
-import React, { useState, useEffect } from "react";
-import axios from "axios";
+import React, { useEffect, useMemo, useState } from "react";
+import { Download, FileText, LogOut, Search, TestTube2 } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import {
+  createBooking,
+  downloadReceipt,
+  getBookings,
+  getReports,
+  getTests
+} from "../services/patientService";
 
 function PatientDashboard() {
-  const [active, setActive] = useState("book");
+  const { user, logout } = useAuth();
+  const [active, setActive] = useState("tests");
   const [tests, setTests] = useState([]);
+  const [bookings, setBookings] = useState([]);
+  const [reports, setReports] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTest, setSelectedTest] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const loadDashboard = async () => {
+    try {
+      setLoading(true);
+      const [testsData, bookingsData, reportsData] = await Promise.all([
+        getTests(),
+        getBookings(),
+        getReports()
+      ]);
+      setTests(testsData || []);
+      setBookings(bookingsData || []);
+      setReports(reportsData || []);
+    } catch (error) {
+      alert(error.response?.data?.message || "Unable to load patient dashboard");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchTests = async () => {
-      try {
-        const res = await axios.get('http://localhost:5000/api/admin/tests');
-        setTests(res.data || []);
-      } catch (err) {
-        console.error("Error fetching tests", err);
-      }
-    };
-    fetchTests();
+    loadDashboard();
   }, []);
 
+  const filteredTests = useMemo(() => {
+    const search = searchTerm.toLowerCase();
+    return tests.filter((test) => {
+      return (
+        test.testName?.toLowerCase().includes(search) ||
+        test.category?.toLowerCase().includes(search)
+      );
+    });
+  }, [tests, searchTerm]);
+
+  const notifications = useMemo(() => {
+    const pendingBookings = bookings.filter((booking) => booking.bookingStatus === "Pending Approval").length;
+    const unpaidBookings = bookings.filter((booking) => booking.paymentStatus === "Unpaid").length;
+    const latestReport = reports[0];
+
+    return [
+      pendingBookings ? `${pendingBookings} booking pending approval` : "No pending booking requests",
+      unpaidBookings ? `${unpaidBookings} payment pending` : "No pending payments",
+      latestReport ? `Latest report available: ${latestReport.testName || "Lab report"}` : "No reports uploaded yet"
+    ];
+  }, [bookings, reports]);
+
   const handleLogout = () => {
-    localStorage.clear(); // Clear everything to prevent role ghosting
+    logout();
     window.location.href = "/";
   };
 
-  // FIXED: Added safety checks to prevent "toLowerCase of undefined" crash
-  const filteredTests = tests.filter(test => {
-    const name = test?.testName?.toLowerCase() || "";
-    const cat = test?.category?.toLowerCase() || "";
-    const search = searchTerm.toLowerCase();
-    return name.includes(search) || cat.includes(search);
-  });
+  const handleBooked = async () => {
+    setSelectedTest(null);
+    setActive("history");
+    await loadDashboard();
+  };
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-br from-[#E0ECFF] via-[#F8FAFF] to-[#EEF2FF] overflow-x-hidden">
-      <div className="absolute top-[-100px] left-[-100px] w-[300px] h-[300px] bg-blue-300 opacity-30 rounded-full blur-3xl"></div>
-      <div className="absolute bottom-[-120px] right-[-100px] w-[350px] h-[350px] bg-indigo-300 opacity-30 rounded-full blur-3xl"></div>
-
-      <div className="flex justify-between items-center px-10 py-5 bg-white/70 backdrop-blur-xl shadow-md border-b border-white/40 relative z-50 sticky top-0">
-        <h1 className="text-2xl font-bold text-[#1E3A8A]">🧪 IndiPath</h1>
-        <div className="flex gap-8 items-center font-medium">
-          <NavBtn text="Book" setActive={(val) => { setActive(val); setSelectedTest(null); }} />
-          <NavBtn text="History" setActive={setActive} />
-          <NavBtn text="Reports" setActive={setActive} />
-          <button onClick={handleLogout} className="bg-gradient-to-r from-[#1E3A8A] to-[#2563EB] text-white px-6 py-2 rounded-full shadow-md hover:scale-105 transition">
-            Logout
+    <div className="min-h-screen bg-slate-50 text-slate-900">
+      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest text-blue-600">INDIPATH Patient Portal</p>
+            <h1 className="text-2xl font-bold text-slate-900">Welcome, {user?.name || "Patient"}</h1>
+          </div>
+          <button onClick={handleLogout} className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700">
+            <LogOut size={18} /> Logout
           </button>
         </div>
+      </header>
+
+      <main className="mx-auto max-w-7xl px-6 py-8">
+        <section className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+          <SummaryCard label="Available Tests" value={tests.length} />
+          <SummaryCard label="Bookings" value={bookings.length} />
+          <SummaryCard label="Reports" value={reports.length} />
+        </section>
+
+        <section className="mb-8 rounded-lg border border-slate-200 bg-white p-5">
+          <h2 className="mb-3 text-lg font-bold text-slate-800">Notifications</h2>
+          <div className="grid gap-3 md:grid-cols-3">
+            {notifications.map((item) => (
+              <div key={item} className="rounded-md bg-blue-50 px-4 py-3 text-sm font-medium text-blue-900">
+                {item}
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <nav className="mb-6 flex flex-wrap gap-2">
+          <TabButton active={active === "tests"} onClick={() => { setActive("tests"); setSelectedTest(null); }}>Available Tests</TabButton>
+          <TabButton active={active === "history"} onClick={() => setActive("history")}>Booking History</TabButton>
+          <TabButton active={active === "payments"} onClick={() => setActive("payments")}>Payment Status</TabButton>
+          <TabButton active={active === "reports"} onClick={() => setActive("reports")}>Reports & Receipts</TabButton>
+        </nav>
+
+        {loading ? (
+          <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-slate-500">Loading dashboard...</div>
+        ) : (
+          <section className="rounded-lg border border-slate-200 bg-white p-6">
+            {active === "tests" && (
+              selectedTest ? (
+                <BookingForm test={selectedTest} onCancel={() => setSelectedTest(null)} onBooked={handleBooked} />
+              ) : (
+                <AvailableTests tests={filteredTests} searchTerm={searchTerm} setSearchTerm={setSearchTerm} onBook={setSelectedTest} />
+              )
+            )}
+
+            {active === "history" && <BookingHistory bookings={bookings} />}
+            {active === "payments" && <PaymentStatus bookings={bookings} />}
+            {active === "reports" && <ReportsAndReceipts bookings={bookings} reports={reports} />}
+          </section>
+        )}
+      </main>
+    </div>
+  );
+}
+
+function SummaryCard({ label, value }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-5">
+      <p className="text-xs font-bold uppercase tracking-widest text-slate-500">{label}</p>
+      <p className="mt-2 text-3xl font-black text-blue-700">{value}</p>
+    </div>
+  );
+}
+
+function TabButton({ active, children, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`rounded-md px-4 py-2 text-sm font-bold ${active ? "bg-blue-600 text-white" : "bg-white text-slate-600 hover:bg-slate-100"}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function AvailableTests({ tests, searchTerm, setSearchTerm, onBook }) {
+  return (
+    <div>
+      <div className="mb-6 flex items-center gap-3 rounded-md border border-slate-200 px-4 py-3">
+        <Search size={18} className="text-slate-400" />
+        <input
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Search tests by name or category"
+          className="w-full outline-none"
+        />
       </div>
 
-      {active === "book" && !selectedTest && (
-        <div className="px-10 pt-10 relative z-10 max-w-4xl mx-auto">
-          <input 
-            type="text" 
-            placeholder="🔍 Search for tests (e.g. CBC, Blood, Glucose)..." 
-            className="w-full p-4 rounded-2xl border-2 border-white bg-white/80 backdrop-blur-md shadow-lg outline-none focus:border-blue-400 transition-all text-lg"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-      )}
-
-      <div className="px-10 py-8 relative z-10">
-        <h2 className="text-4xl font-extrabold text-gray-800 mb-2 tracking-tight">
-          {selectedTest ? `Booking ${selectedTest.testName}` : "Welcome back 👋"}
-        </h2>
-        <p className="text-gray-500 text-lg">
-          {selectedTest ? "Please fill in the details below to confirm" : "Manage your health journey easily"}
-        </p>
-      </div>
-
-      <div className="px-10 pb-20 relative z-10">
-        <div className="bg-white/60 backdrop-blur-xl p-8 rounded-3xl shadow-xl border border-white/40">
-          
-          {active === "book" && (
-            selectedTest ? (
-              <div>
-                <button onClick={() => setSelectedTest(null)} className="mb-4 text-blue-600 font-bold hover:underline">← Back to available tests</button>
-                <BookTest prefilledTest={selectedTest.testName} onComplete={() => { setSelectedTest(null); setActive("history"); }} />
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredTests.length > 0 ? (
-                  filteredTests.map((test) => (
-                    <div key={test._id} className="bg-white p-6 rounded-2xl border border-white shadow-sm hover:shadow-xl hover:-translate-y-1 transition duration-300">
-                      <div className="flex justify-between items-start mb-2">
-                        <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded-full uppercase">{test.category}</span>
-                      </div>
-                      <h3 className="text-xl font-bold text-[#1E3A8A]">{test.testName}</h3>
-                      <p className="text-gray-500 text-sm mt-2 mb-4 line-clamp-2">{test.description || "Full diagnostic lab report."}</p>
-                      <div className="flex justify-between items-center border-t pt-4">
-                        <span className="text-2xl font-black text-gray-800">₹{test.price}</span>
-                        <button 
-                          onClick={() => setSelectedTest(test)}
-                          className="bg-blue-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-blue-700 transition"
-                        >
-                          Book Now
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <p className="col-span-full text-center py-10 text-gray-400">No tests matching your search.</p>
-                )}
-              </div>
-            )
-          )}
-
-          {active === "history" && <History />}
-          {active === "reports" && <Reports />}
-        </div>
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+        {tests.length ? tests.map((test) => (
+          <div key={test._id} className="rounded-lg border border-slate-200 p-5">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <TestTube2 className="mt-1 text-blue-600" size={24} />
+              <span className="rounded bg-slate-100 px-2 py-1 text-xs font-bold uppercase text-slate-500">{test.category}</span>
+            </div>
+            <h3 className="text-lg font-bold text-slate-900">{test.testName}</h3>
+            <p className="mt-2 min-h-12 text-sm text-slate-500">{test.description || "Diagnostic lab test with verified reporting."}</p>
+            <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
+              <span className="text-xl font-black text-slate-900">INR {test.price}</span>
+              <button onClick={() => onBook(test)} className="rounded-md bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700">
+                Book
+              </button>
+            </div>
+          </div>
+        )) : (
+          <p className="col-span-full py-8 text-center text-slate-500">No tests found.</p>
+        )}
       </div>
     </div>
   );
 }
 
-function NavBtn({ text, setActive }) {
-  return (
-    <button onClick={() => setActive(text.toLowerCase())} className="text-gray-600 hover:text-blue-600 transition hover:scale-105">
-      {text}
-    </button>
-  );
-}
-
-function BookTest({ prefilledTest, onComplete }) {
+function BookingForm({ test, onCancel, onBooked }) {
   const [form, setForm] = useState({
-    name: "", testName: prefilledTest || "", age: "", phone: "", email: "", date: "", homeSample: false
+    bookingDate: "",
+    timeSlot: "",
+    notes: ""
   });
 
   const handleChange = (e) => {
@@ -133,74 +204,192 @@ function BookTest({ prefilledTest, onComplete }) {
     setForm({ ...form, [name]: type === "checkbox" ? checked : value });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.name || !form.age || !form.phone || !form.date) {
-      alert("Please fill all required fields ❌");
+
+    if (!form.bookingDate || !form.timeSlot) {
+      alert("Please select preferred date and time slot");
       return;
     }
-    let history = JSON.parse(localStorage.getItem("history")) || [];
-    history.push({ ...form, status: "Pending" });
-    localStorage.setItem("history", JSON.stringify(history));
-    alert("Test Booked Successfully ✅");
-    onComplete();
+
+    try {
+      const data = await createBooking({ ...form, testId: test._id });
+      alert(data.message);
+      onBooked();
+    } catch (error) {
+      alert(error.response?.data?.message || "Booking failed");
+    }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-5">
-      <div className="col-span-2 p-3 bg-blue-50 border border-blue-100 rounded-xl">
-        <label className="text-xs font-bold text-blue-400 uppercase">Selected Test</label>
-        <p className="text-lg font-bold text-blue-900">{form.testName}</p>
-      </div>
-      <Input name="name" placeholder="Patient Full Name" value={form.name} onChange={handleChange} />
-      <Input name="age" placeholder="Age" type="number" value={form.age} onChange={handleChange} />
-      <Input name="phone" placeholder="Phone Number" value={form.phone} onChange={handleChange} />
-      <Input name="email" placeholder="Email (Optional)" value={form.email} onChange={handleChange} />
-      <Input type="date" name="date" value={form.date} onChange={handleChange} className="col-span-2 p-3 rounded-xl border border-gray-300" />
-      <label className="col-span-2 flex gap-2 text-gray-600 items-center bg-white/50 p-3 rounded-xl">
-        <input type="checkbox" name="homeSample" checked={form.homeSample} onChange={handleChange} className="w-5 h-5" />
-        Request Home Sample Collection
-      </label>
-      <button className="col-span-2 bg-gradient-to-r from-[#2563EB] to-[#1E3A8A] text-white p-4 rounded-xl shadow-lg hover:shadow-2xl hover:scale-105 transition duration-300 font-bold text-lg">
-        Confirm Appointment
-      </button>
-    </form>
-  );
-}
-
-function Input({ className, ...props }) {
-  return <input {...props} className={`p-3 rounded-xl border border-gray-300 bg-white/80 focus:ring-2 focus:ring-blue-400 outline-none shadow-sm transition ${className}`} />;
-}
-
-function History() {
-  const history = JSON.parse(localStorage.getItem("history")) || [];
-  return (
     <div>
-      <h2 className="text-xl font-bold text-[#1E3A8A] mb-5">Your Booking History</h2>
-      {history.length === 0 ? <p className="text-gray-500">No previous bookings found.</p> : (
-        <div className="space-y-4">
-          {history.map((item, i) => (
-            <div key={i} className="p-4 bg-white/80 rounded-2xl border shadow-sm flex justify-between items-center">
-              <div>
-                <p className="font-bold text-gray-800">{item.testName}</p>
-                <p className="text-sm text-gray-500">Scheduled: {item.date}</p>
-              </div>
-              <span className="bg-green-100 text-green-700 text-xs font-bold px-3 py-1 rounded-full uppercase">Confirmed</span>
-            </div>
-          ))}
-        </div>
-      )}
+      <button onClick={onCancel} className="mb-5 text-sm font-bold text-blue-600 hover:underline">Back to tests</button>
+      <div className="mb-5 rounded-md bg-blue-50 p-4">
+        <p className="text-xs font-bold uppercase text-blue-500">Selected Test</p>
+        <h2 className="text-xl font-bold text-blue-950">{test.testName}</h2>
+        <p className="text-sm text-blue-800">Amount: INR {test.price}</p>
+      </div>
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <Input name="selectedTest" value={test.testName} readOnly className="bg-slate-50" />
+        <Input name="bookingDate" type="date" value={form.bookingDate} onChange={handleChange} />
+        <select
+          name="timeSlot"
+          value={form.timeSlot}
+          onChange={handleChange}
+          className="rounded-md border border-slate-200 p-3 outline-none focus:border-blue-500 md:col-span-2"
+        >
+          <option value="">Preferred time slot</option>
+          <option value="09:00 AM - 11:00 AM">09:00 AM - 11:00 AM</option>
+          <option value="11:00 AM - 01:00 PM">11:00 AM - 01:00 PM</option>
+          <option value="02:00 PM - 04:00 PM">02:00 PM - 04:00 PM</option>
+          <option value="04:00 PM - 06:00 PM">04:00 PM - 06:00 PM</option>
+        </select>
+        <textarea
+          name="notes"
+          placeholder="Additional notes"
+          value={form.notes}
+          onChange={handleChange}
+          className="min-h-28 rounded-md border border-slate-200 p-3 outline-none focus:border-blue-500 md:col-span-2"
+        />
+        <button className="rounded-md bg-blue-600 p-3 font-bold text-white hover:bg-blue-700 md:col-span-2">Submit Booking Request</button>
+      </form>
     </div>
   );
 }
 
-function Reports() {
+function BookingHistory({ bookings }) {
+  if (!bookings.length) return <EmptyState text="No booking history yet." />;
+
   return (
-    <div className="text-center py-10">
-      <h2 className="text-xl font-bold text-[#1E3A8A] mb-5">Medical Reports</h2>
-      <p className="text-gray-500 italic text-lg">No reports generated yet 📄</p>
+    <div className="space-y-4">
+      {bookings.map((booking) => (
+        <BookingRow key={booking._id} booking={booking} />
+      ))}
     </div>
   );
+}
+
+function PaymentStatus({ bookings }) {
+  if (!bookings.length) return <EmptyState text="No payments to show yet." />;
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-left text-sm">
+        <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+          <tr>
+            <th className="p-3">Test</th>
+            <th className="p-3">Amount</th>
+            <th className="p-3">Payment</th>
+            <th className="p-3">Booking</th>
+          </tr>
+        </thead>
+        <tbody>
+          {bookings.map((booking) => (
+            <tr key={booking._id} className="border-t border-slate-100">
+              <td className="p-3 font-semibold">{booking.testName}</td>
+              <td className="p-3">INR {booking.amount}</td>
+              <td className="p-3"><StatusBadge value={booking.paymentStatus} /></td>
+              <td className="p-3"><StatusBadge value={booking.bookingStatus || booking.status} /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function ReportsAndReceipts({ bookings, reports }) {
+  return (
+    <div className="grid gap-6 lg:grid-cols-2">
+      <div>
+        <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-slate-800"><FileText size={20} /> Download Report</h2>
+        {reports.length ? reports.map((report) => (
+          <a
+            key={report._id}
+            href={report.reportUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="mb-3 flex items-center justify-between rounded-md border border-slate-200 p-4 text-sm font-semibold text-blue-700"
+          >
+            {report.testName || "Lab report"} <Download size={16} />
+          </a>
+        )) : <EmptyState text="No reports uploaded yet." />}
+      </div>
+
+      <div>
+        <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-slate-800"><Download size={20} /> Download Receipt</h2>
+        {bookings.length ? bookings.map((booking) => (
+          <ReceiptButton key={booking._id} booking={booking} />
+        )) : <EmptyState text="No receipts available yet." />}
+      </div>
+    </div>
+  );
+}
+
+function ReceiptButton({ booking }) {
+  const handleDownload = async () => {
+    try {
+      const blob = await downloadReceipt(booking._id);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `receipt-${booking.bookingCode || booking._id}.pdf`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      alert(error.response?.data?.message || "Receipt download failed");
+    }
+  };
+
+  return (
+    <button
+      onClick={handleDownload}
+      disabled={booking.paymentStatus !== "Paid"}
+      className="mb-3 flex w-full items-center justify-between rounded-md border border-slate-200 p-4 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      {booking.testName} {booking.paymentStatus === "Paid" ? <Download size={16} /> : <span className="text-xs">Unpaid</span>}
+    </button>
+  );
+}
+
+function BookingRow({ booking }) {
+  return (
+    <div className="rounded-md border border-slate-200 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-bold uppercase text-slate-400">{booking.bookingCode}</p>
+          <p className="font-bold text-slate-900">{booking.testName}</p>
+          <p className="text-sm text-slate-500">Requested: {booking.bookingDate || booking.date} | {booking.timeSlot}</p>
+          <p className="text-sm text-slate-500">Amount: INR {booking.amount}</p>
+          {booking.notes && <p className="text-sm text-slate-500">Notes: {booking.notes}</p>}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <StatusBadge value={booking.bookingStatus || booking.status} />
+          <StatusBadge value={booking.paymentStatus} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatusBadge({ value }) {
+  const isGood = value === "Paid" || value === "Completed" || value === "Confirmed" || value === "Report Ready";
+  const isWarning = value === "Pending Approval" || value === "Unpaid" || value === "Processing" || value === "Sample Collected";
+  const classes = isGood
+    ? "bg-green-100 text-green-700"
+    : isWarning
+      ? "bg-amber-100 text-amber-700"
+      : "bg-slate-100 text-slate-700";
+
+  return <span className={`rounded px-2 py-1 text-xs font-bold uppercase ${classes}`}>{value}</span>;
+}
+
+function Input({ className = "", ...props }) {
+  return <input {...props} className={`rounded-md border border-slate-200 p-3 outline-none focus:border-blue-500 ${className}`} />;
+}
+
+function EmptyState({ text }) {
+  return <div className="rounded-md bg-slate-50 p-6 text-center text-sm text-slate-500">{text}</div>;
 }
 
 export default PatientDashboard;
