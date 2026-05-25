@@ -1,9 +1,10 @@
 import React from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { roleRoutes, useAuth } from "../context/AuthContext";
 
 function ProtectedRoute({ children, allowedRoles }) {
   const { user } = useAuth();
+  const location = useLocation();
   const token = localStorage.getItem("token");
 
   if (!user || !token) {
@@ -12,6 +13,10 @@ function ProtectedRoute({ children, allowedRoles }) {
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     return <Navigate to={roleRoutes[user.role] || "/login"} />;
+  }
+
+  if (user.mustChangePassword && location.pathname !== "/change-password") {
+    return <Navigate to="/change-password" />;
   }
 
   return children;

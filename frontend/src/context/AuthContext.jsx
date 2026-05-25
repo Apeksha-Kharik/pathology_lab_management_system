@@ -6,9 +6,9 @@ const AuthContext = createContext(null);
 export const roleRoutes = {
   admin: "/admin",
   patient: "/patient_dashboard",
-  receptionist: "/receptionist",
-  technician: "/technician",
-  pathologist: "/pathologist"
+  receptionist: "/receptionist/dashboard",
+  technician: "/technician/dashboard",
+  pathologist: "/pathologist/dashboard"
 };
 
 export function AuthProvider({ children }) {

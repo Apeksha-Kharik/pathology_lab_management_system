@@ -4,6 +4,7 @@ const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   phone: { type: String, required: true },
+  qualification: { type: String },
   password: { type: String, required: true },
   role: { 
       type: String, 
@@ -12,6 +13,7 @@ const userSchema = new mongoose.Schema({
       lowercase: true
   },
   isVerified: { type: Boolean, default: false },
+  mustChangePassword: { type: Boolean, default: false },
   otp: { type: String },
   otpExpiry: { type: Date },
   resetPasswordVerified: { type: Boolean, default: false },

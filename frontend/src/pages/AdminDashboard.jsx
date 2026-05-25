@@ -12,7 +12,7 @@ const AdminDashboard = () => {
 
     const [testForm, setTestForm] = useState({ testName: '', price: '', category: '', conditions: '', description: '' });
     const [userForm, setUserForm] = useState({
-        name: '', email: '', password: '', phone: '', role: 'technician'
+        name: '', email: '', password: '', phone: '', qualification: '', role: 'technician'
     });
 
     const fetchData = async () => {
@@ -38,7 +38,7 @@ const AdminDashboard = () => {
         try {
             const response = await api.post('/api/admin/users', userForm);
             alert(response.data.message);
-            setUserForm({ name: '', email: '', password: '', phone: '', role: 'technician' });
+            setUserForm({ name: '', email: '', password: '', phone: '', qualification: '', role: 'technician' });
             setView('dashboard');
             fetchData();
         } catch (err) {
@@ -98,9 +98,9 @@ const AdminDashboard = () => {
 };
 
     return (
-        <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
+        <div className="flex min-h-screen flex-col bg-slate-50 font-sans text-slate-900 lg:flex-row">
             {/* Sidebar */}
-            <div className="w-72 bg-[#1e3a5f] text-white flex flex-col shadow-xl sticky top-0 h-screen">
+            <div className="w-full bg-[#1e3a5f] text-white flex flex-col shadow-xl lg:sticky lg:top-0 lg:h-screen lg:w-72">
                 <div className="p-6">
                     <div className="flex items-center gap-3 mb-10">
                         <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center shadow-lg">
@@ -111,11 +111,38 @@ const AdminDashboard = () => {
                             <p className="text-[10px] text-blue-300 uppercase font-bold tracking-widest">Admin Systems</p>
                         </div>
                     </div>
-                    <nav className="flex flex-col gap-2">
+                    <nav className="flex gap-2 overflow-x-auto pb-2 lg:flex-col lg:overflow-visible lg:pb-0">
                         <SidebarBtn active={view === 'dashboard'} onClick={() => setView('dashboard')} icon={<LayoutDashboard className="w-5 h-5" />} text="Dashboard" />
                         <SidebarBtn active={view === 'availableTests'} onClick={() => setView('availableTests')} icon={<FlaskConical className="w-5 h-5" />} text="Available Tests" />
                         <SidebarBtn active={view === 'addTest'} onClick={() => setView('addTest')} icon={<TestTube2 className="w-5 h-5" />} text="Add New Test" />
                         <SidebarBtn active={view === 'addUser'} onClick={() => setView('addUser')} icon={<UserPlus className="w-5 h-5" />} text="Add Staff User" />
+                        <SidebarBtn
+                            active={view === 'addTechnician'}
+                            onClick={() => {
+                                setUserForm({ name: '', email: '', password: '', phone: '', qualification: '', role: 'technician' });
+                                setView('addTechnician');
+                            }}
+                            icon={<UserPlus className="w-5 h-5" />}
+                            text="Add Technician"
+                        />
+                        <SidebarBtn
+                            active={view === 'addReceptionist'}
+                            onClick={() => {
+                                setUserForm({ name: '', email: '', password: '', phone: '', qualification: '', role: 'receptionist' });
+                                setView('addReceptionist');
+                            }}
+                            icon={<UserPlus className="w-5 h-5" />}
+                            text="Add Receptionist"
+                        />
+                        <SidebarBtn
+                            active={view === 'addPathologist'}
+                            onClick={() => {
+                                setUserForm({ name: '', email: '', password: '', phone: '', qualification: '', role: 'pathologist' });
+                                setView('addPathologist');
+                            }}
+                            icon={<UserPlus className="w-5 h-5" />}
+                            text="Add Pathologist"
+                        />
                     </nav>
                 </div>
                 <div className="mt-auto p-6">
@@ -127,7 +154,7 @@ const AdminDashboard = () => {
             </div>
 
             {/* Content Area */}
-            <div className="flex-1 p-8 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
                 
                 {view === 'dashboard' && (
                     <div className="space-y-8 animate-in fade-in duration-500">
@@ -142,7 +169,7 @@ const AdminDashboard = () => {
                             <StatsCard title="Staff Count" value={users.filter(u => u.role !== 'patient').length} icon={<Shield />} color="bg-blue-400" />
                         </div>
 
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
                             <div className="p-5 border-b border-slate-100 flex justify-between items-center text-[#1e3a5f]">
                                 <h3 className="font-bold">System Users</h3>
                             </div>
@@ -170,7 +197,7 @@ const AdminDashboard = () => {
 
                 {view === 'availableTests' && (
                     <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
-                        <div className="flex justify-between items-end">
+                        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
                             <div>
                                 <h1 className="text-3xl font-bold text-[#1e3a5f]">Test Catalog</h1>
                                 <p className="text-slate-500">Manage all diagnostic offerings</p>
@@ -210,8 +237,8 @@ const AdminDashboard = () => {
                 {view === 'addTest' && (
                     <div className="max-w-2xl mx-auto space-y-8">
                         <h1 className="text-3xl font-bold text-[#1e3a5f] text-center">Create Lab Test</h1>
-                        <form onSubmit={handleAddTest} className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
-                            <div className="grid grid-cols-2 gap-6">
+                        <form onSubmit={handleAddTest} className="bg-white p-5 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+                            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                                 <FormInput label="Test Name" value={testForm.testName} onChange={(e) => setTestForm({...testForm, testName: e.target.value})} required />
                                 <FormInput label="Price (INR)" type="number" value={testForm.price} onChange={(e) => setTestForm({...testForm, price: e.target.value})} required />
                             </div>
@@ -231,15 +258,18 @@ const AdminDashboard = () => {
                 {view === 'addUser' && (
                     <div className="max-w-2xl mx-auto space-y-8">
                         <h1 className="text-3xl font-bold text-[#1e3a5f] text-center">Staff Registration</h1>
-                        <form onSubmit={handleAddUser} className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
-                            <div className="grid grid-cols-2 gap-6">
+                        <form onSubmit={handleAddUser} className="bg-white p-5 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+                            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                                 <FormInput label="Full Name" value={userForm.name} onChange={(e) => setUserForm({...userForm, name: e.target.value})} required />
                                 <FormInput label="Email" type="email" value={userForm.email} onChange={(e) => setUserForm({...userForm, email: e.target.value})} required />
                             </div>
-                            <div className="grid grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                                 <FormInput label="Password" type="password" value={userForm.password} onChange={(e) => setUserForm({...userForm, password: e.target.value})} required />
                                 <FormInput label="Phone" value={userForm.phone} onChange={(e) => setUserForm({...userForm, phone: e.target.value})} required />
                             </div>
+                            {userForm.role === 'pathologist' && (
+                                <FormInput label="Qualification" value={userForm.qualification} onChange={(e) => setUserForm({...userForm, qualification: e.target.value})} required />
+                            )}
                             <div className="space-y-2">
                                 <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Role</label>
                                 <select className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none focus:ring-2 focus:ring-blue-500"
@@ -254,13 +284,65 @@ const AdminDashboard = () => {
                         </form>
                     </div>
                 )}
+
+                {view === 'addReceptionist' && (
+                    <div className="max-w-2xl mx-auto space-y-8">
+                        <h1 className="text-3xl font-bold text-[#1e3a5f] text-center">Add Receptionist</h1>
+                        <form onSubmit={handleAddUser} className="bg-white p-5 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+                            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                                <FormInput label="Receptionist Name" value={userForm.name} onChange={(e) => setUserForm({...userForm, name: e.target.value, role: 'receptionist'})} required />
+                                <FormInput label="Email" type="email" value={userForm.email} onChange={(e) => setUserForm({...userForm, email: e.target.value, role: 'receptionist'})} required />
+                            </div>
+                            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                                <FormInput label="Phone" value={userForm.phone} onChange={(e) => setUserForm({...userForm, phone: e.target.value, role: 'receptionist'})} required />
+                                <FormInput label="Temporary Password" type="password" value={userForm.password} onChange={(e) => setUserForm({...userForm, password: e.target.value, role: 'receptionist'})} required />
+                            </div>
+                            <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold hover:bg-blue-700 transition-all">Create Receptionist Account</button>
+                        </form>
+                    </div>
+                )}
+
+                {view === 'addTechnician' && (
+                    <div className="max-w-2xl mx-auto space-y-8">
+                        <h1 className="text-3xl font-bold text-[#1e3a5f] text-center">Add Technician</h1>
+                        <form onSubmit={handleAddUser} className="bg-white p-5 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+                            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                                <FormInput label="Technician Name" value={userForm.name} onChange={(e) => setUserForm({...userForm, name: e.target.value, role: 'technician'})} required />
+                                <FormInput label="Email" type="email" value={userForm.email} onChange={(e) => setUserForm({...userForm, email: e.target.value, role: 'technician'})} required />
+                            </div>
+                            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                                <FormInput label="Phone" value={userForm.phone} onChange={(e) => setUserForm({...userForm, phone: e.target.value, role: 'technician'})} required />
+                                <FormInput label="Temporary Password" type="password" value={userForm.password} onChange={(e) => setUserForm({...userForm, password: e.target.value, role: 'technician'})} required />
+                            </div>
+                            <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold hover:bg-blue-700 transition-all">Create Technician Account</button>
+                        </form>
+                    </div>
+                )}
+
+                {view === 'addPathologist' && (
+                    <div className="max-w-2xl mx-auto space-y-8">
+                        <h1 className="text-3xl font-bold text-[#1e3a5f] text-center">Add Pathologist</h1>
+                        <form onSubmit={handleAddUser} className="bg-white p-5 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+                            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                                <FormInput label="Pathologist Name" value={userForm.name} onChange={(e) => setUserForm({...userForm, name: e.target.value, role: 'pathologist'})} required />
+                                <FormInput label="Email" type="email" value={userForm.email} onChange={(e) => setUserForm({...userForm, email: e.target.value, role: 'pathologist'})} required />
+                            </div>
+                            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                                <FormInput label="Phone" value={userForm.phone} onChange={(e) => setUserForm({...userForm, phone: e.target.value, role: 'pathologist'})} required />
+                                <FormInput label="Qualification" value={userForm.qualification} onChange={(e) => setUserForm({...userForm, qualification: e.target.value, role: 'pathologist'})} required />
+                            </div>
+                            <FormInput label="Temporary Password" type="password" value={userForm.password} onChange={(e) => setUserForm({...userForm, password: e.target.value, role: 'pathologist'})} required />
+                            <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold hover:bg-blue-700 transition-all">Create Pathologist Account</button>
+                        </form>
+                    </div>
+                )}
             </div>
         </div>
     );
 };
 
 const SidebarBtn = ({ active, onClick, icon, text }) => (
-    <button onClick={onClick} className={`w-full flex items-center gap-4 p-4 rounded-xl transition-all duration-300 ${active ? 'bg-blue-500/20 text-white font-bold' : 'text-blue-200 hover:text-white hover:bg-white/5'}`}>
+    <button onClick={onClick} className={`flex min-w-max items-center gap-3 rounded-xl p-3 transition-all duration-300 lg:w-full lg:gap-4 lg:p-4 ${active ? 'bg-blue-500/20 text-white font-bold' : 'text-blue-200 hover:text-white hover:bg-white/5'}`}>
         {icon} <span className="text-sm tracking-wide">{text}</span>
     </button>
 );

@@ -16,6 +16,7 @@ const paymentSchema = new mongoose.Schema({
   },
   transactionId: { type: String },
   receiptNumber: { type: String },
+  paymentDate: { type: Date },
   paidAt: { type: Date }
 }, { timestamps: true });
 

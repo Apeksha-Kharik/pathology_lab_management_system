@@ -5,6 +5,21 @@ export const loginUser = async (credentials) => {
   return response.data;
 };
 
+export const loginReceptionist = async (credentials) => {
+  const response = await api.post("/receptionist/login", credentials);
+  return response.data;
+};
+
+export const loginTechnician = async (credentials) => {
+  const response = await api.post("/technician/login", credentials);
+  return response.data;
+};
+
+export const loginPathologist = async (credentials) => {
+  const response = await api.post("/pathologist/login", credentials);
+  return response.data;
+};
+
 export const registerUser = async (payload) => {
   const response = await api.post("/register", payload);
   return response.data;

@@ -31,6 +31,37 @@ html {
   scroll-behavior: smooth;
 }
 
+img,
+video,
+canvas,
+svg {
+  max-width: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+  max-width: 100%;
+}
+
+table {
+  min-width: 640px;
+}
+
+@media (max-width: 640px) {
+  body {
+    overflow-x: hidden;
+  }
+
+  input,
+  select,
+  textarea,
+  button {
+    font-size: 16px;
+  }
+}
+
 /* Scrollbar Styling for Dark Theme */
 ::-webkit-scrollbar {
   width: 8px;

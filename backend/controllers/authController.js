@@ -23,8 +23,10 @@ const buildUserResponse = (user) => ({
   name: user.name,
   email: user.email,
   phone: user.phone || user.get("mobile") || "",
+  qualification: user.qualification || "",
   role: normalizeRole(user.role),
-  isVerified: user.isVerified
+  isVerified: user.isVerified,
+  mustChangePassword: user.mustChangePassword
 });
 
 const generateOtp = () => String(Math.floor(100000 + Math.random() * 900000));
@@ -149,6 +151,102 @@ const login = async (req, res) => {
   }
 };
 
+const receptionistLogin = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user || normalizeRole(user.role) !== "receptionist") {
+      return res.status(401).json({ message: "Invalid receptionist credentials" });
+    }
+
+    const passwordMatches = await bcrypt.compare(password, user.password);
+    if (!passwordMatches) {
+      return res.status(401).json({ message: "Invalid receptionist credentials" });
+    }
+
+    if (user.isVerified === false) {
+      return res.status(403).json({ message: "Receptionist account is not active" });
+    }
+
+    res.json({
+      message: "Receptionist login successful",
+      token: createToken(user),
+      user: buildUserResponse(user)
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Receptionist login failed", error: error.message });
+  }
+};
+
+const technicianLogin = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user || normalizeRole(user.role) !== "technician") {
+      return res.status(401).json({ message: "Invalid technician credentials" });
+    }
+
+    const passwordMatches = await bcrypt.compare(password, user.password);
+    if (!passwordMatches) {
+      return res.status(401).json({ message: "Invalid technician credentials" });
+    }
+
+    if (user.isVerified === false) {
+      return res.status(403).json({ message: "Technician account is not active" });
+    }
+
+    res.json({
+      message: "Technician login successful",
+      token: createToken(user),
+      user: buildUserResponse(user)
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Technician login failed", error: error.message });
+  }
+};
+
+const pathologistLogin = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user || normalizeRole(user.role) !== "pathologist") {
+      return res.status(401).json({ message: "Invalid pathologist credentials" });
+    }
+
+    const passwordMatches = await bcrypt.compare(password, user.password);
+    if (!passwordMatches) {
+      return res.status(401).json({ message: "Invalid pathologist credentials" });
+    }
+
+    if (user.isVerified === false) {
+      return res.status(403).json({ message: "Pathologist account is not active" });
+    }
+
+    res.json({
+      message: "Pathologist login successful",
+      token: createToken(user),
+      user: buildUserResponse(user)
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Pathologist login failed", error: error.message });
+  }
+};
+
 const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
@@ -249,4 +347,4 @@ const resetPassword = async (req, res) => {
   }
 };
 
-module.exports = { register, verifyOtp, login, forgotPassword, verifyResetOtp, resetPassword, normalizeRole };
+module.exports = { register, verifyOtp, login, receptionistLogin, technicianLogin, pathologistLogin, forgotPassword, verifyResetOtp, resetPassword, normalizeRole };

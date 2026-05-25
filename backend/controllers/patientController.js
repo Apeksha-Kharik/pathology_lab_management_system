@@ -96,7 +96,7 @@ const downloadReport = async (req, res) => {
       _id: req.params.reportId,
       userId: req.user._id,
       status: "Approved"
-    }).populate("bookingId");
+    }).populate("bookingId").populate("pathologistId", "name qualification");
 
     if (!report) {
       return res.status(404).json({ message: "Report not found or not ready" });
@@ -116,6 +116,8 @@ const downloadReport = async (req, res) => {
     doc.moveDown(1.5);
     doc.fontSize(11);
     doc.text(`Patient Name: ${report.bookingId.name}`);
+    doc.text(`Age: ${report.bookingId.age || "N/A"}`);
+    doc.text(`Gender: ${report.bookingId.gender || "N/A"}`);
     doc.text(`Phone: ${report.bookingId.phone}`);
     doc.text(`Booking ID: ${report.bookingId.bookingCode}`);
     doc.text(`Test: ${report.testName}`);
@@ -127,14 +129,27 @@ const downloadReport = async (req, res) => {
     report.results.forEach((result, index) => {
       doc.fontSize(11).text(`${index + 1}. ${result.parameter}`);
       doc.text(`   Value: ${result.value}${result.unit ? ` ${result.unit}` : ""}`);
-      doc.text(`   Reference Range: ${result.referenceRange || "N/A"}`);
+      doc.text(`   Normal Range: ${result.normalRange || result.referenceRange || "N/A"}`);
       doc.moveDown(0.3);
     });
 
     doc.moveDown(0.5);
     doc.text(`Technician Remarks: ${report.technicianRemarks || "N/A"}`);
+    doc.text(`Pathologist Remarks: ${report.pathologistRemarks || "N/A"}`);
     doc.moveDown(1);
-    doc.text(`Pathologist Signature: ${report.pathologistSignature}`);
+    const pathologistName = report.pathologistId?.name || report.pathologistSignature || "Pathologist";
+    const qualification = report.pathologistId?.qualification || "";
+    doc.text(`Pathologist: ${pathologistName}${qualification ? ` (${qualification})` : ""}`);
+    doc.text(`Signature: ${report.pathologistSignature}`);
+    if (report.pathologistSignatureImage?.startsWith("data:image")) {
+      try {
+        const base64 = report.pathologistSignatureImage.split(",")[1];
+        doc.moveDown(0.5);
+        doc.image(Buffer.from(base64, "base64"), { width: 140 });
+      } catch (error) {
+        doc.text("Signature image unavailable");
+      }
+    }
     doc.end();
   } catch (error) {
     res.status(500).json({ message: "Report download failed" });

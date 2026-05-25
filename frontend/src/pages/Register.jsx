@@ -92,11 +92,12 @@ function RegisterPage() {
     }}>
       <div style={{
         backgroundColor: "rgba(255, 255, 255, 0.95)",
-        padding: "42px",
+        padding: "clamp(24px, 6vw, 42px)",
         borderRadius: "15px",
         boxShadow: "0 20px 40px rgba(0,0,0,0.2)",
         width: "100%",
-        maxWidth: "460px"
+        maxWidth: "460px",
+        boxSizing: "border-box"
       }}>
         <div style={{ textAlign: "center", marginBottom: "28px" }}>
           <h2 style={{ color: "#1a365d", fontSize: "28px", fontWeight: "700", margin: "0 0 10px 0" }}>

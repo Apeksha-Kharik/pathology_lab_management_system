@@ -45,6 +45,7 @@ const changePassword = async (req, res) => {
     }
 
     user.password = await bcrypt.hash(newPassword, 10);
+    user.mustChangePassword = false;
     await user.save();
 
     res.json({ message: "Password changed successfully" });

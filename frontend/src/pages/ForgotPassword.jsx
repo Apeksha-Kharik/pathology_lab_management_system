@@ -133,9 +133,10 @@ const cardStyle = {
   width: "100%",
   maxWidth: "420px",
   background: "rgba(255,255,255,0.95)",
-  padding: "42px",
+  padding: "clamp(24px, 6vw, 42px)",
   borderRadius: "16px",
-  boxShadow: "0 25px 50px rgba(0,0,0,0.3)"
+  boxShadow: "0 25px 50px rgba(0,0,0,0.3)",
+  boxSizing: "border-box"
 };
 
 const inputStyle = {

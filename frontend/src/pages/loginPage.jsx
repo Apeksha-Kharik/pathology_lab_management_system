@@ -110,10 +110,11 @@ const cardStyle = {
   width: "100%",
   maxWidth: "420px",
   background: "rgba(255,255,255,0.95)",
-  padding: "45px",
+  padding: "clamp(24px, 6vw, 45px)",
   borderRadius: "16px",
   boxShadow: "0 25px 50px rgba(0,0,0,0.3)",
-  backdropFilter: "blur(10px)"
+  backdropFilter: "blur(10px)",
+  boxSizing: "border-box"
 };
 
 const inputStyle = {

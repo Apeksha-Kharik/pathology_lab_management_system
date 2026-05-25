@@ -79,7 +79,7 @@ function PatientDashboard() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-blue-600">INDIPATH Patient Portal</p>
             <h1 className="text-2xl font-bold text-slate-900">Welcome, {user?.name || "Patient"}</h1>
@@ -90,7 +90,7 @@ function PatientDashboard() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-6 py-8">
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
         <section className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
           <SummaryCard label="Available Tests" value={tests.length} />
           <SummaryCard label="Bookings" value={bookings.length} />
@@ -434,6 +434,7 @@ function BookingRow({ booking }) {
           <p className="text-sm text-slate-500">Requested: {booking.bookingDate || booking.date} | {booking.timeSlot}</p>
           <p className="text-sm text-slate-500">Amount: INR {booking.amount}</p>
           {booking.notes && <p className="text-sm text-slate-500">Notes: {booking.notes}</p>}
+          {booking.rejectionReason && <p className="text-sm text-red-600">Rejection reason: {booking.rejectionReason}</p>}
         </div>
         <div className="flex flex-wrap gap-2">
           <StatusBadge value={booking.bookingStatus || booking.status} />
@@ -445,13 +446,15 @@ function BookingRow({ booking }) {
 }
 
 function StatusBadge({ value }) {
-  const isGood = value === "Paid" || value === "Completed" || value === "Confirmed" || value === "Report Ready";
-  const isWarning = value === "Pending Approval" || value === "Unpaid" || value === "Processing" || value === "Sample Collected";
+  const isGood = value === "Paid" || value === "Completed" || value === "Confirmed" || value === "Report Ready" || value === "Arrived";
+  const isWarning = value === "Pending Approval" || value === "Unpaid" || value === "Technician Assigned" || value === "Processing" || value === "Sample Collected" || value === "Pending Report Approval";
   const classes = isGood
     ? "bg-green-100 text-green-700"
-    : isWarning
-      ? "bg-amber-100 text-amber-700"
-      : "bg-slate-100 text-slate-700";
+    : value === "Rejected"
+      ? "bg-red-100 text-red-700"
+      : isWarning
+        ? "bg-amber-100 text-amber-700"
+        : "bg-slate-100 text-slate-700";
 
   return <span className={`rounded px-2 py-1 text-xs font-bold uppercase ${classes}`}>{value}</span>;
 }

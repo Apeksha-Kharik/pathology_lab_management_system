@@ -10,6 +10,16 @@ export const updateTechnicianStatus = async (bookingId, status) => {
   return response.data;
 };
 
+export const startTechnicianTest = async (bookingId) => {
+  const response = await api.patch(`/api/technician/bookings/${bookingId}/start`);
+  return response.data;
+};
+
+export const saveTechnicianReportDraft = async (bookingId, payload) => {
+  const response = await api.post(`/api/technician/bookings/${bookingId}/report/draft`, payload);
+  return response.data;
+};
+
 export const submitTechnicianReport = async (bookingId, payload) => {
   const response = await api.post(`/api/technician/bookings/${bookingId}/report`, payload);
   return response.data;
