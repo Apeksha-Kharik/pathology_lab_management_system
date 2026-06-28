@@ -92,3 +92,17 @@ table {
   background-color: rgba(255, 255, 255, 0.02);
   transition: background-color 0.2s ease;
 }
+
+.field-input {
+  width: 100%;
+  background: transparent;
+  color: #0f172a;
+  font-size: 0.875rem;
+  font-weight: 600;
+  outline: none;
+}
+
+.field-input::placeholder {
+  color: #94a3b8;
+  font-weight: 500;
+}

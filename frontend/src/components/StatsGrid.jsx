@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion as Motion } from 'framer-motion';
 import { Microscope, FileCheck, Users2, ShieldCheck } from 'lucide-react';
 
 const StatsGrid = () => {
@@ -26,7 +26,7 @@ const StatsGrid = () => {
         margin: '0 auto'
       }}>
         {stats.map((stat, i) => (
-          <motion.div
+          <Motion.div
             key={i}
             initial={{ opacity: 0, y: 40 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -78,7 +78,7 @@ const StatsGrid = () => {
             }}>
               {stat.label}
             </p>
-          </motion.div>
+          </Motion.div>
         ))}
       </div>
     </section>

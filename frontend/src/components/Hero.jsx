@@ -6,12 +6,10 @@ import bg3 from '../assets/bg3.png';
 
 const Hero = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [loaded, setLoaded] = useState(false);
 
   const slides = [bg1, bg2, bg3];
 
   useEffect(() => {
-    setLoaded(true);
     const interval = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % slides.length);
     }, 5000);
@@ -52,8 +50,8 @@ const Hero = () => {
         zIndex: 2, 
         padding: '0 8%', 
         color: 'white',
-        opacity: loaded ? 1 : 0,
-        transform: loaded ? 'translateY(0)' : 'translateY(30px)',
+        opacity: 1,
+        transform: 'translateY(0)',
         transition: 'all 1.2s cubic-bezier(0.2, 1, 0.3, 1) 0.5s'
       }}>
         <div style={{ 

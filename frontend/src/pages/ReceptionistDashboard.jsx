@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckCircle2, CreditCard, Download, LogOut, Plus, Search, UserCheck, XCircle } from "lucide-react";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 import {
   createWalkInBooking,
   assignTechnician,
@@ -24,7 +24,7 @@ function ReceptionistDashboard() {
 
   const today = new Date().toISOString().slice(0, 10);
 
-  const loadData = async (searchValue = search) => {
+  const loadData = useCallback(async (searchValue = "") => {
     try {
       setLoading(true);
       const [bookingData, testData, technicianData] = await Promise.all([
@@ -40,11 +40,11 @@ function ReceptionistDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadData("");
-  }, []);
+  }, [loadData]);
 
   const pendingBookings = useMemo(() => bookings.filter((booking) => booking.bookingStatus === "Pending Approval"), [bookings]);
   const todaysBookings = useMemo(() => bookings.filter((booking) => booking.bookingDate === today), [bookings, today]);
@@ -296,17 +296,20 @@ function WalkInModal({ tests, onClose, onCreated }) {
   const [form, setForm] = useState({
     name: "",
     phone: "",
+    age: "",
+    gender: "",
     testId: "",
     bookingDate: new Date().toISOString().slice(0, 10),
     timeSlot: "Walk-in",
+    sampleType: "",
     notes: ""
   });
 
   const submit = async (e) => {
     e.preventDefault();
 
-    if (!form.name || !form.phone || !form.testId || !form.bookingDate) {
-      alert("Patient name, phone, test and date are required");
+    if (!form.name || !form.phone || !form.age || !form.gender || !form.testId || !form.bookingDate) {
+      alert("Patient name, phone, age, gender, test and date are required");
       return;
     }
 
@@ -324,12 +327,23 @@ function WalkInModal({ tests, onClose, onCreated }) {
       <form onSubmit={submit} className="space-y-3">
         <Input placeholder="Patient name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
         <Input placeholder="Phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Input type="number" min="0" max="130" placeholder="Age" value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })} />
+          <select value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })} className="w-full rounded-md border border-slate-200 p-3">
+            <option value="">Gender</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+            <option value="Other">Other</option>
+            <option value="Prefer not to say">Prefer not to say</option>
+          </select>
+        </div>
         <select value={form.testId} onChange={(e) => setForm({ ...form, testId: e.target.value })} className="w-full rounded-md border border-slate-200 p-3">
           <option value="">Select test</option>
           {tests.map((test) => <option key={test._id} value={test._id}>{test.testName} - INR {test.price}</option>)}
         </select>
         <Input type="date" value={form.bookingDate} onChange={(e) => setForm({ ...form, bookingDate: e.target.value })} />
         <Input placeholder="Time slot" value={form.timeSlot} onChange={(e) => setForm({ ...form, timeSlot: e.target.value })} />
+        <Input placeholder="Sample type, if known" value={form.sampleType} onChange={(e) => setForm({ ...form, sampleType: e.target.value })} />
         <textarea placeholder="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="min-h-24 w-full rounded-md border border-slate-200 p-3" />
         <button className="w-full rounded-md bg-green-600 p-3 font-bold text-white">Create Confirmed Booking</button>
       </form>

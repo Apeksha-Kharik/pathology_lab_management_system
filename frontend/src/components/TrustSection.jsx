@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion as Motion } from 'framer-motion';
 import { ShieldCheck, Zap, Award, Microscope, CheckCircle2 } from 'lucide-react';
 
 const TrustSection = () => {
@@ -37,7 +37,7 @@ const TrustSection = () => {
     }}>
       
       {/* Left Side: Visual Card */}
-      <motion.div 
+      <Motion.div 
         initial={{ opacity: 0, x: -50 }}
         whileInView={{ opacity: 1, x: 0 }}
         viewport={{ once: true }}
@@ -79,11 +79,11 @@ const TrustSection = () => {
             "Our laboratory combines robotic automation with expert pathology to ensure every report is a benchmark of accuracy."
           </p>
         </div>
-      </motion.div>
+      </Motion.div>
 
       {/* Right Side: Content */}
       <div style={{ flex: '1 1 450px' }}>
-        <motion.div
+        <Motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
@@ -107,7 +107,7 @@ const TrustSection = () => {
             Setting the standard in <br />
             <span style={{ color: '#3182ce' }}>modern diagnostics.</span>
           </h2>
-        </motion.div>
+        </Motion.div>
 
         <div style={{ 
           display: 'grid', 
@@ -115,7 +115,7 @@ const TrustSection = () => {
           gap: '40px' 
         }}>
           {features.map((item, index) => (
-            <motion.div 
+            <Motion.div 
               key={index}
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -142,7 +142,7 @@ const TrustSection = () => {
               <p style={{ color: '#718096', fontSize: '0.85rem', lineHeight: '1.6' }}>
                 {item.desc}
               </p>
-            </motion.div>
+            </Motion.div>
           ))}
         </div>
 

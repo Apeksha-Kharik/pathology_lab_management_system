@@ -1,15 +1,6 @@
-import React, { createContext, useContext, useState } from "react";
+import React, { useState } from "react";
 import { loginUser } from "../services/authService";
-
-const AuthContext = createContext(null);
-
-export const roleRoutes = {
-  admin: "/admin",
-  patient: "/patient_dashboard",
-  receptionist: "/receptionist/dashboard",
-  technician: "/technician/dashboard",
-  pathologist: "/pathologist/dashboard"
-};
+import { AuthContext } from "./authCore";
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
@@ -37,5 +28,3 @@ export function AuthProvider({ children }) {
     </AuthContext.Provider>
   );
 }
-
-export const useAuth = () => useContext(AuthContext);

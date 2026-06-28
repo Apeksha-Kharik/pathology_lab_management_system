@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Download, FileText, LogOut, Search, TestTube2, User } from "lucide-react";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 import {
   createBooking,
   downloadReport,
@@ -200,6 +200,9 @@ function BookingForm({ test, onCancel, onBooked }) {
   const [form, setForm] = useState({
     bookingDate: "",
     timeSlot: "",
+    age: "",
+    gender: "",
+    sampleType: "",
     notes: ""
   });
 
@@ -211,8 +214,8 @@ function BookingForm({ test, onCancel, onBooked }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!form.bookingDate || !form.timeSlot) {
-      alert("Please select preferred date and time slot");
+    if (!form.bookingDate || !form.timeSlot || !form.age || !form.gender) {
+      alert("Please enter patient age, gender, preferred date and time slot");
       return;
     }
 
@@ -235,7 +238,21 @@ function BookingForm({ test, onCancel, onBooked }) {
       </div>
       <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Input name="selectedTest" value={test.testName} readOnly className="bg-slate-50" />
+        <Input name="age" type="number" min="0" max="130" placeholder="Patient age" value={form.age} onChange={handleChange} />
+        <select
+          name="gender"
+          value={form.gender}
+          onChange={handleChange}
+          className="rounded-md border border-slate-200 p-3 outline-none focus:border-blue-500"
+        >
+          <option value="">Gender</option>
+          <option value="Male">Male</option>
+          <option value="Female">Female</option>
+          <option value="Other">Other</option>
+          <option value="Prefer not to say">Prefer not to say</option>
+        </select>
         <Input name="bookingDate" type="date" value={form.bookingDate} onChange={handleChange} />
+        <Input name="sampleType" placeholder="Sample type, if known" value={form.sampleType} onChange={handleChange} />
         <select
           name="timeSlot"
           value={form.timeSlot}
@@ -383,9 +400,14 @@ function ProfileSection({ user }) {
       <form onSubmit={saveProfile} className="rounded-lg border border-slate-200 p-5">
         <h2 className="mb-4 flex items-center gap-2 text-lg font-bold"><User size={20} /> Patient Profile</h2>
         <p className="mb-4 text-sm text-slate-500">Email: {user?.email}</p>
-        <Input value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} placeholder="Full name" className="mb-3 w-full" />
-        <Input value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} placeholder="Phone number" className="mb-3 w-full" />
-        <button className="rounded-md bg-blue-600 px-4 py-2 text-sm font-bold text-white">Update Profile</button>
+        <div className="grid gap-3 md:grid-cols-2">
+          <Input value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} placeholder="Full name" className="w-full" />
+          <Input value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} placeholder="Phone number" className="w-full" />
+        </div>
+        <p className="my-4 rounded-md bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
+          Age, gender and sample details are captured during each test booking so every test request has accurate visit-specific information.
+        </p>
+        <button className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-800">Update Profile</button>
       </form>
 
       <form onSubmit={savePassword} className="rounded-lg border border-slate-200 p-5">

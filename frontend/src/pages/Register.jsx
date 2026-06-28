@@ -1,12 +1,18 @@
 import React, { useState } from "react";
+import { Eye, EyeOff, Mail, Phone, ShieldCheck, UserRound } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { registerUser, verifyOtp } from "../services/authService";
+import logo from "../assets/logo.png";
+import bg1 from "../assets/bg1.png";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function RegisterPage() {
+  const navigate = useNavigate();
   const [step, setStep] = useState("register");
   const [otp, setOtp] = useState("");
   const [message, setMessage] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -56,7 +62,7 @@ function RegisterPage() {
         password: formData.password
       });
 
-      setMessage(data.devOtp ? `${data.message} Dev OTP: ${data.devOtp}` : data.message);
+      setMessage(data.devOtp ? `${data.message} Local testing OTP: ${data.devOtp}` : data.message);
       setStep("otp");
     } catch (error) {
       alert(error.response?.data?.message || "Registration failed");
@@ -74,99 +80,133 @@ function RegisterPage() {
     try {
       const data = await verifyOtp({ email: formData.email, otp });
       alert(data.message);
-      window.location.href = "/login";
+      navigate("/login");
     } catch (error) {
       alert(error.response?.data?.message || "OTP verification failed");
     }
   };
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      background: "linear-gradient(135deg, #1a365d 0%, #2b6cb0 100%)",
-      fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif',
-      padding: "24px"
-    }}>
-      <div style={{
-        backgroundColor: "rgba(255, 255, 255, 0.95)",
-        padding: "clamp(24px, 6vw, 42px)",
-        borderRadius: "15px",
-        boxShadow: "0 20px 40px rgba(0,0,0,0.2)",
-        width: "100%",
-        maxWidth: "460px",
-        boxSizing: "border-box"
-      }}>
-        <div style={{ textAlign: "center", marginBottom: "28px" }}>
-          <h2 style={{ color: "#1a365d", fontSize: "28px", fontWeight: "700", margin: "0 0 10px 0" }}>
-            Patient Registration
-          </h2>
-          <p style={{ color: "#4a5568", fontSize: "15px", margin: 0 }}>
-            {step === "register" ? "Create your INDIPATH account" : "Verify your email OTP"}
-          </p>
+    <main className="grid min-h-screen bg-[#f4fbf7] text-slate-900 lg:grid-cols-[0.95fr_1.05fr]" style={{ fontFamily: "Segoe UI, Inter, system-ui, sans-serif" }}>
+      <section className="flex items-center justify-center px-4 py-10 sm:px-6 lg:px-10">
+        <div className="w-full max-w-lg">
+          <button onClick={() => navigate("/")} className="mb-8 flex items-center gap-3 text-left">
+            <img src={logo} alt="INDIPATH logo" className="h-12 w-12 rounded-lg object-contain" />
+            <span>
+              <span className="block text-xl font-extrabold text-emerald-950">INDIPATH</span>
+              <span className="block text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">Super Speciality Lab</span>
+            </span>
+          </button>
+
+          <div className="rounded-2xl border border-emerald-100 bg-white p-6 shadow-xl shadow-emerald-950/8 sm:p-8">
+            <div className="mb-7">
+              <p className="text-sm font-bold uppercase tracking-[0.2em] text-emerald-700">
+                {step === "register" ? "Patient registration" : "Email verification"}
+              </p>
+              <h2 className="mt-2 text-3xl font-extrabold tracking-tight text-emerald-950">
+                {step === "register" ? "Create patient account" : "Verify OTP"}
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                {step === "register"
+                  ? "Register once, then book tests and access approved reports from the patient portal."
+                  : `Enter the OTP sent to ${formData.email}.`}
+              </p>
+            </div>
+
+            {message && (
+              <div className="mb-5 rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-sm font-semibold leading-6 text-emerald-900">
+                {message}
+              </div>
+            )}
+
+            {step === "register" ? (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <Field icon={UserRound} label="Full name">
+                  <input name="name" value={formData.name} onChange={handleChange} placeholder="Patient full name" className="field-input" />
+                </Field>
+
+                <Field icon={Mail} label="Email address">
+                  <input name="email" type="email" value={formData.email} onChange={handleChange} placeholder="patient@example.com" className="field-input" />
+                </Field>
+
+                <Field icon={Phone} label="Phone number">
+                  <input name="phone" value={formData.phone} onChange={handleChange} placeholder="Mobile number" className="field-input" />
+                </Field>
+
+                <Field icon={ShieldCheck} label="Password">
+                  <input
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    value={formData.password}
+                    onChange={handleChange}
+                    placeholder="Minimum 6 characters"
+                    className="field-input"
+                  />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="text-slate-500 hover:text-emerald-700" aria-label={showPassword ? "Hide password" : "Show password"}>
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </Field>
+
+                <Field icon={ShieldCheck} label="Confirm password">
+                  <input name="confirmPassword" type={showPassword ? "text" : "password"} value={formData.confirmPassword} onChange={handleChange} placeholder="Repeat password" className="field-input" />
+                </Field>
+
+                <button type="submit" className="w-full rounded-xl bg-emerald-700 px-5 py-3.5 text-sm font-extrabold text-white shadow-lg shadow-emerald-950/10 hover:bg-emerald-800">
+                  Register and Send OTP
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleVerifyOtp} className="space-y-4">
+                <Field icon={ShieldCheck} label="One-time password">
+                  <input name="otp" value={otp} onChange={(e) => setOtp(e.target.value)} placeholder="Enter 6 digit OTP" className="field-input" />
+                </Field>
+                <button type="submit" className="w-full rounded-xl bg-emerald-700 px-5 py-3.5 text-sm font-extrabold text-white shadow-lg shadow-emerald-950/10 hover:bg-emerald-800">
+                  Verify Account
+                </button>
+                <button type="button" onClick={() => setStep("register")} className="w-full rounded-xl border border-emerald-200 px-5 py-3 text-sm font-bold text-emerald-800 hover:bg-emerald-50">
+                  Edit registration details
+                </button>
+              </form>
+            )}
+
+            <div className="mt-6 rounded-xl bg-emerald-50 p-4 text-center text-sm font-semibold text-slate-700">
+              Already registered?{" "}
+              <button onClick={() => navigate("/login")} className="font-extrabold text-emerald-800 hover:text-emerald-950">
+                Login
+              </button>
+            </div>
+          </div>
         </div>
+      </section>
 
-        {message && (
-          <p style={{ color: "#1a365d", background: "#ebf8ff", padding: "12px", borderRadius: "8px", fontSize: "13px" }}>
-            {message}
-          </p>
-        )}
-
-        {step === "register" ? (
-          <form onSubmit={handleSubmit}>
-            <Input name="name" placeholder="Full name" value={formData.name} onChange={handleChange} />
-            <Input name="email" type="email" placeholder="Email" value={formData.email} onChange={handleChange} />
-            <Input name="phone" placeholder="Phone" value={formData.phone} onChange={handleChange} />
-            <Input name="password" type="password" placeholder="Password" value={formData.password} onChange={handleChange} />
-            <Input name="confirmPassword" type="password" placeholder="Confirm password" value={formData.confirmPassword} onChange={handleChange} />
-
-            <button type="submit" style={buttonStyle}>Register</button>
-          </form>
-        ) : (
-          <form onSubmit={handleVerifyOtp}>
-            <Input name="otp" placeholder="Enter OTP" value={otp} onChange={(e) => setOtp(e.target.value)} />
-            <button type="submit" style={buttonStyle}>Verify OTP</button>
-          </form>
-        )}
-
-        <div style={{ textAlign: "center", marginTop: "20px", fontSize: "13px", color: "#718096" }}>
-          Already have an account? <a href="/login" style={{ color: "#2b6cb0", textDecoration: "none", fontWeight: "500" }}>Login</a>
+      <section className="relative hidden overflow-hidden bg-emerald-950 lg:block">
+        <div className="absolute inset-0 bg-cover bg-center opacity-55" style={{ backgroundImage: `url(${bg1})` }} />
+        <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(2,44,34,0.95),rgba(6,95,70,0.76))]" />
+        <div className="relative flex h-full flex-col justify-between p-12 text-white">
+          <div className="ml-auto max-w-xl rounded-2xl border border-white/15 bg-white/10 p-6 backdrop-blur">
+            <p className="text-sm font-bold uppercase tracking-[0.2em] text-emerald-100">Patient benefits</p>
+            <h1 className="mt-4 text-5xl font-extrabold leading-tight">A clean account for bookings, receipts and approved reports.</h1>
+            <p className="mt-5 leading-8 text-emerald-50/85">
+              Keep patient access separate from staff operations while maintaining a simple registration process.
+            </p>
+          </div>
+          <p className="text-sm font-semibold text-emerald-100/75">Registration uses OTP verification. Real SMTP setup remains intentionally pending.</p>
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }
 
-function Input(props) {
+function Field({ icon: Icon, label, children }) {
   return (
-    <input
-      {...props}
-      style={{
-        width: "100%",
-        padding: "14px 16px",
-        marginBottom: "16px",
-        borderRadius: "8px",
-        border: "1px solid #cbd5e0",
-        boxSizing: "border-box",
-        fontSize: "14px",
-        color: "#2d3748"
-      }}
-    />
+    <label className="block">
+      <span className="mb-2 block text-sm font-bold text-slate-700">{label}</span>
+      <span className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 focus-within:border-emerald-500 focus-within:bg-white">
+        {React.createElement(Icon, { size: 18, className: "shrink-0 text-emerald-700" })}
+        {children}
+      </span>
+    </label>
   );
 }
-
-const buttonStyle = {
-  width: "100%",
-  padding: "14px 0",
-  backgroundColor: "#2b6cb0",
-  color: "#fff",
-  border: "none",
-  borderRadius: "8px",
-  fontSize: "16px",
-  fontWeight: "600",
-  cursor: "pointer"
-};
 
 export default RegisterPage;

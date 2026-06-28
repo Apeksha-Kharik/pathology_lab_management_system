@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion as Motion } from 'framer-motion';
 import { Home, Dna, Activity, ArrowRight, Zap, Microscope } from 'lucide-react';
 
 const Services = () => {
@@ -41,7 +41,7 @@ const Services = () => {
       </div>
 
       <div style={{ textAlign: 'center', marginBottom: '80px', position: 'relative' }}>
-        <motion.span 
+        <Motion.span 
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           style={{ 
@@ -53,7 +53,7 @@ const Services = () => {
           }}
         >
           ~ Laboratory Services ~
-        </motion.span>
+        </Motion.span>
         <h2 style={{ 
           fontSize: '3.2rem', 
           color: '#1a365d', 
@@ -72,7 +72,7 @@ const Services = () => {
         gap: '30px' 
       }}>
         {services.map((service, index) => (
-          <motion.div
+          <Motion.div
             key={index}
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -168,7 +168,7 @@ const Services = () => {
               height: '100px',
               background: `radial-gradient(circle, ${service.accent}20 0%, transparent 70%)`
             }} />
-          </motion.div>
+          </Motion.div>
         ))}
       </div>
     </section>

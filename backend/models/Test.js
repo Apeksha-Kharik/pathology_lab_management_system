@@ -6,6 +6,9 @@ const testSchema = new mongoose.Schema({
     price: { type: Number, required: true },
     description: { type: String },
     conditions: { type: String }, // e.g. "Fast for 12 hours"
+    sampleType: { type: String },
+    turnaroundTime: { type: String },
+    isActive: { type: Boolean, default: true },
     createdAt: { type: Date, default: Date.now }
 });
 

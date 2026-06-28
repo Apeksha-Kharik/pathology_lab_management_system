@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { roleRoutes, useAuth } from "../context/AuthContext";
+import { roleRoutes } from "../context/authCore";
+import { useAuth } from "../context/useAuth";
 import { changePassword } from "../services/profileService";
 
 function ChangePassword() {

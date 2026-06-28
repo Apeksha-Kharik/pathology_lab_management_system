@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { Quote } from 'lucide-react';
 
 const doctors = [
@@ -32,7 +32,7 @@ const ExpertMessages = () => {
       <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '400px' }}>
         
         <AnimatePresence mode="wait">
-          <motion.div
+          <Motion.div
             key={index}
             initial={{ opacity: 0, x: 50 }}
             animate={{ opacity: 1, x: 0 }}
@@ -84,7 +84,7 @@ const ExpertMessages = () => {
                 <p style={{ color: '#94a3b8', fontSize: '0.9rem', margin: '5px 0 0 0' }}>{doctors[index].role}</p>
               </div>
             </div>
-          </motion.div>
+          </Motion.div>
         </AnimatePresence>
       </div>
     </section>

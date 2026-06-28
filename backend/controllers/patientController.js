@@ -25,7 +25,7 @@ const getTests = async (req, res) => {
 
 const createBooking = async (req, res) => {
   try {
-    const { testId, bookingDate, timeSlot, notes } = req.body;
+    const { testId, bookingDate, timeSlot, notes, age, gender, sampleType } = req.body;
 
     if (!testId || !bookingDate || !timeSlot) {
       return res.status(400).json({ message: "Selected test, preferred date and time slot are required" });
@@ -44,11 +44,13 @@ const createBooking = async (req, res) => {
       name: req.user.name,
       phone: req.user.phone,
       email: req.user.email,
-      age: Number(req.body.age || 0),
+      age: Number(age || req.user.age || 0),
+      gender: gender || req.user.gender || "",
       date: bookingDate,
       bookingDate,
       timeSlot,
       notes,
+      sampleType: sampleType || "",
       homeSample: false,
       testName: test.testName,
       amount: test.price,

@@ -58,7 +58,7 @@ const getTechnicians = async (req, res) => {
 
 const createWalkInBooking = async (req, res) => {
   try {
-    const { name, phone, testId, bookingDate, timeSlot = "Walk-in", notes = "" } = req.body;
+    const { name, phone, testId, bookingDate, timeSlot = "Walk-in", notes = "", gender = "", sampleType = "" } = req.body;
 
     if (!name || !phone || !testId || !bookingDate) {
       return res.status(400).json({ message: "Patient name, phone, test and date are required" });
@@ -74,6 +74,7 @@ const createWalkInBooking = async (req, res) => {
       name,
       phone,
       age: Number(req.body.age || 0),
+      gender,
       email: req.body.email || "",
       testName: test.testName,
       amount: Number(test.price),
@@ -81,6 +82,7 @@ const createWalkInBooking = async (req, res) => {
       bookingDate,
       timeSlot,
       notes,
+      sampleType,
       bookingStatus: "Confirmed",
       status: "Confirmed",
       paymentStatus: "Unpaid",

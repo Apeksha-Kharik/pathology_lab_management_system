@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Eye, LogOut, Search, Upload, XCircle } from "lucide-react";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 import { approveReport, getPathologistReports, rejectReport } from "../services/pathologistService";
 
 function PathologistDashboard() {
