@@ -42,26 +42,76 @@ const generateOtp = () => String(Math.floor(100000 + Math.random() * 900000));
 
 const getOtpExpiry = () => new Date(Date.now() + 10 * 60 * 1000);
 
+const getPasswordValidationErrors = (password) => {
+  const errors = [];
+
+  if (!password || password.length < 8) {
+    errors.push("Password must be at least 8 characters");
+  }
+
+  if (!/[A-Z]/.test(password || "")) {
+    errors.push("Password must include at least one uppercase character");
+  }
+
+  if (!/[a-z]/.test(password || "")) {
+    errors.push("Password must include at least one lowercase character");
+  }
+
+  if (!/[!@#$%^&*(),.?":{}|<>]/.test(password || "")) {
+    errors.push("Password must include at least one special character");
+  }
+
+  return errors;
+};
+
+const cleanupPendingRegistration = async (email) => {
+  if (!email) {
+    return;
+  }
+
+  await User.deleteMany({
+    email: String(email).toLowerCase().trim(),
+    isVerified: false
+  });
+};
+
 const register = async (req, res) => {
   try {
-    const { name, email, password, phone, mobile } = req.body;
+    const { name, email, password, phone, mobile, city, address } = req.body;
     const userPhone = phone || mobile;
+    const normalizedEmail = String(email || "").toLowerCase().trim();
 
-    if (!name || !email || !password || !userPhone) {
-      return res.status(400).json({ message: "Name, email, phone and password are required" });
+    if (!name || !normalizedEmail || !password || !userPhone || !city || !address) {
+      return res.status(400).json({ message: "Name, email, phone, city, address and password are required" });
     }
 
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
-    if (existingUser) {
-      return res.status(400).json({ message: "Email already registered" });
+    const passwordErrors = getPasswordValidationErrors(password);
+    if (passwordErrors.length) {
+      return res.status(400).json({ message: passwordErrors.join(". ") });
     }
+
+    const verifiedUser = await User.findOne({ 
+      email: normalizedEmail, 
+      isVerified: true 
+    });
+    
+    if (verifiedUser) {
+      return res.status(400).json({ message: "Email already registered. Please login instead." });
+    }
+
+    await User.deleteMany({
+      email: normalizedEmail,
+      isVerified: false
+    });
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const otp = generateOtp();
     const user = await User.create({
       name,
-      email,
+      email: normalizedEmail,
       phone: userPhone,
+      city,
+      address,
       password: hashedPassword,
       role: "patient",
       isVerified: false,
@@ -99,11 +149,13 @@ const verifyOtp = async (req, res) => {
     }
 
     if (!user.otp || user.otp !== otp) {
-      return res.status(400).json({ message: "Invalid OTP" });
+      await cleanupPendingRegistration(email);
+      return res.status(400).json({ message: "Invalid OTP. Registration cancelled. Please register again." });
     }
 
     if (!user.otpExpiry || user.otpExpiry < new Date()) {
-      return res.status(400).json({ message: "OTP expired" });
+      await cleanupPendingRegistration(email);
+      return res.status(400).json({ message: "OTP expired. Registration cancelled. Please register again." });
     }
 
     user.isVerified = true;
@@ -114,6 +166,29 @@ const verifyOtp = async (req, res) => {
     res.json({ message: "Email verified successfully" });
   } catch (error) {
     res.status(500).json({ message: "OTP verification failed", error: error.message });
+  }
+};
+
+const cancelRegistration = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const normalizedEmail = String(email || "").toLowerCase().trim();
+
+    if (!normalizedEmail) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    const result = await User.deleteOne({
+      email: normalizedEmail,
+      isVerified: false,
+      otp: { $exists: true }
+    });
+
+    res.json({
+      message: result.deletedCount ? "Registration cancelled successfully" : "No pending registration found"
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Registration cancellation failed", error: error.message });
   }
 };
 
@@ -356,4 +431,4 @@ const resetPassword = async (req, res) => {
   }
 };
 
-module.exports = { register, verifyOtp, login, receptionistLogin, technicianLogin, pathologistLogin, forgotPassword, verifyResetOtp, resetPassword, normalizeRole };
+module.exports = { register, verifyOtp, cancelRegistration, login, receptionistLogin, technicianLogin, pathologistLogin, forgotPassword, verifyResetOtp, resetPassword, normalizeRole };

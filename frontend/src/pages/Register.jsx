@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { Eye, EyeOff, Mail, Phone, ShieldCheck, UserRound } from "lucide-react";
+import { Eye, EyeOff, Mail, MapPin, Phone, ShieldCheck, UserRound } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { registerUser, verifyOtp } from "../services/authService";
+import { cancelRegistration, registerUser, verifyOtp } from "../services/authService";
 import logo from "../assets/logo.png";
 import bg1 from "../assets/bg1.png";
 
@@ -13,10 +13,13 @@ function RegisterPage() {
   const [otp, setOtp] = useState("");
   const [message, setMessage] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [passwordHint, setPasswordHint] = useState("");
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     phone: "",
+    city: "",
+    address: "",
     password: "",
     confirmPassword: ""
   });
@@ -25,17 +28,43 @@ function RegisterPage() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const getPasswordValidationMessage = (password) => {
+    const requirements = [];
+
+    if (password.length < 8) {
+      requirements.push("at least 8 characters");
+    }
+
+    if (!/[A-Z]/.test(password)) {
+      requirements.push("at least one uppercase letter");
+    }
+
+    if (!/[a-z]/.test(password)) {
+      requirements.push("at least one lowercase letter");
+    }
+
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+      requirements.push("at least one special character");
+    }
+
+    return requirements.length ? `Password must include ${requirements.join(", ")}` : "";
+  };
+
   const validate = () => {
-    if (!formData.name || !formData.email || !formData.phone || !formData.password || !formData.confirmPassword) {
-      return "Please fill all fields";
+    const requiredFields = ["name", "email", "phone", "city", "address", "password", "confirmPassword"];
+    const missingFields = requiredFields.filter((field) => !String(formData[field]).trim());
+
+    if (missingFields.length) {
+      return `Please fill all required fields: ${missingFields.join(", ")}`;
     }
 
     if (!emailPattern.test(formData.email)) {
       return "Please enter a valid email";
     }
 
-    if (formData.password.length < 6) {
-      return "Password must be at least 6 characters";
+    const passwordValidationMessage = getPasswordValidationMessage(formData.password);
+    if (passwordValidationMessage) {
+      return passwordValidationMessage;
     }
 
     if (formData.password !== formData.confirmPassword) {
@@ -50,15 +79,20 @@ function RegisterPage() {
     const validationError = validate();
 
     if (validationError) {
+      setPasswordHint(validationError);
       alert(validationError);
       return;
     }
+
+    setPasswordHint("");
 
     try {
       const data = await registerUser({
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
+        city: formData.city,
+        address: formData.address,
         password: formData.password
       });
 
@@ -83,6 +117,21 @@ function RegisterPage() {
       navigate("/login");
     } catch (error) {
       alert(error.response?.data?.message || "OTP verification failed");
+    }
+  };
+
+  const handleCancelRegistration = async () => {
+    if (!formData.email) {
+      setStep("register");
+      return;
+    }
+
+    try {
+      await cancelRegistration({ email: formData.email });
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setStep("register");
     }
   };
 
@@ -133,19 +182,29 @@ function RegisterPage() {
                   <input name="phone" value={formData.phone} onChange={handleChange} placeholder="Mobile number" className="field-input" />
                 </Field>
 
+                <Field icon={MapPin} label="City">
+                  <input name="city" value={formData.city} onChange={handleChange} placeholder="Enter city" className="field-input" />
+                </Field>
+
+                <Field icon={MapPin} label="Address">
+                  <input name="address" value={formData.address} onChange={handleChange} placeholder="Enter full address" className="field-input" />
+                </Field>
+
                 <Field icon={ShieldCheck} label="Password">
                   <input
                     name="password"
                     type={showPassword ? "text" : "password"}
                     value={formData.password}
                     onChange={handleChange}
-                    placeholder="Minimum 6 characters"
+                    placeholder="Minimum 8 characters"
                     className="field-input"
                   />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="text-slate-500 hover:text-emerald-700" aria-label={showPassword ? "Hide password" : "Show password"}>
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </Field>
+
+                {passwordHint && <p className="text-sm font-semibold text-amber-700">{passwordHint}</p>}
 
                 <Field icon={ShieldCheck} label="Confirm password">
                   <input name="confirmPassword" type={showPassword ? "text" : "password"} value={formData.confirmPassword} onChange={handleChange} placeholder="Repeat password" className="field-input" />
@@ -163,7 +222,7 @@ function RegisterPage() {
                 <button type="submit" className="w-full rounded-xl bg-emerald-700 px-5 py-3.5 text-sm font-extrabold text-white shadow-lg shadow-emerald-950/10 hover:bg-emerald-800">
                   Verify Account
                 </button>
-                <button type="button" onClick={() => setStep("register")} className="w-full rounded-xl border border-emerald-200 px-5 py-3 text-sm font-bold text-emerald-800 hover:bg-emerald-50">
+                <button type="button" onClick={handleCancelRegistration} className="w-full rounded-xl border border-emerald-200 px-5 py-3 text-sm font-bold text-emerald-800 hover:bg-emerald-50">
                   Edit registration details
                 </button>
               </form>

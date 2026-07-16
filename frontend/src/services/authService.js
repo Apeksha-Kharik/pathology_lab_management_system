@@ -25,6 +25,11 @@ export const registerUser = async (payload) => {
   return response.data;
 };
 
+export const cancelRegistration = async (payload) => {
+  const response = await api.post("/cancel-registration", payload);
+  return response.data;
+};
+
 export const verifyOtp = async (payload) => {
   const response = await api.post("/verify-otp", payload);
   return response.data;
