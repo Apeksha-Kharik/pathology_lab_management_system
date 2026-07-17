@@ -1,6 +1,7 @@
 const express = require("express");
 const {
   getTests,
+  getPackages,
   createBooking,
   getBookings,
   getReports,
@@ -12,6 +13,7 @@ const { protect, allowRoles } = require("../middleware/authMiddleware");
 const router = express.Router();
 
 router.get("/tests", protect, allowRoles("patient"), getTests);
+router.get("/packages", protect, allowRoles("patient"), getPackages);
 router.post("/book-test", protect, allowRoles("patient"), createBooking);
 router.post("/bookings", protect, allowRoles("patient"), createBooking);
 router.get("/bookings", protect, allowRoles("patient"), getBookings);

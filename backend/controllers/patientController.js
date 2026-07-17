@@ -3,6 +3,7 @@ const Booking = require("../models/Booking");
 const Payment = require("../models/Payment");
 const Report = require("../models/Report");
 const Test = require("../models/Test");
+const Package = require("../models/Package");
 
 const getTests = async (req, res) => {
   try {
@@ -23,24 +24,40 @@ const getTests = async (req, res) => {
   }
 };
 
+const getPackages = async (req, res) => {
+  try {
+    const packages = await Package.find({ isActive: true })
+      .populate("includedTests", "testName")
+      .sort({ createdAt: -1 });
+    res.json(packages);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching packages" });
+  }
+};
+
 const createBooking = async (req, res) => {
   try {
-    const { testId, bookingDate, timeSlot, notes, age, gender, sampleType, prescribedBy } = req.body;
+    const { testId, packageId, bookingDate, timeSlot, notes, age, gender, sampleType } = req.body;
 
-    if (!testId || !bookingDate || !timeSlot) {
-      return res.status(400).json({ message: "Selected test, preferred date and time slot are required" });
+    if ((!testId && !packageId) || !bookingDate || !timeSlot) {
+      return res.status(400).json({ message: "Select a test or package, preferred date and time slot" });
     }
 
-    const test = await Test.findById(testId);
-    if (!test) {
-      return res.status(404).json({ message: "Selected test not found" });
+    const bookingType = packageId ? "Package" : "Test";
+    const selectedItem = packageId
+      ? await Package.findOne({ _id: packageId, isActive: true })
+      : await Test.findById(testId);
+    if (!selectedItem) {
+      return res.status(404).json({ message: `Selected ${bookingType.toLowerCase()} not found` });
     }
 
     const bookingCode = `BK${Date.now().toString().slice(-6)}`;
     const booking = await Booking.create({
       userId: req.user._id,
       patientId: req.user._id,
-      testId: test._id,
+      testId: bookingType === "Test" ? selectedItem._id : undefined,
+      packageId: bookingType === "Package" ? selectedItem._id : undefined,
+      bookingType,
       name: req.user.name,
       phone: req.user.phone,
       email: req.user.email,
@@ -51,10 +68,9 @@ const createBooking = async (req, res) => {
       timeSlot,
       notes,
       sampleType: sampleType || "",
-      prescribedBy: prescribedBy || "",
       homeSample: false,
-      testName: test.testName,
-      amount: test.price,
+      testName: bookingType === "Package" ? selectedItem.packageName : selectedItem.testName,
+      amount: selectedItem.price,
       status: "Pending Approval",
       bookingStatus: "Pending Approval",
       paymentStatus: "Unpaid",
@@ -64,7 +80,7 @@ const createBooking = async (req, res) => {
     await Payment.create({
       bookingId: booking._id,
       userId: req.user._id,
-      amount: test.price,
+      amount: selectedItem.price,
       method: "cash",
       status: "pending"
     });
@@ -203,4 +219,4 @@ const downloadReceipt = async (req, res) => {
   }
 };
 
-module.exports = { getTests, createBooking, getBookings, getReports, downloadReport, downloadReceipt };
+module.exports = { getTests, getPackages, createBooking, getBookings, getReports, downloadReport, downloadReceipt };

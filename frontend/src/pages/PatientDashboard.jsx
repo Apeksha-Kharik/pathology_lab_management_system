@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Download, FileText, LogOut, Search, TestTube2, User } from "lucide-react";
+import { Download, FileText, LogOut, Search, TestTube2, User, PackageCheck, Home } from "lucide-react";
 import { useAuth } from "../context/useAuth";
 import {
   createBooking,
@@ -7,14 +7,17 @@ import {
   downloadReceipt,
   getBookings,
   getReports,
-  getTests
+  getTests,
+  getPackages
 } from "../services/patientService";
 import { changePassword, updateProfile } from "../services/profileService";
+import packageFallbackImage from "../assets/bg1.png";
 
 function PatientDashboard() {
   const { user, logout } = useAuth();
   const [active, setActive] = useState("tests");
   const [tests, setTests] = useState([]);
+  const [packages, setPackages] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [reports, setReports] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -24,12 +27,14 @@ function PatientDashboard() {
   const loadDashboard = async () => {
     try {
       setLoading(true);
-      const [testsData, bookingsData, reportsData] = await Promise.all([
+      const [testsData, packagesData, bookingsData, reportsData] = await Promise.all([
         getTests(),
+        getPackages(),
         getBookings(),
         getReports()
       ]);
       setTests(testsData || []);
+      setPackages(packagesData || []);
       setBookings(bookingsData || []);
       setReports(reportsData || []);
     } catch (error) {
@@ -53,8 +58,6 @@ function PatientDashboard() {
     });
   }, [tests, searchTerm]);
 
-  
-
   const handleLogout = () => {
     logout();
     window.location.href = "/";
@@ -67,17 +70,12 @@ function PatientDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 text-slate-900 font-sans antialiased">
-      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white shadow-sm">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
-          <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-700 font-bold text-lg">
-              {user?.name?.charAt(0) || "P"}
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">INDIPATH Patient Portal</p>
-              <h1 className="text-2xl font-extrabold text-slate-900">Welcome, {user?.name || "Patient"}</h1>
-            </div>
+    <div className="min-h-screen bg-slate-50 text-slate-900">
+      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest text-blue-600">INDIPATH Patient Portal</p>
+            <h1 className="text-2xl font-bold text-slate-900">Welcome, {user?.name || "Patient"}</h1>
           </div>
           <button onClick={handleLogout} className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700">
             <LogOut size={18} /> Logout
@@ -86,11 +84,7 @@ function PatientDashboard() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
-        {/* Summary cards removed as requested */}
-
-        {/* Notifications removed as requested */}
-
-        <nav className="mb-6 flex flex-wrap gap-3">
+        <nav className="mb-6 flex flex-wrap gap-2">
           <TabButton active={active === "tests"} onClick={() => { setActive("tests"); setSelectedTest(null); }}>Available Tests</TabButton>
           <TabButton active={active === "history"} onClick={() => setActive("history")}>Booking History</TabButton>
           <TabButton active={active === "payments"} onClick={() => setActive("payments")}>Payment Status</TabButton>
@@ -106,7 +100,7 @@ function PatientDashboard() {
               selectedTest ? (
                 <BookingForm test={selectedTest} onCancel={() => setSelectedTest(null)} onBooked={handleBooked} />
               ) : (
-                <AvailableTests tests={filteredTests} searchTerm={searchTerm} setSearchTerm={setSearchTerm} onBook={setSelectedTest} />
+                <AvailableTests tests={filteredTests} packages={packages} searchTerm={searchTerm} setSearchTerm={setSearchTerm} onBook={setSelectedTest} />
               )
             )}
 
@@ -121,20 +115,18 @@ function PatientDashboard() {
   );
 }
 
-// SummaryCard removed — no longer used in patient dashboard
-
 function TabButton({ active, children, onClick }) {
   return (
     <button
       onClick={onClick}
-      className={`rounded-full px-3 py-1 text-sm font-semibold border ${active ? "bg-blue-600 text-white border-blue-600 shadow" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"}`}
+      className={`rounded-md px-4 py-2 text-sm font-bold ${active ? "bg-blue-600 text-white" : "bg-white text-slate-600 hover:bg-slate-100"}`}
     >
       {children}
     </button>
   );
 }
 
-function AvailableTests({ tests, searchTerm, setSearchTerm, onBook }) {
+function AvailableTests({ tests, packages, searchTerm, setSearchTerm, onBook }) {
   return (
     <div>
       <div className="mb-6 flex items-center gap-3 rounded-md border border-slate-200 px-4 py-3">
@@ -147,18 +139,32 @@ function AvailableTests({ tests, searchTerm, setSearchTerm, onBook }) {
         />
       </div>
 
+      {packages.length > 0 && (
+        <>
+          <div className="mb-4 flex items-center gap-2"><PackageCheck className="text-emerald-700" size={22} /><h2 className="text-xl font-bold text-slate-900">Full Body & Health Packages</h2></div>
+          <div className="mb-8 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+            {packages.map((item) => (
+              <div key={item._id} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md">
+                <img src={item.imageUrl || packageFallbackImage} onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = packageFallbackImage; }} alt={item.packageName} className="h-40 w-full object-cover" />
+                <div className="p-5"><div className="mb-3 flex items-start justify-between gap-3"><span className="rounded bg-emerald-50 px-2 py-1 text-xs font-bold uppercase text-emerald-700">{item.category}</span>{item.homeCollection && <span title="Home collection available" className="text-emerald-700"><Home size={18} /></span>}</div><h3 className="text-lg font-bold text-slate-900">{item.packageName}</h3><p className="mt-2 min-h-12 text-sm text-slate-500">{item.description || "Comprehensive health checkup package."}</p><p className="mt-3 text-xs font-semibold text-slate-500">{item.includedTests?.length || item.parametersCount || 0} tests / parameters included</p><div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4"><span className="text-xl font-black text-slate-900">INR {item.price}</span><button onClick={() => onBook({ ...item, bookingType: "Package", displayName: item.packageName })} className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-800">Book Now</button></div></div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+      <h2 className="mb-4 text-xl font-bold text-slate-900">Individual Tests</h2>
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
         {tests.length ? tests.map((test) => (
-          <div key={test._id} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm hover:shadow-lg transform hover:-translate-y-1 transition">
+          <div key={test._id} className="rounded-lg border border-slate-200 p-5">
             <div className="mb-4 flex items-start justify-between gap-3">
               <TestTube2 className="mt-1 text-blue-600" size={24} />
-              <span className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold uppercase text-slate-500">{test.category}</span>
+              <span className="rounded bg-slate-100 px-2 py-1 text-xs font-bold uppercase text-slate-500">{test.category}</span>
             </div>
-            <h3 className="text-lg font-semibold text-slate-900">{test.testName}</h3>
-            <p className="mt-2 min-h-12 text-sm text-slate-600">{test.description || "Diagnostic lab test with verified reporting."}</p>
+            <h3 className="text-lg font-bold text-slate-900">{test.testName}</h3>
+            <p className="mt-2 min-h-12 text-sm text-slate-500">{test.description || "Diagnostic lab test with verified reporting."}</p>
             <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
-              <span className="text-lg font-extrabold text-slate-900">INR {test.price}</span>
-              <button onClick={() => onBook(test)} className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 shadow">
+              <span className="text-xl font-black text-slate-900">INR {test.price}</span>
+              <button onClick={() => onBook({ ...test, bookingType: "Test", displayName: test.testName })} className="rounded-md bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700">
                 Book
               </button>
             </div>
@@ -178,7 +184,6 @@ function BookingForm({ test, onCancel, onBooked }) {
     age: "",
     gender: "",
     sampleType: "",
-    prescribedBy: "",
     notes: ""
   });
 
@@ -196,7 +201,7 @@ function BookingForm({ test, onCancel, onBooked }) {
     }
 
     try {
-      const data = await createBooking({ ...form, testId: test._id });
+      const data = await createBooking({ ...form, ...(test.bookingType === "Package" ? { packageId: test._id } : { testId: test._id }) });
       alert(data.message);
       onBooked();
     } catch (error) {
@@ -207,15 +212,14 @@ function BookingForm({ test, onCancel, onBooked }) {
   return (
     <div>
       <button onClick={onCancel} className="mb-5 text-sm font-bold text-blue-600 hover:underline">Back to tests</button>
-      <div className="mb-5 rounded-md bg-blue-50 p-4">
-        <p className="text-xs font-bold uppercase text-blue-500">Selected Test</p>
-        <h2 className="text-xl font-bold text-blue-950">{test.testName}</h2>
-        <p className="text-sm text-blue-800">Amount: INR {test.price}</p>
+      <div className={`mb-5 rounded-md p-4 ${test.bookingType === "Package" ? "bg-emerald-50" : "bg-blue-50"}`}>
+        <p className={`text-xs font-bold uppercase ${test.bookingType === "Package" ? "text-emerald-600" : "text-blue-500"}`}>Selected {test.bookingType || "Test"}</p>
+        <h2 className={`text-xl font-bold ${test.bookingType === "Package" ? "text-emerald-950" : "text-blue-950"}`}>{test.displayName || test.testName}</h2>
+        <p className={`text-sm ${test.bookingType === "Package" ? "text-emerald-800" : "text-blue-800"}`}>Amount: INR {test.price}</p>
       </div>
       <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Input name="selectedTest" value={test.testName} readOnly className="bg-slate-50" />
+        <Input name="selectedTest" value={test.displayName || test.testName} readOnly className="bg-slate-50" />
         <Input name="age" type="number" min="0" max="130" placeholder="Patient age" value={form.age} onChange={handleChange} />
-        <Input name="prescribedBy" placeholder="Prescribed by" value={form.prescribedBy} onChange={handleChange} />
         <select
           name="gender"
           value={form.gender}
@@ -432,7 +436,6 @@ function BookingRow({ booking }) {
           <p className="font-bold text-slate-900">{booking.testName}</p>
           <p className="text-sm text-slate-500">Requested: {booking.bookingDate || booking.date} | {booking.timeSlot}</p>
           <p className="text-sm text-slate-500">Amount: INR {booking.amount}</p>
-          {booking.prescribedBy && <p className="text-sm text-slate-500">Prescribed by: {booking.prescribedBy}</p>}
           {booking.notes && <p className="text-sm text-slate-500">Notes: {booking.notes}</p>}
           {booking.rejectionReason && <p className="text-sm text-red-600">Rejection reason: {booking.rejectionReason}</p>}
         </div>
