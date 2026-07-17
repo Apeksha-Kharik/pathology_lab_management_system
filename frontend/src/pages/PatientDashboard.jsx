@@ -53,17 +53,7 @@ function PatientDashboard() {
     });
   }, [tests, searchTerm]);
 
-  const notifications = useMemo(() => {
-    const pendingBookings = bookings.filter((booking) => booking.bookingStatus === "Pending Approval").length;
-    const unpaidBookings = bookings.filter((booking) => booking.paymentStatus === "Unpaid").length;
-    const latestReport = reports[0];
-
-    return [
-      pendingBookings ? `${pendingBookings} booking pending approval` : "No pending booking requests",
-      unpaidBookings ? `${unpaidBookings} payment pending` : "No pending payments",
-      latestReport ? `Latest report available: ${latestReport.testName || "Lab report"}` : "No reports uploaded yet"
-    ];
-  }, [bookings, reports]);
+  
 
   const handleLogout = () => {
     logout();
@@ -77,12 +67,17 @@ function PatientDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-widest text-blue-600">INDIPATH Patient Portal</p>
-            <h1 className="text-2xl font-bold text-slate-900">Welcome, {user?.name || "Patient"}</h1>
+    <div className="min-h-screen bg-gray-50 text-slate-900 font-sans antialiased">
+      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white shadow-sm">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
+          <div className="flex items-center gap-4">
+            <div className="h-12 w-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-700 font-bold text-lg">
+              {user?.name?.charAt(0) || "P"}
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">INDIPATH Patient Portal</p>
+              <h1 className="text-2xl font-extrabold text-slate-900">Welcome, {user?.name || "Patient"}</h1>
+            </div>
           </div>
           <button onClick={handleLogout} className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700">
             <LogOut size={18} /> Logout
@@ -91,24 +86,11 @@ function PatientDashboard() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
-        <section className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
-          <SummaryCard label="Available Tests" value={tests.length} />
-          <SummaryCard label="Bookings" value={bookings.length} />
-          <SummaryCard label="Reports" value={reports.length} />
-        </section>
+        {/* Summary cards removed as requested */}
 
-        <section className="mb-8 rounded-lg border border-slate-200 bg-white p-5">
-          <h2 className="mb-3 text-lg font-bold text-slate-800">Notifications</h2>
-          <div className="grid gap-3 md:grid-cols-3">
-            {notifications.map((item) => (
-              <div key={item} className="rounded-md bg-blue-50 px-4 py-3 text-sm font-medium text-blue-900">
-                {item}
-              </div>
-            ))}
-          </div>
-        </section>
+        {/* Notifications removed as requested */}
 
-        <nav className="mb-6 flex flex-wrap gap-2">
+        <nav className="mb-6 flex flex-wrap gap-3">
           <TabButton active={active === "tests"} onClick={() => { setActive("tests"); setSelectedTest(null); }}>Available Tests</TabButton>
           <TabButton active={active === "history"} onClick={() => setActive("history")}>Booking History</TabButton>
           <TabButton active={active === "payments"} onClick={() => setActive("payments")}>Payment Status</TabButton>
@@ -139,20 +121,13 @@ function PatientDashboard() {
   );
 }
 
-function SummaryCard({ label, value }) {
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white p-5">
-      <p className="text-xs font-bold uppercase tracking-widest text-slate-500">{label}</p>
-      <p className="mt-2 text-3xl font-black text-blue-700">{value}</p>
-    </div>
-  );
-}
+// SummaryCard removed — no longer used in patient dashboard
 
 function TabButton({ active, children, onClick }) {
   return (
     <button
       onClick={onClick}
-      className={`rounded-md px-4 py-2 text-sm font-bold ${active ? "bg-blue-600 text-white" : "bg-white text-slate-600 hover:bg-slate-100"}`}
+      className={`rounded-full px-3 py-1 text-sm font-semibold border ${active ? "bg-blue-600 text-white border-blue-600 shadow" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"}`}
     >
       {children}
     </button>
@@ -174,16 +149,16 @@ function AvailableTests({ tests, searchTerm, setSearchTerm, onBook }) {
 
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
         {tests.length ? tests.map((test) => (
-          <div key={test._id} className="rounded-lg border border-slate-200 p-5">
+          <div key={test._id} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm hover:shadow-lg transform hover:-translate-y-1 transition">
             <div className="mb-4 flex items-start justify-between gap-3">
               <TestTube2 className="mt-1 text-blue-600" size={24} />
-              <span className="rounded bg-slate-100 px-2 py-1 text-xs font-bold uppercase text-slate-500">{test.category}</span>
+              <span className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold uppercase text-slate-500">{test.category}</span>
             </div>
-            <h3 className="text-lg font-bold text-slate-900">{test.testName}</h3>
-            <p className="mt-2 min-h-12 text-sm text-slate-500">{test.description || "Diagnostic lab test with verified reporting."}</p>
+            <h3 className="text-lg font-semibold text-slate-900">{test.testName}</h3>
+            <p className="mt-2 min-h-12 text-sm text-slate-600">{test.description || "Diagnostic lab test with verified reporting."}</p>
             <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
-              <span className="text-xl font-black text-slate-900">INR {test.price}</span>
-              <button onClick={() => onBook(test)} className="rounded-md bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700">
+              <span className="text-lg font-extrabold text-slate-900">INR {test.price}</span>
+              <button onClick={() => onBook(test)} className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 shadow">
                 Book
               </button>
             </div>
