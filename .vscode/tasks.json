@@ -1,0 +1,13 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Validate Admin package support",
+			"type": "shell",
+			"command": "cd \"d:\\projects resume\\pathology_lab_management_system\" && node -e \"const fs=require('fs'); const content=fs.readFileSync('frontend/src/pages/AdminDashboard.jsx','utf8'); console.log(content.includes('isPackage'), content.includes('packageItems'));\"",
+			"args": [],
+			"isBackground": false,
+			"problemMatcher": []
+		}
+	]
+}

@@ -1,5 +1,6 @@
 const User = require("../models/User");
 const Test = require("../models/Test");
+const Package = require("../models/Package");
 const Booking = require("../models/Booking");
 const Payment = require("../models/Payment");
 const Report = require("../models/Report");
@@ -304,4 +305,50 @@ const deleteTest = async (req, res) => {
   }
 };
 
-module.exports = { getDashboardMetrics, createUser, getUsers, deleteUser, addTest, getTests, updateTest, deleteTest };
+const buildPackagePayload = (body) => ({
+  packageName: body.packageName,
+  category: body.category || "Health Checkup",
+  price: Number(body.price),
+  description: body.description || "",
+  imageUrl: body.imageUrl || "",
+  includedTests: Array.isArray(body.includedTests) ? body.includedTests : [],
+  parametersCount: Number(body.parametersCount || 0),
+  homeCollection: body.homeCollection !== false,
+  isActive: body.isActive !== undefined ? Boolean(body.isActive) : true
+});
+
+const getPackages = async (req, res) => {
+  try {
+    const packages = await Package.find().populate("includedTests", "testName").sort({ createdAt: -1 });
+    res.json(packages);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching packages" });
+  }
+};
+
+const addPackage = async (req, res) => {
+  try {
+    const { packageName, price } = req.body;
+    if (!packageName || price === undefined || price === "") {
+      return res.status(400).json({ message: "Package name and price are required" });
+    }
+    const packageItem = await Package.create(buildPackagePayload(req.body));
+    await writeAuditLog({ actor: req.user, action: "PACKAGE_CREATED", entityType: "Package", entityId: packageItem._id, details: { packageName: packageItem.packageName, price: packageItem.price } });
+    res.status(201).json({ message: "Package added successfully", package: packageItem });
+  } catch (error) {
+    res.status(500).json({ message: "Error adding package", error: error.message });
+  }
+};
+
+const deletePackage = async (req, res) => {
+  try {
+    const packageItem = await Package.findByIdAndDelete(req.params.id);
+    if (!packageItem) return res.status(404).json({ message: "Package not found" });
+    await writeAuditLog({ actor: req.user, action: "PACKAGE_DELETED", entityType: "Package", entityId: packageItem._id, details: { packageName: packageItem.packageName } });
+    res.json({ message: "Package deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Error deleting package" });
+  }
+};
+
+module.exports = { getDashboardMetrics, createUser, getUsers, deleteUser, addTest, getTests, updateTest, deleteTest, getPackages, addPackage, deletePackage };

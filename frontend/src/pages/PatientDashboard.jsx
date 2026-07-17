@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Download, FileText, LogOut, Search, TestTube2, User } from "lucide-react";
+import { Download, FileText, LogOut, Search, TestTube2, User, PackageCheck, Home } from "lucide-react";
 import { useAuth } from "../context/useAuth";
 import {
   createBooking,
@@ -7,14 +7,17 @@ import {
   downloadReceipt,
   getBookings,
   getReports,
-  getTests
+  getTests,
+  getPackages
 } from "../services/patientService";
 import { changePassword, updateProfile } from "../services/profileService";
+import packageFallbackImage from "../assets/bg1.png";
 
 function PatientDashboard() {
   const { user, logout } = useAuth();
   const [active, setActive] = useState("tests");
   const [tests, setTests] = useState([]);
+  const [packages, setPackages] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [reports, setReports] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -24,12 +27,14 @@ function PatientDashboard() {
   const loadDashboard = async () => {
     try {
       setLoading(true);
-      const [testsData, bookingsData, reportsData] = await Promise.all([
+      const [testsData, packagesData, bookingsData, reportsData] = await Promise.all([
         getTests(),
+        getPackages(),
         getBookings(),
         getReports()
       ]);
       setTests(testsData || []);
+      setPackages(packagesData || []);
       setBookings(bookingsData || []);
       setReports(reportsData || []);
     } catch (error) {
@@ -52,18 +57,6 @@ function PatientDashboard() {
       );
     });
   }, [tests, searchTerm]);
-
-  const notifications = useMemo(() => {
-    const pendingBookings = bookings.filter((booking) => booking.bookingStatus === "Pending Approval").length;
-    const unpaidBookings = bookings.filter((booking) => booking.paymentStatus === "Unpaid").length;
-    const latestReport = reports[0];
-
-    return [
-      pendingBookings ? `${pendingBookings} booking pending approval` : "No pending booking requests",
-      unpaidBookings ? `${unpaidBookings} payment pending` : "No pending payments",
-      latestReport ? `Latest report available: ${latestReport.testName || "Lab report"}` : "No reports uploaded yet"
-    ];
-  }, [bookings, reports]);
 
   const handleLogout = () => {
     logout();
@@ -91,23 +84,6 @@ function PatientDashboard() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
-        <section className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
-          <SummaryCard label="Available Tests" value={tests.length} />
-          <SummaryCard label="Bookings" value={bookings.length} />
-          <SummaryCard label="Reports" value={reports.length} />
-        </section>
-
-        <section className="mb-8 rounded-lg border border-slate-200 bg-white p-5">
-          <h2 className="mb-3 text-lg font-bold text-slate-800">Notifications</h2>
-          <div className="grid gap-3 md:grid-cols-3">
-            {notifications.map((item) => (
-              <div key={item} className="rounded-md bg-blue-50 px-4 py-3 text-sm font-medium text-blue-900">
-                {item}
-              </div>
-            ))}
-          </div>
-        </section>
-
         <nav className="mb-6 flex flex-wrap gap-2">
           <TabButton active={active === "tests"} onClick={() => { setActive("tests"); setSelectedTest(null); }}>Available Tests</TabButton>
           <TabButton active={active === "history"} onClick={() => setActive("history")}>Booking History</TabButton>
@@ -124,7 +100,7 @@ function PatientDashboard() {
               selectedTest ? (
                 <BookingForm test={selectedTest} onCancel={() => setSelectedTest(null)} onBooked={handleBooked} />
               ) : (
-                <AvailableTests tests={filteredTests} searchTerm={searchTerm} setSearchTerm={setSearchTerm} onBook={setSelectedTest} />
+                <AvailableTests tests={filteredTests} packages={packages} searchTerm={searchTerm} setSearchTerm={setSearchTerm} onBook={setSelectedTest} />
               )
             )}
 
@@ -135,15 +111,6 @@ function PatientDashboard() {
           </section>
         )}
       </main>
-    </div>
-  );
-}
-
-function SummaryCard({ label, value }) {
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white p-5">
-      <p className="text-xs font-bold uppercase tracking-widest text-slate-500">{label}</p>
-      <p className="mt-2 text-3xl font-black text-blue-700">{value}</p>
     </div>
   );
 }
@@ -159,7 +126,7 @@ function TabButton({ active, children, onClick }) {
   );
 }
 
-function AvailableTests({ tests, searchTerm, setSearchTerm, onBook }) {
+function AvailableTests({ tests, packages, searchTerm, setSearchTerm, onBook }) {
   return (
     <div>
       <div className="mb-6 flex items-center gap-3 rounded-md border border-slate-200 px-4 py-3">
@@ -172,6 +139,20 @@ function AvailableTests({ tests, searchTerm, setSearchTerm, onBook }) {
         />
       </div>
 
+      {packages.length > 0 && (
+        <>
+          <div className="mb-4 flex items-center gap-2"><PackageCheck className="text-emerald-700" size={22} /><h2 className="text-xl font-bold text-slate-900">Full Body & Health Packages</h2></div>
+          <div className="mb-8 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+            {packages.map((item) => (
+              <div key={item._id} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md">
+                <img src={item.imageUrl || packageFallbackImage} onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = packageFallbackImage; }} alt={item.packageName} className="h-40 w-full object-cover" />
+                <div className="p-5"><div className="mb-3 flex items-start justify-between gap-3"><span className="rounded bg-emerald-50 px-2 py-1 text-xs font-bold uppercase text-emerald-700">{item.category}</span>{item.homeCollection && <span title="Home collection available" className="text-emerald-700"><Home size={18} /></span>}</div><h3 className="text-lg font-bold text-slate-900">{item.packageName}</h3><p className="mt-2 min-h-12 text-sm text-slate-500">{item.description || "Comprehensive health checkup package."}</p><p className="mt-3 text-xs font-semibold text-slate-500">{item.includedTests?.length || item.parametersCount || 0} tests / parameters included</p><div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4"><span className="text-xl font-black text-slate-900">INR {item.price}</span><button onClick={() => onBook({ ...item, bookingType: "Package", displayName: item.packageName })} className="rounded-md bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-800">Book Now</button></div></div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+      <h2 className="mb-4 text-xl font-bold text-slate-900">Individual Tests</h2>
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
         {tests.length ? tests.map((test) => (
           <div key={test._id} className="rounded-lg border border-slate-200 p-5">
@@ -183,7 +164,7 @@ function AvailableTests({ tests, searchTerm, setSearchTerm, onBook }) {
             <p className="mt-2 min-h-12 text-sm text-slate-500">{test.description || "Diagnostic lab test with verified reporting."}</p>
             <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
               <span className="text-xl font-black text-slate-900">INR {test.price}</span>
-              <button onClick={() => onBook(test)} className="rounded-md bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700">
+              <button onClick={() => onBook({ ...test, bookingType: "Test", displayName: test.testName })} className="rounded-md bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700">
                 Book
               </button>
             </div>
@@ -220,7 +201,7 @@ function BookingForm({ test, onCancel, onBooked }) {
     }
 
     try {
-      const data = await createBooking({ ...form, testId: test._id });
+      const data = await createBooking({ ...form, ...(test.bookingType === "Package" ? { packageId: test._id } : { testId: test._id }) });
       alert(data.message);
       onBooked();
     } catch (error) {
@@ -231,13 +212,13 @@ function BookingForm({ test, onCancel, onBooked }) {
   return (
     <div>
       <button onClick={onCancel} className="mb-5 text-sm font-bold text-blue-600 hover:underline">Back to tests</button>
-      <div className="mb-5 rounded-md bg-blue-50 p-4">
-        <p className="text-xs font-bold uppercase text-blue-500">Selected Test</p>
-        <h2 className="text-xl font-bold text-blue-950">{test.testName}</h2>
-        <p className="text-sm text-blue-800">Amount: INR {test.price}</p>
+      <div className={`mb-5 rounded-md p-4 ${test.bookingType === "Package" ? "bg-emerald-50" : "bg-blue-50"}`}>
+        <p className={`text-xs font-bold uppercase ${test.bookingType === "Package" ? "text-emerald-600" : "text-blue-500"}`}>Selected {test.bookingType || "Test"}</p>
+        <h2 className={`text-xl font-bold ${test.bookingType === "Package" ? "text-emerald-950" : "text-blue-950"}`}>{test.displayName || test.testName}</h2>
+        <p className={`text-sm ${test.bookingType === "Package" ? "text-emerald-800" : "text-blue-800"}`}>Amount: INR {test.price}</p>
       </div>
       <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Input name="selectedTest" value={test.testName} readOnly className="bg-slate-50" />
+        <Input name="selectedTest" value={test.displayName || test.testName} readOnly className="bg-slate-50" />
         <Input name="age" type="number" min="0" max="130" placeholder="Patient age" value={form.age} onChange={handleChange} />
         <select
           name="gender"

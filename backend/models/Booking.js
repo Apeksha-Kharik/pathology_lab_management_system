@@ -3,7 +3,9 @@ const mongoose = require("mongoose");
 const bookingSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   patientId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-  testId: { type: mongoose.Schema.Types.ObjectId, ref: "Test", required: true },
+  testId: { type: mongoose.Schema.Types.ObjectId, ref: "Test" },
+  packageId: { type: mongoose.Schema.Types.ObjectId, ref: "Package" },
+  bookingType: { type: String, enum: ["Test", "Package"], default: "Test" },
   name: { type: String, required: true },
   testName: { type: String, required: true },
   age: { type: Number, required: true },

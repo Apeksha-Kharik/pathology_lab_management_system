@@ -5,6 +5,11 @@ export const getTests = async (search = "") => {
   return response.data;
 };
 
+export const getPackages = async () => {
+  const response = await api.get("/packages");
+  return response.data;
+};
+
 export const createBooking = async (payload) => {
   const response = await api.post("/book-test", payload);
   return response.data;
