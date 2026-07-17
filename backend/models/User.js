@@ -1,10 +1,40 @@
 const mongoose = require('mongoose');
 
+const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 const userSchema = new mongoose.Schema({
-  name: { type: String, required: true },
+  name: {
+    type: String,
+    required: true,
+    trim: true,
+    validate: {
+      validator: async function (value) {
+        if (this.role !== "patient" || !value) {
+          return true;
+        }
+
+        const existingUser = await this.constructor.findOne({
+          _id: { $ne: this._id },
+          role: "patient",
+          name: { $regex: `^${escapeRegex(value.trim())}$`, $options: "i" }
+        });
+
+        return !existingUser;
+      },
+      message: "Name already exists"
+    }
+  },
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   phone: { type: String, required: true },
-  age: { type: Number },
+  age: {
+    type: Number,
+    min: [18, "Age must be 18 or above"],
+    max: [120, "Age must be 120 or below"],
+    validate: {
+      validator: Number.isInteger,
+      message: "Age must be a whole number"
+    }
+  },
   gender: { type: String, enum: ["Male", "Female", "Other", "Prefer not to say", ""], default: "" },
   dateOfBirth: { type: Date },
   address: { type: String },
