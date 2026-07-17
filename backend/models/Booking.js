@@ -16,6 +16,7 @@ const bookingSchema = new mongoose.Schema({
   bookingDate: { type: String, required: true },
   timeSlot: { type: String, required: true },
   notes: { type: String },
+  prescribedBy: { type: String },
   doctorNotes: { type: String },
   sampleType: { type: String },
   rejectionReason: { type: String },

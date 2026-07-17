@@ -178,6 +178,7 @@ function BookingForm({ test, onCancel, onBooked }) {
     age: "",
     gender: "",
     sampleType: "",
+    prescribedBy: "",
     notes: ""
   });
 
@@ -214,6 +215,7 @@ function BookingForm({ test, onCancel, onBooked }) {
       <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Input name="selectedTest" value={test.testName} readOnly className="bg-slate-50" />
         <Input name="age" type="number" min="0" max="130" placeholder="Patient age" value={form.age} onChange={handleChange} />
+        <Input name="prescribedBy" placeholder="Prescribed by" value={form.prescribedBy} onChange={handleChange} />
         <select
           name="gender"
           value={form.gender}
@@ -430,6 +432,7 @@ function BookingRow({ booking }) {
           <p className="font-bold text-slate-900">{booking.testName}</p>
           <p className="text-sm text-slate-500">Requested: {booking.bookingDate || booking.date} | {booking.timeSlot}</p>
           <p className="text-sm text-slate-500">Amount: INR {booking.amount}</p>
+          {booking.prescribedBy && <p className="text-sm text-slate-500">Prescribed by: {booking.prescribedBy}</p>}
           {booking.notes && <p className="text-sm text-slate-500">Notes: {booking.notes}</p>}
           {booking.rejectionReason && <p className="text-sm text-red-600">Rejection reason: {booking.rejectionReason}</p>}
         </div>
