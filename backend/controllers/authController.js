@@ -137,7 +137,7 @@ const register = async (req, res) => {
       otpExpiry: getOtpExpiry()
     });
 
-    const emailResult = await sendOtpEmail({
+    await sendOtpEmail({
       to: user.email,
       subject: "Verify your INDIPATH account",
       otp
@@ -145,8 +145,7 @@ const register = async (req, res) => {
 
     res.status(201).json({
       message: "Registration successful. OTP sent to your email.",
-      user: buildUserResponse(user),
-      devOtp: emailResult.devOtp
+      user: buildUserResponse(user)
     });
   } catch (error) {
     if (error.name === "ValidationError") {
@@ -374,15 +373,14 @@ const forgotPassword = async (req, res) => {
     user.resetPasswordExpiry = undefined;
     await user.save();
 
-    const emailResult = await sendOtpEmail({
+    await sendOtpEmail({
       to: user.email,
       subject: "Reset your INDIPATH password",
       otp
     });
 
     res.json({
-      message: "Password reset OTP sent to your email",
-      devOtp: emailResult.devOtp
+      message: "Password reset OTP sent to your email"
     });
   } catch (error) {
     res.status(500).json({ message: "Forgot password failed", error: error.message });
