@@ -39,6 +39,7 @@ const userSchema = new mongoose.Schema({
   dateOfBirth: { type: Date },
   address: { type: String },
   city: { type: String },
+  state: { type: String },
   pincode: { type: String },
   emergencyContactName: { type: String },
   emergencyContactPhone: { type: String },

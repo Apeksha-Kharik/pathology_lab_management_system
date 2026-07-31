@@ -10,6 +10,7 @@ import PathologistLogin from "./pages/PathologistLogin";
 import ForgotPassword from "./pages/ForgotPassword";
 import ChangePassword from "./pages/ChangePassword";
 import PatientDashboard from "./pages/PatientDashboard";
+import PatientProfile from "./pages/PatientProfile";
 import AdminDashboard from "./pages/AdminDashboard";
 import ReceptionistDashboard from "./pages/ReceptionistDashboard";
 import TechnicianDashboard from "./pages/TechnicianDashboard";
@@ -32,6 +33,7 @@ function App() {
           <Route path="/change-password" element={<ProtectedRoute allowedRoles={["admin", "patient", "receptionist", "technician", "pathologist"]}><ChangePassword /></ProtectedRoute>} />
 
           <Route path="/patient_dashboard" element={<ProtectedRoute allowedRoles={["patient"]}><PatientDashboard /></ProtectedRoute>} />
+          <Route path="/patient/profile" element={<ProtectedRoute allowedRoles={["patient"]}><PatientProfile /></ProtectedRoute>} />
           <Route path="/admin" element={<ProtectedRoute allowedRoles={["admin"]}><AdminDashboard /></ProtectedRoute>} />
           <Route path="/receptionist" element={<ProtectedRoute allowedRoles={["receptionist"]}><ReceptionistDashboard /></ProtectedRoute>} />
           <Route path="/receptionist/dashboard" element={<ProtectedRoute allowedRoles={["receptionist"]}><ReceptionistDashboard /></ProtectedRoute>} />

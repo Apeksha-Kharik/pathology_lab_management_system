@@ -28,6 +28,7 @@ const buildUserResponse = (user) => ({
   dateOfBirth: user.dateOfBirth || "",
   address: user.address || "",
   city: user.city || "",
+  state: user.state || "",
   pincode: user.pincode || "",
   emergencyContactName: user.emergencyContactName || "",
   emergencyContactPhone: user.emergencyContactPhone || "",

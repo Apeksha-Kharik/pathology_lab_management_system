@@ -1,172 +1,330 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion as Motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import {
-  ChevronDown,
+  BadgeCheck,
+  CalendarDays,
   ChevronLeft,
   ChevronRight,
+  CheckCircle2,
   Download,
   FileText,
-  Home,
+  FlaskConical,
+  HeartPulse,
   LogOut,
+  MapPin,
   Phone,
+  Printer,
   Search,
+  ShieldCheck,
   ShoppingCart,
   TestTube2,
-  User,
-  UserRound
+  UserRound,
+  X
 } from "lucide-react";
 import { useAuth } from "../context/useAuth";
 import {
-  createBooking,
   downloadReport,
   downloadReceipt,
   getBookings,
   getReports,
-  getTests,
-  getPackages
+  getTests
 } from "../services/patientService";
-import { changePassword, updateProfile } from "../services/profileService";
 import logo from "../assets/logo.png";
-import packageFallbackImage from "../assets/bg1.png";
+import bg1 from "../assets/bg1.png";
 import bg2 from "../assets/bg2.png";
+import bg3 from "../assets/bg3.png";
 
 const dashboardFont = "Aptos, 'Avenir Next', Inter, 'Segoe UI', system-ui, sans-serif";
+const showLegacyDashboardSections = false;
 
-const packagePresentation = [
+const healthPackageCards = [
   {
+    id: "pkg-01",
+    type: "package",
     title: "Executive Wellness Check",
-    category: "Preventive Care",
-    description: "A balanced screening for working professionals covering core blood markers, metabolic health, organ function, and lifestyle risk indicators.",
-    imageUrl: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=900&q=80"
+    imageUrl: bg2,
+    chips: ["72 profiles", "110 parameters", "24 hr report"],
+    price: 1499,
+    oldPrice: 2999,
+    discount: "50% off"
   },
   {
+    id: "pkg-02",
+    type: "package",
     title: "Complete Body Profile",
-    category: "Full Body",
-    description: "A broad preventive profile designed to review everyday wellness, nutritional status, vital organ function, and early health risk signals.",
-    imageUrl: "https://images.unsplash.com/photo-1582719471384-894fbb16e074?auto=format&fit=crop&w=900&q=80"
+    imageUrl: bg1,
+    chips: ["85 profiles", "125 parameters", "Same day"],
+    price: 1899,
+    oldPrice: 3799,
+    discount: "50% off"
   },
   {
+    id: "pkg-03",
+    type: "package",
     title: "Diabetes Care Panel",
-    category: "Diabetes",
-    description: "Focused monitoring for blood sugar trends, kidney impact, lipid balance, and long-term diabetic care planning.",
-    imageUrl: "https://images.unsplash.com/photo-1579154204601-01588f351e67?auto=format&fit=crop&w=900&q=80"
+    imageUrl: bg3,
+    chips: ["18 profiles", "42 parameters", "12 hr report"],
+    price: 899,
+    oldPrice: 1599,
+    discount: "44% off"
   },
   {
+    id: "pkg-04",
+    type: "package",
     title: "Heart Health Screening",
-    category: "Cardiac",
-    description: "A cardiac-focused assessment for cholesterol, inflammation risk, and markers that support proactive heart health decisions.",
-    imageUrl: "https://images.unsplash.com/photo-1559757148-5c350d0d3c56?auto=format&fit=crop&w=900&q=80"
+    imageUrl: bg2,
+    chips: ["24 profiles", "58 parameters", "24 hr report"],
+    price: 1199,
+    oldPrice: 2199,
+    discount: "45% off"
   },
   {
+    id: "pkg-05",
+    type: "package",
     title: "Women Wellness Profile",
-    category: "Women Health",
-    description: "Thoughtfully selected tests for hormonal balance, anemia screening, thyroid health, vitamin levels, and overall wellness.",
-    imageUrl: "https://images.unsplash.com/photo-1551601651-2a8555f1a136?auto=format&fit=crop&w=900&q=80"
+    imageUrl: bg1,
+    chips: ["34 profiles", "76 parameters", "24 hr report"],
+    price: 1399,
+    oldPrice: 2499,
+    discount: "44% off"
   },
   {
+    id: "pkg-06",
+    type: "package",
     title: "Senior Citizen Care",
-    category: "Senior Care",
-    description: "A practical profile for older adults covering chronic health markers, organ function, bone health, and key preventive indicators.",
-    imageUrl: "https://images.unsplash.com/photo-1584515933487-779824d29309?auto=format&fit=crop&w=900&q=80"
+    imageUrl: bg3,
+    chips: ["52 profiles", "92 parameters", "Free fasting"],
+    price: 1699,
+    oldPrice: 3299,
+    discount: "48% off"
   },
   {
+    id: "pkg-07",
+    type: "package",
     title: "Thyroid & Vitamin Profile",
-    category: "Energy & Fatigue",
-    description: "Ideal for fatigue, weight changes, and low energy concerns, with thyroid markers and essential vitamin screening.",
-    imageUrl: "https://images.unsplash.com/photo-1576671081837-49000212a370?auto=format&fit=crop&w=900&q=80"
+    imageUrl: bg2,
+    chips: ["12 profiles", "28 parameters", "12 hr report"],
+    price: 799,
+    oldPrice: 1399,
+    discount: "43% off"
   },
   {
+    id: "pkg-08",
+    type: "package",
     title: "Liver & Kidney Function",
-    category: "Organ Health",
-    description: "A focused organ function review to monitor liver enzymes, kidney filtration, electrolytes, and related metabolic markers.",
-    imageUrl: "https://images.unsplash.com/photo-1581595220892-b0739db3ba8c?auto=format&fit=crop&w=900&q=80"
+    imageUrl: bg1,
+    chips: ["16 profiles", "38 parameters", "Same day"],
+    price: 999,
+    oldPrice: 1799,
+    discount: "44% off"
   },
   {
+    id: "pkg-09",
+    type: "package",
     title: "Immunity & Infection Panel",
-    category: "Immunity",
-    description: "A clinically useful panel for infection clues, inflammation trends, blood counts, and immune response indicators.",
-    imageUrl: "https://images.unsplash.com/photo-1581093458791-9f3c3900df7b?auto=format&fit=crop&w=900&q=80"
+    imageUrl: bg3,
+    chips: ["14 profiles", "33 parameters", "Urgent slots"],
+    price: 1099,
+    oldPrice: 1999,
+    discount: "45% off"
   },
   {
+    id: "pkg-10",
+    type: "package",
     title: "Active Lifestyle Profile",
-    category: "Fitness",
-    description: "Designed for active adults, this profile reviews muscle recovery, nutrients, cardiac risk, and metabolic readiness.",
-    imageUrl: "https://images.unsplash.com/photo-1571019613914-85f342c6a11e?auto=format&fit=crop&w=900&q=80"
+    imageUrl: bg2,
+    chips: ["28 profiles", "63 parameters", "24 hr report"],
+    price: 1299,
+    oldPrice: 2399,
+    discount: "46% off"
   },
   {
+    id: "pkg-11",
+    type: "package",
     title: "Child Wellness Check",
-    category: "Child Care",
-    description: "A compact wellness screen for children, focused on blood counts, nutritional markers, and common health indicators.",
-    imageUrl: "https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?auto=format&fit=crop&w=900&q=80"
+    imageUrl: bg1,
+    chips: ["10 profiles", "22 parameters", "Pediatric care"],
+    price: 699,
+    oldPrice: 1299,
+    discount: "46% off"
   },
   {
+    id: "pkg-12",
+    type: "package",
     title: "Pre-Surgery Screening",
-    category: "Clinical Readiness",
-    description: "Essential pre-procedure investigations to help clinicians review blood health, clotting status, and organ readiness.",
-    imageUrl: "https://images.unsplash.com/photo-1583912267550-d44c12f83739?auto=format&fit=crop&w=900&q=80"
+    imageUrl: bg3,
+    chips: ["20 profiles", "45 parameters", "Doctor ready"],
+    price: 1599,
+    oldPrice: 2899,
+    discount: "45% off"
   },
   {
+    id: "pkg-13",
+    type: "package",
     title: "Fever & Inflammation Check",
-    category: "Acute Care",
-    description: "A responsive package for fever, body ache, and infection symptoms with blood counts and inflammation-focused markers.",
-    imageUrl: "https://images.unsplash.com/photo-1585435557343-3b092031a831?auto=format&fit=crop&w=900&q=80"
+    imageUrl: bg2,
+    chips: ["9 profiles", "19 parameters", "Fast report"],
+    price: 599,
+    oldPrice: 1099,
+    discount: "45% off"
   },
   {
+    id: "pkg-14",
+    type: "package",
     title: "Essential Annual Checkup",
-    category: "Annual Care",
-    description: "A clean annual profile for individuals who want a reliable overview of wellness, deficiencies, and lifestyle risk factors.",
-    imageUrl: "https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&w=900&q=80"
+    imageUrl: bg1,
+    chips: ["40 profiles", "80 parameters", "24 hr report"],
+    price: 1299,
+    oldPrice: 2499,
+    discount: "48% off"
   },
   {
+    id: "pkg-15",
+    type: "package",
     title: "Advanced Wellness Plus",
-    category: "Premium Care",
-    description: "A premium preventive panel combining routine diagnostics with deeper metabolic, cardiac, thyroid, and vitamin insights.",
-    imageUrl: "https://images.unsplash.com/photo-1580281657527-47f249e8f4df?auto=format&fit=crop&w=900&q=80"
+    imageUrl: bg3,
+    chips: ["96 profiles", "145 parameters", "Premium care"],
+    price: 2499,
+    oldPrice: 4999,
+    discount: "50% off"
   }
 ];
 
-const toTitleCase = (value = "") =>
-  value
-    .toString()
-    .trim()
-    .toLowerCase()
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+const popularTestCards = [
+  { id: "test-01", type: "test", title: "Complete Blood Count", icon: TestTube2, chips: ["29 parameters", "Same day", "Blood"], price: 299 },
+  { id: "test-02", type: "test", title: "Thyroid Profile Total", icon: HeartPulse, chips: ["T3 T4 TSH", "12 hr report", "Serum"], price: 449 },
+  { id: "test-03", type: "test", title: "Lipid Profile", icon: FlaskConical, chips: ["9 parameters", "Fasting", "Serum"], price: 599 },
+  { id: "test-04", type: "test", title: "Liver Function Test", icon: ShieldCheck, chips: ["12 parameters", "Same day", "Serum"], price: 699 },
+  { id: "test-05", type: "test", title: "Kidney Function Test", icon: BadgeCheck, chips: ["11 parameters", "Same day", "Serum"], price: 649 },
+  { id: "test-06", type: "test", title: "HbA1c", icon: TestTube2, chips: ["Diabetes", "3 month avg", "Blood"], price: 399 },
+  { id: "test-07", type: "test", title: "Vitamin D Total", icon: HeartPulse, chips: ["Deficiency", "24 hr report", "Serum"], price: 899 },
+  { id: "test-08", type: "test", title: "Vitamin B12", icon: FlaskConical, chips: ["Energy", "24 hr report", "Serum"], price: 749 },
+  { id: "test-09", type: "test", title: "CRP Quantitative", icon: ShieldCheck, chips: ["Inflammation", "Same day", "Blood"], price: 499 },
+  { id: "test-10", type: "test", title: "Urine Routine", icon: BadgeCheck, chips: ["Microscopy", "Same day", "Urine"], price: 199 },
+  { id: "test-11", type: "test", title: "Blood Sugar Fasting", icon: TestTube2, chips: ["Glucose", "Fasting", "Plasma"], price: 99 },
+  { id: "test-12", type: "test", title: "Electrolytes Profile", icon: HeartPulse, chips: ["Na K Cl", "Same day", "Serum"], price: 499 },
+  { id: "test-13", type: "test", title: "Iron Studies", icon: FlaskConical, chips: ["Anemia", "24 hr report", "Serum"], price: 799 },
+  { id: "test-14", type: "test", title: "Dengue NS1 Antigen", icon: ShieldCheck, chips: ["Fever", "Rapid report", "Blood"], price: 699 },
+  { id: "test-15", type: "test", title: "ESR", icon: BadgeCheck, chips: ["Inflammation", "Same day", "Blood"], price: 149 }
+];
 
-const enhancePackage = (item, index) => {
-  const preset = packagePresentation[index % packagePresentation.length];
-  return {
-    ...item,
-    packageName: toTitleCase(item.packageName || preset.title),
-    category: toTitleCase(item.category || preset.category),
-    description: item.description || preset.description,
-    imageUrl: item.imageUrl || preset.imageUrl,
-    parametersCount: item.parametersCount || item.includedTests?.length || 0
-  };
+const filterShowcaseItems = (items, searchTerm) => {
+  const search = searchTerm.trim().toLowerCase();
+
+  if (!search) {
+    return items;
+  }
+
+  return items.filter((item) => {
+    const searchableText = [
+      item.title,
+      item.type,
+      item.discount,
+      ...(item.chips || [])
+    ].join(" ").toLowerCase();
+
+    return searchableText.includes(search);
+  });
+};
+
+const getCartStorageKey = (user) => {
+  const identifier = user?.id || user?._id || user?.email || "guest";
+  return `indipath_cart_${identifier}`;
+};
+
+const getBookingRequestsStorageKey = (user) => {
+  const identifier = user?.id || user?._id || user?.email || "guest";
+  return `indipath_booking_requests_${identifier}`;
+};
+
+const readStoredCart = (storageKey) => {
+  try {
+    const savedCart = localStorage.getItem(storageKey);
+    return savedCart ? JSON.parse(savedCart) : [];
+  } catch {
+    return [];
+  }
+};
+
+const readStoredBookingRequests = (storageKey) => {
+  try {
+    const savedRequests = localStorage.getItem(storageKey);
+    return savedRequests ? JSON.parse(savedRequests) : [];
+  } catch {
+    return [];
+  }
+};
+
+const buildBookingHistoryRows = (localRequests, serverBookings) => {
+  const localRows = localRequests.map((booking) => ({
+    id: booking.bookingId,
+    code: booking.bookingId,
+    status: booking.status || "Pending Approval",
+    paymentStatus: booking.paymentStatus || "Pending",
+    testName: booking.itemTitle,
+    bookingType: booking.itemType,
+    patientName: booking.patient?.name || "",
+    age: booking.patient?.age || "",
+    gender: booking.patient?.gender || "",
+    mobile: booking.patient?.mobile || "",
+    email: booking.patient?.email || "",
+    collectionType: booking.collectionType,
+    location: booking.location,
+    date: booking.preferredDate,
+    timeSlot: booking.timeSlot,
+    amount: booking.amount,
+    notes: booking.patient?.notes || ""
+  }));
+
+  const serverRows = serverBookings.map((booking) => ({
+    id: booking._id,
+    code: booking.bookingCode || booking._id,
+    status: booking.bookingStatus || booking.status || "Pending Approval",
+    paymentStatus: booking.paymentStatus || "Pending",
+    testName: booking.testName,
+    bookingType: booking.bookingType || "Test",
+    patientName: booking.patientName || "",
+    age: booking.age || "",
+    gender: booking.gender || "",
+    mobile: booking.phone || "",
+    email: booking.email || "",
+    collectionType: booking.collectionType || "Lab",
+    location: booking.address || nearestLab.address,
+    date: booking.bookingDate || booking.date || "",
+    timeSlot: booking.timeSlot || "",
+    amount: booking.amount || "",
+    notes: booking.notes || ""
+  }));
+
+  return [...localRows, ...serverRows];
 };
 
 function PatientDashboard() {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const cartStorageKey = useMemo(() => getCartStorageKey(user), [user]);
+  const bookingRequestsStorageKey = useMemo(() => getBookingRequestsStorageKey(user), [user]);
   const [active, setActive] = useState("tests");
+  const [patientView, setPatientView] = useState("book");
   const [tests, setTests] = useState([]);
-  const [packages, setPackages] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [reports, setReports] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedTest, setSelectedTest] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [cartItems, setCartItems] = useState([]);
+  const [cartItems, setCartItems] = useState(() => readStoredCart(cartStorageKey));
+  const [bookingRequests, setBookingRequests] = useState(() => readStoredBookingRequests(bookingRequestsStorageKey));
+  const [bookingItem, setBookingItem] = useState(null);
 
   const loadDashboard = async () => {
     try {
       setLoading(true);
-      const [testsData, packagesData, bookingsData, reportsData] = await Promise.all([
+      const [testsData, bookingsData, reportsData] = await Promise.all([
         getTests(),
-        getPackages(),
         getBookings(),
         getReports()
       ]);
       setTests(testsData || []);
-      setPackages(packagesData || []);
       setBookings(bookingsData || []);
       setReports(reportsData || []);
     } catch (error) {
@@ -190,9 +348,14 @@ function PatientDashboard() {
     });
   }, [tests, searchTerm]);
 
-  const displayPackages = useMemo(
-    () => packages.map((item, index) => enhancePackage(item, index)),
-    [packages]
+  const filteredHealthPackages = useMemo(
+    () => filterShowcaseItems(healthPackageCards, searchTerm),
+    [searchTerm]
+  );
+
+  const filteredPopularTests = useMemo(
+    () => filterShowcaseItems(popularTestCards, searchTerm),
+    [searchTerm]
   );
 
   const handleLogout = () => {
@@ -200,88 +363,128 @@ function PatientDashboard() {
     window.location.href = "/";
   };
 
-  const handleBooked = async () => {
-    setSelectedTest(null);
-    setCartItems([]);
-    setActive("history");
-    await loadDashboard();
-  };
-
   const handleAddToCart = (item) => {
-    const packageItem = { ...item, bookingType: "Package", displayName: item.packageName };
     setCartItems((currentItems) => {
-      if (currentItems.some((cartItem) => cartItem._id === item._id)) {
+      if (currentItems.some((cartItem) => cartItem.id === item.id)) {
         return currentItems;
       }
 
-      return [...currentItems, packageItem];
+      const nextItems = [...currentItems, item];
+      localStorage.setItem(cartStorageKey, JSON.stringify(nextItems));
+      return nextItems;
     });
   };
 
   const handleRemoveFromCart = (itemId) => {
-    setCartItems((currentItems) => currentItems.filter((item) => item._id !== itemId));
+    setCartItems((currentItems) => {
+      const nextItems = currentItems.filter((item) => item.id !== itemId);
+      localStorage.setItem(cartStorageKey, JSON.stringify(nextItems));
+      return nextItems;
+    });
   };
 
-  const handleBookFromCart = (item) => {
-    setSelectedTest(item);
-    setActive("tests");
+  const handleOpenBooking = (item) => {
+    setBookingItem(item);
   };
 
-  const handleBookPackage = (item) => {
-    setSelectedTest({ ...item, bookingType: "Package", displayName: item.packageName });
-    setActive("tests");
+  const handleCloseBooking = () => {
+    setBookingItem(null);
   };
+
+  const handleBookingRequested = (request) => {
+    setBookingRequests((currentRequests) => {
+      const nextRequests = [request, ...currentRequests];
+      localStorage.setItem(bookingRequestsStorageKey, JSON.stringify(nextRequests));
+      return nextRequests;
+    });
+  };
+
+  const bookingHistoryRows = useMemo(
+    () => buildBookingHistoryRows(bookingRequests, bookings),
+    [bookingRequests, bookings]
+  );
 
   return (
     <div className="min-h-screen bg-[#f6fbf8] text-slate-900" style={{ fontFamily: dashboardFont }}>
       <PatientNavbar
         cartItems={cartItems}
-        onBookItem={handleBookFromCart}
+        onBookNow={handleOpenBooking}
         onLogout={handleLogout}
         onRemoveItem={handleRemoveFromCart}
         onSearchChange={setSearchTerm}
-        onShowProfile={() => setActive("profile")}
+        onShowProfile={() => navigate("/patient/profile")}
         searchTerm={searchTerm}
         user={user}
       />
 
       <main className="mx-auto max-w-7xl px-4 py-7 sm:px-6 sm:py-9 lg:px-8">
-        {!loading && displayPackages.length > 0 && (
-          <HealthPackagesCarousel
-            cartItems={cartItems}
-            packages={displayPackages}
-            onAddToCart={handleAddToCart}
-            onBook={handleBookPackage}
-          />
+        <div className="mb-6 flex flex-wrap gap-3">
+          <button onClick={() => setPatientView("book")} className={`rounded-2xl px-5 py-3 text-sm font-black shadow-sm transition-colors ${patientView === "book" ? "bg-emerald-700 text-white" : "border border-emerald-100 bg-white text-emerald-800 hover:bg-emerald-50"}`}>
+            Book Tests
+          </button>
+          <button onClick={() => setPatientView("history")} className={`rounded-2xl px-5 py-3 text-sm font-black shadow-sm transition-colors ${patientView === "history" ? "bg-emerald-700 text-white" : "border border-emerald-100 bg-white text-emerald-800 hover:bg-emerald-50"}`}>
+            Booking History
+          </button>
+        </div>
+
+        {!loading && patientView === "book" && (
+          <div className="mb-8 space-y-8">
+            <ShowcaseRow
+              cartItems={cartItems}
+              eyebrow="Health Packages"
+              items={filteredHealthPackages}
+              onAddToCart={handleAddToCart}
+              onBookNow={handleOpenBooking}
+              subtitle="Preventive profiles with bundled savings, fast reporting, and clean patient-facing booking flow."
+              title="Health Packages"
+            />
+            <ShowcaseRow
+              cartItems={cartItems}
+              eyebrow="Popular Tests"
+              items={filteredPopularTests}
+              onAddToCart={handleAddToCart}
+              onBookNow={handleOpenBooking}
+              subtitle="Frequently booked individual diagnostics presented in the same responsive carousel pattern."
+              title="Popular Tests"
+            />
+          </div>
         )}
 
-        <nav className="mb-6 flex flex-wrap gap-2">
-          <TabButton active={active === "tests"} onClick={() => { setActive("tests"); setSelectedTest(null); }}>Available Tests</TabButton>
-          <TabButton active={active === "history"} onClick={() => setActive("history")}>Booking History</TabButton>
-          <TabButton active={active === "payments"} onClick={() => setActive("payments")}>Payment Status</TabButton>
-          <TabButton active={active === "reports"} onClick={() => setActive("reports")}>Reports & Receipts</TabButton>
-          <TabButton active={active === "profile"} onClick={() => setActive("profile")}>Profile</TabButton>
-        </nav>
+        {!loading && patientView === "history" && (
+          <BookingHistoryTable bookings={bookingHistoryRows} />
+        )}
 
-        {loading ? (
-          <div className="rounded-2xl border border-emerald-100 bg-white p-8 text-center font-semibold text-slate-500 shadow-sm">Loading dashboard...</div>
-        ) : (
-          <section className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-xl shadow-emerald-950/8 sm:p-7">
-            {active === "tests" && (
-              selectedTest ? (
-                <BookingForm test={selectedTest} onCancel={() => setSelectedTest(null)} onBooked={handleBooked} />
-              ) : (
-                <AvailableTests tests={filteredTests} searchTerm={searchTerm} setSearchTerm={setSearchTerm} onBook={setSelectedTest} />
-              )
+        {showLegacyDashboardSections && (
+          <>
+            <nav className="mb-6 flex flex-wrap gap-2">
+              <TabButton active={active === "tests"} onClick={() => setActive("tests")}>Available Tests</TabButton>
+              <TabButton active={active === "history"} onClick={() => setActive("history")}>Booking History</TabButton>
+              <TabButton active={active === "payments"} onClick={() => setActive("payments")}>Payment Status</TabButton>
+              <TabButton active={active === "reports"} onClick={() => setActive("reports")}>Reports & Receipts</TabButton>
+            </nav>
+
+            {loading ? (
+              <div className="rounded-2xl border border-emerald-100 bg-white p-8 text-center font-semibold text-slate-500 shadow-sm">Loading dashboard...</div>
+            ) : (
+              <section className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-xl shadow-emerald-950/8 sm:p-7">
+                {active === "tests" && <AvailableTests tests={filteredTests} searchTerm={searchTerm} setSearchTerm={setSearchTerm} onBook={() => {}} />}
+                {active === "history" && <BookingHistory bookings={bookings} />}
+                {active === "payments" && <PaymentStatus bookings={bookings} />}
+                {active === "reports" && <ReportsAndReceipts bookings={bookings} reports={reports} />}
+              </section>
             )}
-
-            {active === "history" && <BookingHistory bookings={bookings} />}
-            {active === "payments" && <PaymentStatus bookings={bookings} />}
-            {active === "reports" && <ReportsAndReceipts bookings={bookings} reports={reports} />}
-            {active === "profile" && <ProfileSection user={user} />}
-          </section>
+          </>
         )}
       </main>
+
+      {bookingItem && (
+        <BookingWizardModal
+          item={bookingItem}
+          onBookingRequested={handleBookingRequested}
+          onClose={handleCloseBooking}
+          user={user}
+        />
+      )}
     </div>
   );
 }
@@ -297,7 +500,7 @@ function TabButton({ active, children, onClick }) {
   );
 }
 
-function PatientNavbar({ cartItems, onBookItem, onLogout, onRemoveItem, onSearchChange, onShowProfile, searchTerm, user }) {
+function PatientNavbar({ cartItems, onBookNow, onLogout, onRemoveItem, onSearchChange, onShowProfile, searchTerm, user }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const cartTotal = cartItems.reduce((sum, item) => sum + Number(item.price || 0), 0);
@@ -362,14 +565,14 @@ function PatientNavbar({ cartItems, onBookItem, onLogout, onRemoveItem, onSearch
                 {cartItems.length ? (
                   <div className="space-y-3">
                     {cartItems.map((item) => (
-                      <div key={item._id} className="rounded-xl border border-slate-100 bg-slate-50 p-3">
-                        <p className="text-sm font-black text-slate-900">{item.packageName}</p>
+                      <div key={item.id} className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+                        <p className="text-sm font-black text-slate-900">{item.title}</p>
                         <p className="text-xs font-semibold text-slate-500">INR {item.price}</p>
                         <div className="mt-3 flex gap-2">
-                          <button onClick={() => { onBookItem(item); setCartOpen(false); }} className="flex-1 rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-800">
-                            Book
+                          <button onClick={() => { onBookNow(item); setCartOpen(false); }} className="flex-1 rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-800">
+                            Book Now
                           </button>
-                          <button onClick={() => onRemoveItem(item._id)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-white">
+                          <button onClick={() => onRemoveItem(item.id)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-emerald-50 hover:text-emerald-800">
                             Remove
                           </button>
                         </div>
@@ -392,77 +595,562 @@ function PatientNavbar({ cartItems, onBookItem, onLogout, onRemoveItem, onSearch
   );
 }
 
-function HealthPackagesCarousel({ cartItems, packages, onAddToCart, onBook }) {
-  const carouselRef = useRef(null);
+function ShowcaseRow({ cartItems, eyebrow, items, onAddToCart, onBookNow, subtitle, title }) {
+  const rowRef = useRef(null);
 
-  const scrollByCard = (direction) => {
-    carouselRef.current?.scrollBy({ left: direction * 380, behavior: "smooth" });
+  const scrollRow = (direction) => {
+    rowRef.current?.scrollBy({
+      left: direction * Math.max(rowRef.current.clientWidth * 0.85, 320),
+      behavior: "smooth"
+    });
   };
 
   return (
-    <section className="mb-8 overflow-hidden rounded-3xl border border-emerald-100 bg-white shadow-xl shadow-emerald-950/8">
-      <div className="relative bg-emerald-950 px-5 py-8 text-white sm:px-7">
+    <section className="overflow-hidden rounded-3xl border border-emerald-100 bg-white shadow-xl shadow-emerald-950/8">
+      <div className="relative bg-emerald-950 px-6 py-8 text-white sm:px-8">
         <div className="absolute inset-0 bg-cover bg-center opacity-30" style={{ backgroundImage: `url(${bg2})` }} />
         <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(2,44,34,0.97),rgba(6,95,70,0.78),rgba(15,118,110,0.58))]" />
         <div className="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.22em] text-emerald-100">Health Packages</p>
-            <h2 className="mt-2 max-w-3xl text-3xl font-black leading-tight tracking-tight sm:text-[2.5rem]">Curated checkups for preventive care</h2>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-emerald-50/85">Choose from clinically relevant preventive profiles and book through the same secure patient workflow.</p>
+            <p className="text-xs font-bold uppercase tracking-[0.22em] text-emerald-100">{eyebrow}</p>
+            <h2 className="mt-2 max-w-3xl text-4xl font-black leading-tight tracking-tight sm:text-[2.65rem]">{title}</h2>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-emerald-50/85">{subtitle}</p>
           </div>
           <div className="flex gap-2">
-            <button onClick={() => scrollByCard(-1)} className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/15 bg-white/10 text-white transition hover:-translate-y-0.5 hover:bg-white/15" aria-label="Previous packages">
+            <button onClick={() => scrollRow(-1)} className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/15 bg-white/10 text-white transition-colors hover:bg-white/15" aria-label={`Scroll ${title} left`}>
               <ChevronLeft size={22} />
             </button>
-            <button onClick={() => scrollByCard(1)} className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/15 bg-white/10 text-white transition hover:-translate-y-0.5 hover:bg-white/15" aria-label="Next packages">
+            <button onClick={() => scrollRow(1)} className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/15 bg-white/10 text-white transition-colors hover:bg-white/15" aria-label={`Scroll ${title} right`}>
               <ChevronRight size={22} />
             </button>
           </div>
         </div>
       </div>
 
-      <div ref={carouselRef} className="flex snap-x gap-5 overflow-x-auto scroll-smooth px-5 py-6 sm:px-7">
-        {packages.map((item, index) => {
-          const isInCart = cartItems.some((cartItem) => cartItem._id === item._id);
+      <div className="px-5 py-7 sm:px-8">
+        {items.length ? (
+          <div ref={rowRef} className="flex gap-6 overflow-x-auto scroll-smooth pb-2">
+            {items.map((item) => {
+              const isInCart = cartItems.some((cartItem) => cartItem.id === item.id);
 
-          return (
-            <Motion.article
-              key={item._id}
-              initial={{ opacity: 0, y: 18 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, delay: index * 0.04 }}
-              className="group min-w-[82%] snap-start overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-sm transition duration-300 hover:-translate-y-1.5 hover:border-emerald-300 hover:shadow-xl hover:shadow-emerald-950/10 sm:min-w-[19.5rem] lg:min-w-[20.5rem]"
-            >
-              <div className="relative h-44 overflow-hidden">
-                <img src={item.imageUrl || packageFallbackImage} onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = packageFallbackImage; }} alt={item.packageName} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
-                <div className="absolute left-4 top-4 rounded-full bg-white/95 px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-emerald-800 shadow-sm">
-                  {item.category || "Package"}
-                </div>
-              </div>
-              <div className="p-5">
-                <div className="flex items-start justify-between gap-4">
-                  <h3 className="text-[1.08rem] font-black leading-snug text-emerald-950">{item.packageName}</h3>
-                  {item.homeCollection && <span title="Home collection available" className="rounded-lg bg-emerald-50 p-2 text-emerald-700"><Home size={18} /></span>}
-                </div>
-                <p className="mt-3 min-h-24 text-sm leading-6 text-slate-600">{item.description || "Comprehensive health checkup package."}</p>
-                <p className="mt-3 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">{item.includedTests?.length || item.parametersCount || 0} tests / parameters included</p>
-                <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-emerald-100 pt-4">
-                  <span className="text-2xl font-black text-emerald-950">INR {item.price}</span>
-                  <div className="flex gap-2">
-                    <button onClick={() => onAddToCart(item)} className={`rounded-xl px-4 py-2 text-sm font-bold transition ${isInCart ? "bg-emerald-50 text-emerald-800" : "bg-emerald-700 text-white hover:bg-emerald-800"}`}>
-                      {isInCart ? "Added" : "Add to cart"}
-                    </button>
-                    <button onClick={() => onBook(item)} className="rounded-xl border border-emerald-200 px-4 py-2 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50">
-                      Book
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </Motion.article>
-          );
-        })}
+              return (
+                <ShowcaseCard
+                  key={item.id}
+                  item={item}
+                  isInCart={isInCart}
+                  onAddToCart={onAddToCart}
+                  onBookNow={onBookNow}
+                />
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-3xl border border-emerald-100 bg-emerald-50 p-8 text-center text-sm font-bold text-slate-600">
+            No {title.toLowerCase()} found for this search.
+          </div>
+        )}
       </div>
     </section>
+  );
+}
+
+function ShowcaseCard({ item, isInCart, onAddToCart, onBookNow }) {
+  const Icon = item.icon || CalendarDays;
+
+  return (
+    <article className="flex min-h-[31rem] shrink-0 basis-[88%] flex-col overflow-hidden rounded-3xl border border-emerald-100 bg-white shadow-[0_10px_35px_rgba(2,44,34,0.07)] transition-shadow duration-300 hover:border-emerald-300 hover:shadow-[0_18px_45px_rgba(2,44,34,0.12)] sm:basis-[calc((100%_-_24px)/2)] lg:basis-[calc((100%_-_48px)/3)]">
+      <div className="relative h-48 overflow-hidden bg-emerald-50">
+        {item.imageUrl ? (
+          <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full items-center justify-center bg-[linear-gradient(135deg,#ecfdf5,#f8fafc)]">
+            <span className="flex h-24 w-24 items-center justify-center rounded-3xl bg-white text-emerald-700 shadow-lg shadow-emerald-950/10">
+              <Icon size={46} />
+            </span>
+          </div>
+        )}
+        {item.discount && (
+          <span className="absolute right-4 top-4 rounded-full bg-emerald-700 px-3 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-white shadow-sm">
+            {item.discount}
+          </span>
+        )}
+      </div>
+
+      <div className="flex flex-1 flex-col p-6">
+        <h3 className="min-h-16 text-[1.28rem] font-black leading-snug text-emerald-950">{item.title}</h3>
+
+        <div className="mt-4 flex min-h-20 flex-wrap content-start gap-2.5">
+          {item.chips.map((chip) => (
+            <span key={chip} className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800">
+              {chip}
+            </span>
+          ))}
+        </div>
+
+        <div className="mt-5 border-t border-emerald-100 pt-5">
+          <div className="flex min-h-9 items-center gap-2">
+            <span className="text-[1.7rem] font-black text-emerald-950">INR {item.price}</span>
+            {item.oldPrice && <span className="text-sm font-bold text-slate-400 line-through">INR {item.oldPrice}</span>}
+          </div>
+        </div>
+
+        <div className="mt-auto space-y-2">
+          <button
+            onClick={() => onAddToCart(item)}
+            className={`w-full rounded-2xl px-4 py-3.5 text-sm font-black text-white shadow-lg shadow-emerald-950/10 transition-colors duration-200 ${isInCart ? "bg-emerald-900" : "bg-emerald-700 hover:bg-emerald-800"}`}
+          >
+            {isInCart ? "Added to Cart" : "Add to Cart"}
+          </button>
+          {isInCart && (
+            <button
+              onClick={() => onBookNow(item)}
+              className="w-full rounded-2xl border border-emerald-200 bg-white px-4 py-3.5 text-sm font-black text-emerald-800 shadow-sm transition-colors duration-200 hover:bg-emerald-50"
+            >
+              Book Now
+            </button>
+          )}
+        </div>
+      </div>
+    </article>
+  );
+}
+
+const timeSlots = [
+  "07:00 AM - 09:00 AM",
+  "09:00 AM - 11:00 AM",
+  "11:00 AM - 01:00 PM",
+  "04:00 PM - 06:00 PM"
+];
+
+const nearestLab = {
+  name: "INDIPATH Super Speciality Pathology Lab",
+  address: "Near Main Road, Kankavali, Maharashtra 416602",
+  timings: "Mon-Sat, 7:00 AM - 8:00 PM",
+  contact: "02367-231970, 7448231970",
+  map: "https://maps.google.com/?q=Kankavali%20Maharashtra%20416602"
+};
+
+const createBlankBookingForm = () => ({
+  name: "",
+  age: "",
+  gender: "",
+  mobile: "",
+  email: "",
+  prescribedBy: "",
+  notes: "",
+  preferredDate: "",
+  timeSlot: "",
+  houseNo: "",
+  building: "",
+  street: "",
+  landmark: "",
+  area: "",
+  city: "",
+  taluka: "",
+  district: "",
+  state: "",
+  pinCode: ""
+});
+
+const createSelfBookingForm = (user) => ({
+  ...createBlankBookingForm(),
+  name: user?.name || "",
+  age: user?.age || "",
+  gender: user?.gender || "",
+  mobile: user?.phone || "",
+  email: user?.email || "",
+  street: user?.address || "",
+  city: user?.city || "",
+  state: user?.state || "",
+  pinCode: user?.pincode || user?.pinCode || ""
+});
+
+function BookingWizardModal({ item, onBookingRequested, onClose, user }) {
+  const [step, setStep] = useState(1);
+  const [patientType, setPatientType] = useState("self");
+  const [collectionType, setCollectionType] = useState("home");
+  const [error, setError] = useState("");
+  const [bookingId, setBookingId] = useState("");
+  const [form, setForm] = useState(() => createSelfBookingForm(user));
+
+  const updateField = (name, value) => {
+    setForm((current) => ({ ...current, [name]: value }));
+  };
+
+  const updatePatientType = (value) => {
+    setPatientType(value);
+    setError("");
+
+    if (value === "self") {
+      setForm(createSelfBookingForm(user));
+      return;
+    }
+
+    setForm(createBlankBookingForm());
+  };
+
+  const selectedItems = [item];
+  const totalAmount = selectedItems.reduce((sum, selectedItem) => sum + Number(selectedItem.price || 0), 0);
+
+  const validateStep = () => {
+    if (step === 1) {
+      const patientFields = ["name", "age", "gender", "mobile", "email"];
+      const missingPatient = patientFields.some((field) => !String(form[field] || "").trim());
+
+      if (missingPatient || !form.preferredDate || !form.timeSlot) {
+        return "Please complete patient details, preferred date, and time slot.";
+      }
+    }
+
+    if (step === 2 && collectionType === "home") {
+      const addressFields = ["houseNo", "street", "area", "city", "taluka", "district", "state", "pinCode"];
+      const missingAddress = addressFields.some((field) => !String(form[field] || "").trim());
+
+      if (missingAddress) {
+        return "Please complete the home collection address.";
+      }
+    }
+
+    return "";
+  };
+
+  const goNext = () => {
+    const validationError = validateStep();
+
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    setError("");
+    setStep((current) => Math.min(current + 1, 3));
+  };
+
+  const confirmBooking = () => {
+    const id = `IND-${Date.now().toString().slice(-6)}`;
+    const location = collectionType === "home"
+      ? `${form.houseNo}, ${form.building ? `${form.building}, ` : ""}${form.street}, ${form.landmark ? `${form.landmark}, ` : ""}${form.area}, ${form.city}, ${form.taluka}, ${form.district}, ${form.state} - ${form.pinCode}`
+      : `${nearestLab.name}, ${nearestLab.address}`;
+
+    onBookingRequested({
+      bookingId: id,
+      status: "Pending Approval",
+      paymentStatus: "Pending",
+      itemId: item.id,
+      itemTitle: item.title,
+      itemType: item.type === "package" ? "Package" : "Test",
+      amount: totalAmount,
+      patient: {
+        name: form.name,
+        age: form.age,
+        gender: form.gender,
+        mobile: form.mobile,
+        email: form.email,
+        prescribedBy: form.prescribedBy,
+        notes: form.notes
+      },
+      collectionType: collectionType === "home" ? "Home Collection" : "Visit Lab",
+      location,
+      preferredDate: form.preferredDate,
+      timeSlot: form.timeSlot,
+      createdAt: new Date().toISOString()
+    });
+    setBookingId(id);
+    setStep(4);
+  };
+
+  const summaryText = [
+    `Booking ID: ${bookingId}`,
+    `Item: ${item.title}`,
+    `Patient: ${form.name}`,
+    `Date/Time: ${form.preferredDate}, ${form.timeSlot}`,
+    `Collection: ${collectionType === "home" ? "Home Collection" : "Visit Lab"}`,
+    `Amount: INR ${totalAmount}`,
+    "Payment Status: Pay at lab / pending"
+  ].join("\n");
+
+  const downloadSummary = () => {
+    const blob = new Blob([summaryText], { type: "text/plain;charset=utf-8" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${bookingId || "booking"}-summary.txt`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-emerald-950/35 px-4 py-6 backdrop-blur-md">
+      <Motion.div
+        initial={{ opacity: 0, y: 18, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.28, ease: "easeOut" }}
+        className="max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-3xl border border-white/60 bg-white shadow-2xl shadow-emerald-950/25"
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-emerald-100 px-5 py-4 sm:px-7">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-700">Secure booking</p>
+            <h2 className="mt-1 text-2xl font-black text-emerald-950 sm:text-3xl">{step === 4 ? "Booking Request Submitted" : item.title}</h2>
+          </div>
+          <button onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-emerald-50 hover:text-emerald-800" aria-label="Close booking modal">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="max-h-[calc(92vh-5.5rem)] overflow-y-auto px-5 py-6 sm:px-7">
+          {step < 4 && <WizardProgress step={step} />}
+          {error && <div className="mb-5 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-800">{error}</div>}
+
+          {step === 1 && (
+            <div className="space-y-6">
+              <SegmentedChoice
+                value={patientType}
+                onChange={updatePatientType}
+                options={[
+                  { value: "self", label: "Self", description: "Use your registered patient details." },
+                  { value: "other", label: "Other Patient", description: "Book for a family member or another patient." }
+                ]}
+              />
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <WizardField label="Name" value={form.name} onChange={(value) => updateField("name", value)} />
+                <WizardField label="Age" type="number" value={form.age} onChange={(value) => updateField("age", value)} />
+                <WizardSelect label="Gender" value={form.gender} onChange={(value) => updateField("gender", value)} options={["", "Male", "Female", "Other", "Prefer not to say"]} />
+                <WizardField label="Mobile" value={form.mobile} onChange={(value) => updateField("mobile", value)} />
+                <WizardField label="Email" type="email" value={form.email} onChange={(value) => updateField("email", value)} />
+                <WizardField label="Prescribed By / Doctor" value={form.prescribedBy} onChange={(value) => updateField("prescribedBy", value)} />
+                <WizardField label="Preferred Date" type="date" value={form.preferredDate} onChange={(value) => updateField("preferredDate", value)} />
+                <WizardSelect label="Time Slot" value={form.timeSlot} onChange={(value) => updateField("timeSlot", value)} options={["", ...timeSlots]} />
+                <label className="md:col-span-2">
+                  <span className="mb-2 block text-sm font-black text-slate-700">Notes if needed</span>
+                  <textarea value={form.notes} onChange={(event) => updateField("notes", event.target.value)} className="min-h-28 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-semibold outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100" />
+                </label>
+              </div>
+            </div>
+          )}
+
+          {step === 2 && (
+            <div className="space-y-6">
+              <SegmentedChoice
+                value={collectionType}
+                onChange={(value) => { setCollectionType(value); setError(""); }}
+                options={[
+                  { value: "home", label: "Home Collection", description: "Technician visits your selected address." },
+                  { value: "lab", label: "Visit Lab", description: "Walk in at the nearest INDIPATH lab." }
+                ]}
+              />
+
+              {collectionType === "home" ? (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <WizardField label="House / Flat No." value={form.houseNo} onChange={(value) => updateField("houseNo", value)} />
+                  <WizardField label="Building" value={form.building} onChange={(value) => updateField("building", value)} />
+                  <WizardField label="Street" value={form.street} onChange={(value) => updateField("street", value)} />
+                  <WizardField label="Landmark" value={form.landmark} onChange={(value) => updateField("landmark", value)} />
+                  <WizardField label="Area" value={form.area} onChange={(value) => updateField("area", value)} />
+                  <WizardField label="City" value={form.city} onChange={(value) => updateField("city", value)} />
+                  <WizardField label="Taluka" value={form.taluka} onChange={(value) => updateField("taluka", value)} />
+                  <WizardField label="District" value={form.district} onChange={(value) => updateField("district", value)} />
+                  <WizardField label="State" value={form.state} onChange={(value) => updateField("state", value)} />
+                  <WizardField label="PIN Code" value={form.pinCode} onChange={(value) => updateField("pinCode", value)} />
+                </div>
+              ) : (
+                <div className="overflow-hidden rounded-3xl border border-emerald-100 bg-emerald-50">
+                  <div className="flex h-56 items-center justify-center bg-[linear-gradient(135deg,#d1fae5,#f8fafc)] text-emerald-800">
+                    <div className="text-center">
+                      <MapPin size={52} className="mx-auto mb-3" />
+                      <p className="text-sm font-black uppercase tracking-[0.18em]">Nearest Lab Location</p>
+                    </div>
+                  </div>
+                  <div className="grid gap-4 p-6 md:grid-cols-[1fr_auto] md:items-center">
+                    <div>
+                      <h3 className="text-xl font-black text-emerald-950">{nearestLab.name}</h3>
+                      <p className="mt-2 text-sm font-semibold leading-7 text-slate-700">{nearestLab.address}</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-600">Timings: {nearestLab.timings}</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-600">Contact: {nearestLab.contact}</p>
+                    </div>
+                    <a href={nearestLab.map} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-800">
+                      <MapPin size={18} /> View Map
+                    </a>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {step === 3 && (
+            <BookingReview item={item} form={form} collectionType={collectionType} totalAmount={totalAmount} />
+          )}
+
+          {step === 4 && (
+            <BookingSuccess
+              bookingId={bookingId}
+              collectionType={collectionType}
+              form={form}
+              item={item}
+              onBookMore={onClose}
+              onDownload={downloadSummary}
+              totalAmount={totalAmount}
+            />
+          )}
+
+          {step < 4 && (
+            <div className="mt-7 flex flex-col-reverse gap-3 border-t border-emerald-100 pt-5 sm:flex-row sm:justify-between">
+              <button type="button" onClick={() => step === 1 ? onClose() : setStep((current) => current - 1)} className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50">
+                {step === 1 ? "Cancel" : "Back"}
+              </button>
+              <button type="button" onClick={step === 3 ? confirmBooking : goNext} className="rounded-2xl bg-emerald-700 px-6 py-3 text-sm font-black text-white shadow-lg shadow-emerald-950/10 transition hover:bg-emerald-800 hover:shadow-xl">
+                {step === 3 ? "Submit Request" : "Next"}
+              </button>
+            </div>
+          )}
+        </div>
+      </Motion.div>
+    </div>
+  );
+}
+
+function WizardProgress({ step }) {
+  return (
+    <div className="mb-6 grid gap-3 sm:grid-cols-3">
+      {["Patient", "Collection", "Review"].map((label, index) => {
+        const number = index + 1;
+        const active = step >= number;
+
+        return (
+          <div key={label} className={`rounded-2xl border px-4 py-3 transition ${active ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-slate-200 bg-white text-slate-500"}`}>
+            <p className="text-xs font-black uppercase tracking-[0.18em]">Step {number}</p>
+            <p className="mt-1 text-sm font-black">{label}</p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function SegmentedChoice({ options, onChange, value }) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      {options.map((option) => {
+        const active = value === option.value;
+
+        return (
+          <button key={option.value} type="button" onClick={() => onChange(option.value)} className={`rounded-3xl border p-5 text-left transition duration-300 ${active ? "border-emerald-300 bg-emerald-50 shadow-lg shadow-emerald-950/8" : "border-slate-200 bg-white hover:border-emerald-200 hover:shadow-md"}`}>
+            <span className="text-lg font-black text-emerald-950">{option.label}</span>
+            <span className="mt-2 block text-sm font-semibold leading-6 text-slate-600">{option.description}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function WizardField({ label, onChange, readOnly = false, type = "text", value }) {
+  return (
+    <label>
+      <span className="mb-2 block text-sm font-black text-slate-700">{label}</span>
+      <input
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        readOnly={readOnly}
+        className={`w-full rounded-2xl border border-slate-200 px-4 py-3 font-semibold outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 ${readOnly ? "bg-emerald-50 text-slate-600" : "bg-slate-50 focus:bg-white"}`}
+      />
+    </label>
+  );
+}
+
+function WizardSelect({ disabled = false, label, onChange, options, value }) {
+  return (
+    <label>
+      <span className="mb-2 block text-sm font-black text-slate-700">{label}</span>
+      <select
+        disabled={disabled}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className={`w-full rounded-2xl border border-slate-200 px-4 py-3 font-semibold outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 ${disabled ? "bg-emerald-50 text-slate-600" : "bg-slate-50 focus:bg-white"}`}
+      >
+        {options.map((option) => (
+          <option key={option || "empty"} value={option}>{option || `Select ${label}`}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function BookingReview({ collectionType, form, item, totalAmount }) {
+  const address = `${form.houseNo}, ${form.building ? `${form.building}, ` : ""}${form.street}, ${form.landmark ? `${form.landmark}, ` : ""}${form.area}, ${form.city}, ${form.taluka}, ${form.district}, ${form.state} - ${form.pinCode}`;
+
+  return (
+    <div className="grid gap-5 lg:grid-cols-[1fr_0.85fr]">
+      <div className="rounded-3xl border border-emerald-100 bg-white p-5 shadow-sm">
+        <h3 className="text-xl font-black text-emerald-950">Booking Review</h3>
+        <div className="mt-5 space-y-4">
+          <ReviewLine label="Selected" value={item.title} />
+          <ReviewLine label="Patient" value={`${form.name}, ${form.age} yrs, ${form.gender}`} />
+          <ReviewLine label="Contact" value={`${form.mobile} | ${form.email}`} />
+          <ReviewLine label="Doctor" value={form.prescribedBy || "Not specified"} />
+          <ReviewLine label="Date & Time" value={`${form.preferredDate} | ${form.timeSlot}`} />
+          <ReviewLine label="Collection" value={collectionType === "home" ? "Home Collection" : "Visit Lab"} />
+          <ReviewLine label={collectionType === "home" ? "Address" : "Lab"} value={collectionType === "home" ? address : `${nearestLab.name}, ${nearestLab.address}`} />
+          {form.notes && <ReviewLine label="Notes" value={form.notes} />}
+        </div>
+      </div>
+
+      <div className="rounded-3xl bg-emerald-950 p-6 text-white shadow-xl shadow-emerald-950/15">
+        <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-200">Amount</p>
+        <p className="mt-3 text-4xl font-black">INR {totalAmount}</p>
+        <p className="mt-3 text-sm font-semibold leading-7 text-emerald-50/80">Payment status will remain pending until lab confirmation or collection payment.</p>
+      </div>
+    </div>
+  );
+}
+
+function ReviewLine({ label, value }) {
+  return (
+    <div className="border-b border-slate-100 pb-3 last:border-b-0 last:pb-0">
+      <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">{label}</p>
+      <p className="mt-1 text-sm font-bold leading-6 text-slate-800">{value}</p>
+    </div>
+  );
+}
+
+function BookingSuccess({ bookingId, collectionType, form, item, onBookMore, onDownload, totalAmount }) {
+  return (
+    <div className="mx-auto max-w-3xl text-center">
+      <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+        <CheckCircle2 size={58} />
+      </div>
+      <h3 className="mt-5 text-3xl font-black text-emerald-950">Booking request submitted</h3>
+      <p className="mt-2 text-sm font-semibold text-slate-600">Booking ID: <span className="text-emerald-800">{bookingId}</span></p>
+      <p className="mt-2 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
+        Status: Pending Approval. Your booking will be confirmed only after receptionist approval.
+      </p>
+
+      <div className="mt-6 rounded-3xl border border-emerald-100 bg-emerald-50 p-5 text-left">
+        <ReviewLine label="Selected" value={item.title} />
+        <ReviewLine label="Patient" value={form.name} />
+        <ReviewLine label="Date & Time" value={`${form.preferredDate} | ${form.timeSlot}`} />
+        <ReviewLine label="Collection" value={collectionType === "home" ? "Home Collection" : "Visit Lab"} />
+        <ReviewLine label="Amount" value={`INR ${totalAmount}`} />
+        <ReviewLine label="Booking Status" value="Pending Approval" />
+        <ReviewLine label="Payment Status" value="Pending / Pay at lab" />
+      </div>
+
+      <div className="mt-6 grid gap-3 sm:grid-cols-2">
+        <button onClick={onDownload} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-800 transition hover:bg-emerald-50">
+          <Download size={18} /> Download
+        </button>
+        <button onClick={() => window.print()} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-800 transition hover:bg-emerald-50">
+          <Printer size={18} /> Print
+        </button>
+        <button onClick={onBookMore} className="rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white transition hover:bg-emerald-800">
+          Book More Tests
+        </button>
+        <button onClick={() => { window.location.href = "/"; }} className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-black text-white transition hover:bg-slate-800">
+          Go to Home
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -504,85 +1192,69 @@ function AvailableTests({ tests, searchTerm, setSearchTerm, onBook }) {
   );
 }
 
-function BookingForm({ test, onCancel, onBooked }) {
-  const [form, setForm] = useState({
-    bookingDate: "",
-    timeSlot: "",
-    age: "",
-    gender: "",
-    sampleType: "",
-    notes: ""
-  });
-
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setForm({ ...form, [name]: type === "checkbox" ? checked : value });
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!form.bookingDate || !form.timeSlot || !form.age || !form.gender) {
-      alert("Please enter patient age, gender, preferred date and time slot");
-      return;
-    }
-
-    try {
-      const data = await createBooking({ ...form, ...(test.bookingType === "Package" ? { packageId: test._id } : { testId: test._id }) });
-      alert(data.message);
-      onBooked();
-    } catch (error) {
-      alert(error.response?.data?.message || "Booking failed");
-    }
-  };
+function BookingHistoryTable({ bookings }) {
+  if (!bookings.length) {
+    return (
+      <section className="rounded-3xl border border-emerald-100 bg-white p-8 text-center shadow-xl shadow-emerald-950/8">
+        <h2 className="text-2xl font-black text-emerald-950">Booking History</h2>
+        <p className="mt-2 text-sm font-semibold text-slate-500">No booking requests yet.</p>
+      </section>
+    );
+  }
 
   return (
-    <div>
-      <button onClick={onCancel} className="mb-5 text-sm font-extrabold text-emerald-700 hover:text-emerald-950">Back to tests</button>
-      <div className="mb-5 rounded-xl bg-emerald-50 p-4">
-        <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-emerald-700">Selected {test.bookingType || "Test"}</p>
-        <h2 className="text-xl font-extrabold text-emerald-950">{test.displayName || test.testName}</h2>
-        <p className="text-sm font-semibold text-emerald-800">Amount: INR {test.price}</p>
+    <section className="overflow-hidden rounded-3xl border border-emerald-100 bg-white shadow-xl shadow-emerald-950/8">
+      <div className="border-b border-emerald-100 px-5 py-5 sm:px-7">
+        <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-700">Patient Portal</p>
+        <h2 className="mt-1 text-3xl font-black text-emerald-950">Booking History</h2>
       </div>
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Input name="selectedTest" value={test.displayName || test.testName} readOnly className="bg-slate-50" />
-        <Input name="age" type="number" min="0" max="130" placeholder="Patient age" value={form.age} onChange={handleChange} />
-        <select
-          name="gender"
-          value={form.gender}
-          onChange={handleChange}
-          className="rounded-xl border border-slate-200 bg-slate-50 p-3 font-semibold outline-none focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100"
-        >
-          <option value="">Gender</option>
-          <option value="Male">Male</option>
-          <option value="Female">Female</option>
-          <option value="Other">Other</option>
-          <option value="Prefer not to say">Prefer not to say</option>
-        </select>
-        <Input name="bookingDate" type="date" value={form.bookingDate} onChange={handleChange} />
-        <Input name="sampleType" placeholder="Sample type, if known" value={form.sampleType} onChange={handleChange} />
-        <select
-          name="timeSlot"
-          value={form.timeSlot}
-          onChange={handleChange}
-          className="rounded-xl border border-slate-200 bg-slate-50 p-3 font-semibold outline-none focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100 md:col-span-2"
-        >
-          <option value="">Preferred time slot</option>
-          <option value="09:00 AM - 11:00 AM">09:00 AM - 11:00 AM</option>
-          <option value="11:00 AM - 01:00 PM">11:00 AM - 01:00 PM</option>
-          <option value="02:00 PM - 04:00 PM">02:00 PM - 04:00 PM</option>
-          <option value="04:00 PM - 06:00 PM">04:00 PM - 06:00 PM</option>
-        </select>
-        <textarea
-          name="notes"
-          placeholder="Additional notes"
-          value={form.notes}
-          onChange={handleChange}
-          className="min-h-28 rounded-xl border border-slate-200 bg-slate-50 p-3 font-semibold outline-none focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100 md:col-span-2"
-        />
-        <button className="rounded-xl bg-emerald-700 p-3 font-extrabold text-white shadow-lg shadow-emerald-950/10 hover:bg-emerald-800 md:col-span-2">Submit Booking Request</button>
-      </form>
-    </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[1180px] text-left text-sm">
+          <thead className="bg-emerald-50 text-xs uppercase tracking-[0.12em] text-emerald-900">
+            <tr>
+              <th className="px-4 py-4">Booking ID</th>
+              <th className="px-4 py-4">Status</th>
+              <th className="px-4 py-4">Payment</th>
+              <th className="px-4 py-4">Test / Package</th>
+              <th className="px-4 py-4">Type</th>
+              <th className="px-4 py-4">Patient</th>
+              <th className="px-4 py-4">Age</th>
+              <th className="px-4 py-4">Gender</th>
+              <th className="px-4 py-4">Mobile</th>
+              <th className="px-4 py-4">Email</th>
+              <th className="px-4 py-4">Collection</th>
+              <th className="px-4 py-4">Location</th>
+              <th className="px-4 py-4">Date</th>
+              <th className="px-4 py-4">Time</th>
+              <th className="px-4 py-4">Amount</th>
+              <th className="px-4 py-4">Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {bookings.map((booking) => (
+              <tr key={booking.id} className="border-t border-emerald-50 align-top">
+                <td className="px-4 py-4 font-black text-emerald-950">{booking.code}</td>
+                <td className="px-4 py-4"><StatusBadge value={booking.status} /></td>
+                <td className="px-4 py-4"><StatusBadge value={booking.paymentStatus} /></td>
+                <td className="px-4 py-4 font-bold text-slate-900">{booking.testName}</td>
+                <td className="px-4 py-4 text-slate-600">{booking.bookingType}</td>
+                <td className="px-4 py-4 text-slate-600">{booking.patientName || "N/A"}</td>
+                <td className="px-4 py-4 text-slate-600">{booking.age || "N/A"}</td>
+                <td className="px-4 py-4 text-slate-600">{booking.gender || "N/A"}</td>
+                <td className="px-4 py-4 text-slate-600">{booking.mobile || "N/A"}</td>
+                <td className="px-4 py-4 text-slate-600">{booking.email || "N/A"}</td>
+                <td className="px-4 py-4 text-slate-600">{booking.collectionType || "N/A"}</td>
+                <td className="max-w-xs px-4 py-4 text-slate-600">{booking.location || "N/A"}</td>
+                <td className="px-4 py-4 text-slate-600">{booking.date || "N/A"}</td>
+                <td className="px-4 py-4 text-slate-600">{booking.timeSlot || "N/A"}</td>
+                <td className="px-4 py-4 font-black text-emerald-950">INR {booking.amount || 0}</td>
+                <td className="max-w-xs px-4 py-4 text-slate-600">{booking.notes || "N/A"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 
@@ -669,65 +1341,6 @@ function ReportButton({ report }) {
   );
 }
 
-function ProfileSection({ user }) {
-  const [profile, setProfile] = useState({
-    name: user?.name || "",
-    phone: user?.phone || ""
-  });
-  const [passwords, setPasswords] = useState({
-    currentPassword: "",
-    newPassword: ""
-  });
-
-  const saveProfile = async (e) => {
-    e.preventDefault();
-
-    try {
-      const data = await updateProfile(profile);
-      localStorage.setItem("user", JSON.stringify(data.user));
-      alert(data.message);
-    } catch (error) {
-      alert(error.response?.data?.message || "Profile update failed");
-    }
-  };
-
-  const savePassword = async (e) => {
-    e.preventDefault();
-
-    try {
-      const data = await changePassword(passwords);
-      setPasswords({ currentPassword: "", newPassword: "" });
-      alert(data.message);
-    } catch (error) {
-      alert(error.response?.data?.message || "Password change failed");
-    }
-  };
-
-  return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <form onSubmit={saveProfile} className="rounded-2xl border border-emerald-100 p-5">
-        <h2 className="mb-4 flex items-center gap-2 text-lg font-extrabold text-emerald-950"><User size={20} /> Patient Profile</h2>
-        <p className="mb-4 text-sm text-slate-500">Email: {user?.email}</p>
-        <div className="grid gap-3 md:grid-cols-2">
-          <Input value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} placeholder="Full name" className="w-full" />
-          <Input value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} placeholder="Phone number" className="w-full" />
-        </div>
-        <p className="my-4 rounded-md bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
-          Age, gender and sample details are captured during each test booking so every test request has accurate visit-specific information.
-        </p>
-        <button className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-extrabold text-white hover:bg-emerald-800">Update Profile</button>
-      </form>
-
-      <form onSubmit={savePassword} className="rounded-2xl border border-emerald-100 p-5">
-        <h2 className="mb-4 text-lg font-extrabold text-emerald-950">Change Password</h2>
-        <Input type="password" value={passwords.currentPassword} onChange={(e) => setPasswords({ ...passwords, currentPassword: e.target.value })} placeholder="Current password" className="mb-3 w-full" />
-        <Input type="password" value={passwords.newPassword} onChange={(e) => setPasswords({ ...passwords, newPassword: e.target.value })} placeholder="New password" className="mb-3 w-full" />
-        <button className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-extrabold text-white">Change Password</button>
-      </form>
-    </div>
-  );
-}
-
 function ReceiptButton({ booking }) {
   const handleDownload = async () => {
     try {
@@ -777,7 +1390,7 @@ function BookingRow({ booking }) {
 
 function StatusBadge({ value }) {
   const isGood = value === "Paid" || value === "Completed" || value === "Confirmed" || value === "Report Ready" || value === "Arrived";
-  const isWarning = value === "Pending Approval" || value === "Unpaid" || value === "Technician Assigned" || value === "Processing" || value === "Sample Collected" || value === "Pending Report Approval";
+  const isWarning = value === "Pending" || value === "Pending Approval" || value === "Unpaid" || value === "Technician Assigned" || value === "Processing" || value === "Sample Collected" || value === "Pending Report Approval";
   const classes = isGood
     ? "bg-green-100 text-green-700"
     : value === "Rejected"
@@ -787,10 +1400,6 @@ function StatusBadge({ value }) {
         : "bg-slate-100 text-slate-700";
 
   return <span className={`rounded px-2 py-1 text-xs font-bold uppercase ${classes}`}>{value}</span>;
-}
-
-function Input({ className = "", ...props }) {
-  return <input {...props} className={`rounded-xl border border-slate-200 bg-slate-50 p-3 font-semibold outline-none focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100 ${className}`} />;
 }
 
 function EmptyState({ text }) {
