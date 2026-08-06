@@ -1,6 +1,7 @@
 const express = require("express");
 const dotenv = require("dotenv");
 const cors = require("cors");
+const path = require("path");
 
 const connectDB = require("./config/db");
 const { verifyTransporter } = require("./config/email");
@@ -36,6 +37,17 @@ app.use(cors({
 }));
 
 app.use(express.json());
+app.use("/uploads/signatures", express.static(path.join(__dirname, "uploads", "signatures"), {
+  dotfiles: "deny",
+  fallthrough: false,
+  immutable: true,
+  maxAge: "1y",
+  index: false,
+  setHeaders: (res) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Content-Security-Policy", "default-src 'none'; img-src 'self'");
+  }
+}));
 
 // Test Route
 app.get("/", (req, res) => {

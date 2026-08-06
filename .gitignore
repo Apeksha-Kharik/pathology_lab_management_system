@@ -1,3 +1,5 @@
 node_modules
 .env
 dist
+backend/uploads/signatures/*
+!backend/uploads/signatures/.gitkeep

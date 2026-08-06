@@ -18,9 +18,13 @@ const reportSchema = new mongoose.Schema({
   results: [resultSchema],
   technicianRemarks: { type: String },
   pathologistId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   pathologistRemarks: { type: String },
   pathologistSignature: { type: String },
   pathologistSignatureImage: { type: String },
+  approvedPathologistName: { type: String },
+  approvedPathologistQualification: { type: String },
+  approvedPathologistRegistrationNumber: { type: String },
   rejectionReason: { type: String },
   reportStatus: {
     type: String,

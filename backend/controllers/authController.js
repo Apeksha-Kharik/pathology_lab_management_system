@@ -34,6 +34,8 @@ const buildUserResponse = (user) => ({
   emergencyContactPhone: user.emergencyContactPhone || "",
   referredBy: user.referredBy || "",
   qualification: user.qualification || "",
+  registrationNumber: user.registrationNumber || "",
+  signatureUrl: user.signatureUrl || "",
   role: normalizeRole(user.role),
   isVerified: user.isVerified,
   mustChangePassword: user.mustChangePassword

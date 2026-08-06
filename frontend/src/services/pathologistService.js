@@ -10,9 +10,22 @@ export const getPathologistReports = async () => {
   return response.data;
 };
 
+export const getPathologistProfile = async () => {
+  const response = await api.get("/api/pathologist/profile");
+  return response.data;
+};
+
+export const uploadPathologistSignature = async ({ file, qualification, registrationNumber }) => {
+  const formData = new FormData();
+  formData.append("signature", file);
+  formData.append("qualification", qualification);
+  formData.append("registrationNumber", registrationNumber);
+  const response = await api.post("/api/pathologist/profile/signature", formData);
+  return response.data;
+};
+
 export const approveReport = async (reportId, payload) => {
-  const body = typeof payload === "string" ? { pathologistSignature: payload } : payload;
-  const response = await api.patch(`/api/pathologist/reports/${reportId}/approve`, body);
+  const response = await api.patch(`/api/pathologist/reports/${reportId}/approve`, payload);
   return response.data;
 };
 

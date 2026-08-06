@@ -24,10 +24,14 @@ const protect = async (req, res, next) => {
 };
 
 const allowRoles = (...roles) => (req, res, next) => {
-  if (!req.user || !roles.includes(req.user.role)) {
+  const userRole = String(req.user?.role || "").trim().toLowerCase();
+  const allowedRoles = roles.map((role) => String(role).trim().toLowerCase());
+
+  if (!req.user || !allowedRoles.includes(userRole)) {
     return res.status(403).json({ message: "Access denied" });
   }
 
+  req.user.role = userRole;
   next();
 };
 

@@ -26,10 +26,22 @@ export const getReports = async () => {
 };
 
 export const downloadReport = async (reportId) => {
-  const response = await api.get(`/reports/${reportId}/download`, {
-    responseType: "blob"
-  });
-  return response.data;
+  try {
+    const response = await api.get(`/reports/${reportId}/download`, {
+      responseType: "blob"
+    });
+    return response.data;
+  } catch (error) {
+    if (error.response?.data instanceof Blob) {
+      try {
+        const body = JSON.parse(await error.response.data.text());
+        error.reportMessage = body.message;
+      } catch {
+        // The server did not return a JSON error body.
+      }
+    }
+    throw error;
+  }
 };
 
 export const downloadReceipt = async (bookingId) => {

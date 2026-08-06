@@ -8,6 +8,7 @@ import {
   ChevronRight,
   CheckCircle2,
   Download,
+  Eye,
   FileText,
   FlaskConical,
   HeartPulse,
@@ -24,9 +25,11 @@ import {
 } from "lucide-react";
 import { useAuth } from "../context/useAuth";
 import {
+  createBooking,
   downloadReport,
   downloadReceipt,
   getBookings,
+  getPackages,
   getReports,
   getTests
 } from "../services/patientService";
@@ -308,23 +311,26 @@ function PatientDashboard() {
   const [active, setActive] = useState("tests");
   const [patientView, setPatientView] = useState("book");
   const [tests, setTests] = useState([]);
+  const [packages, setPackages] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [reports, setReports] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [cartItems, setCartItems] = useState(() => readStoredCart(cartStorageKey));
-  const [bookingRequests, setBookingRequests] = useState(() => readStoredBookingRequests(bookingRequestsStorageKey));
+  const [bookingRequests] = useState(() => readStoredBookingRequests(bookingRequestsStorageKey));
   const [bookingItem, setBookingItem] = useState(null);
 
   const loadDashboard = async () => {
     try {
       setLoading(true);
-      const [testsData, bookingsData, reportsData] = await Promise.all([
+      const [testsData, packagesData, bookingsData, reportsData] = await Promise.all([
         getTests(),
+        getPackages(),
         getBookings(),
         getReports()
       ]);
       setTests(testsData || []);
+      setPackages(packagesData || []);
       setBookings(bookingsData || []);
       setReports(reportsData || []);
     } catch (error) {
@@ -349,13 +355,27 @@ function PatientDashboard() {
   }, [tests, searchTerm]);
 
   const filteredHealthPackages = useMemo(
-    () => filterShowcaseItems(healthPackageCards, searchTerm),
-    [searchTerm]
+    () => filterShowcaseItems(packages.map((item, index) => ({
+      id: item._id,
+      type: "package",
+      title: item.packageName,
+      imageUrl: item.imageUrl || healthPackageCards[index % healthPackageCards.length]?.imageUrl,
+      chips: [item.category, `${item.parametersCount || 0} parameters`, item.homeCollection ? "Home collection" : "Visit lab"].filter(Boolean),
+      price: item.price
+    })), searchTerm),
+    [packages, searchTerm]
   );
 
   const filteredPopularTests = useMemo(
-    () => filterShowcaseItems(popularTestCards, searchTerm),
-    [searchTerm]
+    () => filterShowcaseItems(tests.map((item, index) => ({
+      id: item._id,
+      type: "test",
+      title: item.testName,
+      icon: popularTestCards[index % popularTestCards.length]?.icon || TestTube2,
+      chips: [item.category, item.sampleType, item.turnaroundTime].filter(Boolean),
+      price: item.price
+    })), searchTerm),
+    [tests, searchTerm]
   );
 
   const handleLogout = () => {
@@ -392,11 +412,7 @@ function PatientDashboard() {
   };
 
   const handleBookingRequested = (request) => {
-    setBookingRequests((currentRequests) => {
-      const nextRequests = [request, ...currentRequests];
-      localStorage.setItem(bookingRequestsStorageKey, JSON.stringify(nextRequests));
-      return nextRequests;
-    });
+    setBookings((currentBookings) => [request, ...currentBookings.filter((booking) => booking._id !== request._id)]);
   };
 
   const bookingHistoryRows = useMemo(
@@ -425,6 +441,9 @@ function PatientDashboard() {
           <button onClick={() => setPatientView("history")} className={`rounded-2xl px-5 py-3 text-sm font-black shadow-sm transition-colors ${patientView === "history" ? "bg-emerald-700 text-white" : "border border-emerald-100 bg-white text-emerald-800 hover:bg-emerald-50"}`}>
             Booking History
           </button>
+          <button onClick={() => setPatientView("reports")} className={`inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-black shadow-sm transition-colors ${patientView === "reports" ? "bg-emerald-700 text-white" : "border border-emerald-100 bg-white text-emerald-800 hover:bg-emerald-50"}`}>
+            <FileText size={17} /> View / Download Reports
+          </button>
         </div>
 
         {!loading && patientView === "book" && (
@@ -452,6 +471,10 @@ function PatientDashboard() {
 
         {!loading && patientView === "history" && (
           <BookingHistoryTable bookings={bookingHistoryRows} />
+        )}
+
+        {!loading && patientView === "reports" && (
+          <ApprovedReportsPanel reports={reports} />
         )}
 
         {showLegacyDashboardSections && (
@@ -771,6 +794,7 @@ function BookingWizardModal({ item, onBookingRequested, onClose, user }) {
   const [collectionType, setCollectionType] = useState("home");
   const [error, setError] = useState("");
   const [bookingId, setBookingId] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState(() => createSelfBookingForm(user));
 
   const updateField = (name, value) => {
@@ -826,37 +850,38 @@ function BookingWizardModal({ item, onBookingRequested, onClose, user }) {
     setStep((current) => Math.min(current + 1, 3));
   };
 
-  const confirmBooking = () => {
-    const id = `IND-${Date.now().toString().slice(-6)}`;
+  const confirmBooking = async () => {
     const location = collectionType === "home"
       ? `${form.houseNo}, ${form.building ? `${form.building}, ` : ""}${form.street}, ${form.landmark ? `${form.landmark}, ` : ""}${form.area}, ${form.city}, ${form.taluka}, ${form.district}, ${form.state} - ${form.pinCode}`
       : `${nearestLab.name}, ${nearestLab.address}`;
 
-    onBookingRequested({
-      bookingId: id,
-      status: "Pending Approval",
-      paymentStatus: "Pending",
-      itemId: item.id,
-      itemTitle: item.title,
-      itemType: item.type === "package" ? "Package" : "Test",
-      amount: totalAmount,
-      patient: {
+    try {
+      setSubmitting(true);
+      setError("");
+      const data = await createBooking({
+        testId: item.type === "test" ? item.id : undefined,
+        packageId: item.type === "package" ? item.id : undefined,
+        bookingDate: form.preferredDate,
+        timeSlot: form.timeSlot,
+        notes: form.notes,
         name: form.name,
+        phone: form.mobile,
+        email: form.email,
         age: form.age,
         gender: form.gender,
-        mobile: form.mobile,
-        email: form.email,
         prescribedBy: form.prescribedBy,
-        notes: form.notes
-      },
-      collectionType: collectionType === "home" ? "Home Collection" : "Visit Lab",
-      location,
-      preferredDate: form.preferredDate,
-      timeSlot: form.timeSlot,
-      createdAt: new Date().toISOString()
-    });
-    setBookingId(id);
-    setStep(4);
+        collectionType: collectionType === "home" ? "Home Collection" : "Visit Lab",
+        address: location,
+        homeSample: collectionType === "home"
+      });
+      onBookingRequested(data.booking);
+      setBookingId(data.booking.bookingCode || data.booking._id);
+      setStep(4);
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || "Booking request could not be submitted. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const summaryText = [
@@ -998,8 +1023,8 @@ function BookingWizardModal({ item, onBookingRequested, onClose, user }) {
               <button type="button" onClick={() => step === 1 ? onClose() : setStep((current) => current - 1)} className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50">
                 {step === 1 ? "Cancel" : "Back"}
               </button>
-              <button type="button" onClick={step === 3 ? confirmBooking : goNext} className="rounded-2xl bg-emerald-700 px-6 py-3 text-sm font-black text-white shadow-lg shadow-emerald-950/10 transition hover:bg-emerald-800 hover:shadow-xl">
-                {step === 3 ? "Submit Request" : "Next"}
+              <button type="button" disabled={submitting} onClick={step === 3 ? confirmBooking : goNext} className="rounded-2xl bg-emerald-700 px-6 py-3 text-sm font-black text-white shadow-lg shadow-emerald-950/10 transition hover:bg-emerald-800 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60">
+                {step === 3 ? (submitting ? "Submitting..." : "Submit Request") : "Next"}
               </button>
             </div>
           )}
@@ -1299,14 +1324,29 @@ function PaymentStatus({ bookings }) {
   );
 }
 
+function ApprovedReportsPanel({ reports }) {
+  return (
+    <section className="rounded-3xl border border-emerald-100 bg-white p-5 shadow-xl shadow-emerald-950/8 sm:p-7">
+      <div className="mb-6">
+        <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-700">Patient Portal</p>
+        <h2 className="mt-1 text-3xl font-black text-emerald-950">Approved Reports</h2>
+        <p className="mt-2 text-sm font-semibold text-slate-500">View your signed report in the browser or download a PDF copy.</p>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {reports.length ? reports.map((report) => <ReportButton key={report._id} report={report} />) : <div className="md:col-span-2 xl:col-span-3"><EmptyState text="Reports appear here after pathologist approval." /></div>}
+      </div>
+    </section>
+  );
+}
+
 function ReportsAndReceipts({ bookings, reports }) {
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <div>
-        <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-slate-800"><FileText size={20} /> Download Report</h2>
+        <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-slate-800"><FileText size={20} /> Approved Reports</h2>
         {reports.length ? reports.map((report) => (
           <ReportButton key={report._id} report={report} />
-        )) : <EmptyState text="Download Report appears only when report status is ready." />}
+        )) : <EmptyState text="Reports appear here after pathologist approval." />}
       </div>
 
       <div>
@@ -1320,8 +1360,29 @@ function ReportsAndReceipts({ bookings, reports }) {
 }
 
 function ReportButton({ report }) {
+  const [reportAction, setReportAction] = useState("");
+
+  const handleView = async () => {
+    try {
+      setReportAction("view");
+      const blob = await downloadReport(report._id);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.click();
+      window.setTimeout(() => window.URL.revokeObjectURL(url), 60000);
+    } catch (error) {
+      alert(error.reportMessage || error.response?.data?.message || "Report preview failed");
+    } finally {
+      setReportAction("");
+    }
+  };
+
   const handleDownload = async () => {
     try {
+      setReportAction("download");
       const blob = await downloadReport(report._id);
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -1330,14 +1391,27 @@ function ReportButton({ report }) {
       link.click();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      alert(error.response?.data?.message || "Report download failed");
+      alert(error.reportMessage || error.response?.data?.message || "Report download failed");
+    } finally {
+      setReportAction("");
     }
   };
 
   return (
-    <button onClick={handleDownload} className="mb-3 flex w-full items-center justify-between rounded-md border border-slate-200 p-4 text-left text-sm font-semibold text-blue-700">
-      {report.testName || "Lab report"} <Download size={16} />
-    </button>
+    <div className="rounded-xl border border-emerald-100 bg-white p-4 shadow-sm">
+      <div className="mb-3">
+        <p className="font-bold text-slate-800">{report.testName || "Lab report"}</p>
+        <p className="mt-1 text-xs text-slate-500">Approved report</p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={handleView} disabled={Boolean(reportAction)} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">
+          <Eye size={16} /> {reportAction === "view" ? "Opening..." : "View Report"}
+        </button>
+        <button type="button" onClick={handleDownload} disabled={Boolean(reportAction)} className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60">
+          <Download size={16} /> {reportAction === "download" ? "Downloading..." : "Download"}
+        </button>
+      </div>
+    </div>
   );
 }
 

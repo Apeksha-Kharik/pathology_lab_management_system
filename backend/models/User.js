@@ -45,6 +45,8 @@ const userSchema = new mongoose.Schema({
   emergencyContactPhone: { type: String },
   referredBy: { type: String },
   qualification: { type: String },
+  registrationNumber: { type: String, trim: true },
+  signatureUrl: { type: String, default: "", trim: true },
   password: { type: String, required: true },
   role: { 
       type: String, 

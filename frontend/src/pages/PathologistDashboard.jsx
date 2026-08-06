@@ -1,13 +1,16 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Eye, LogOut, Search, Upload, XCircle } from "lucide-react";
+import { CheckCircle2, Eye, FileImage, LogOut, Search, ShieldCheck, Upload, XCircle } from "lucide-react";
 import { useAuth } from "../context/useAuth";
-import { approveReport, getPathologistReports, rejectReport } from "../services/pathologistService";
+import { approveReport, getPathologistProfile, getPathologistReports, rejectReport, uploadPathologistSignature } from "../services/pathologistService";
 
 function PathologistDashboard() {
-  const { logout, user } = useAuth();
+  const { logout, user, updateUser } = useAuth();
   const [reports, setReports] = useState([]);
-  const [signature, setSignature] = useState(user?.qualification ? `${user.name}, ${user.qualification}` : user?.name || "");
-  const [signatureImage, setSignatureImage] = useState("");
+  const [profile, setProfile] = useState(user || {});
+  const [signatureFile, setSignatureFile] = useState(null);
+  const [signaturePreview, setSignaturePreview] = useState("");
+  const [signatureMessage, setSignatureMessage] = useState({ type: "", text: "" });
+  const [uploadingSignature, setUploadingSignature] = useState(false);
   const [selectedReport, setSelectedReport] = useState(null);
   const [activeSection, setActiveSection] = useState("pending");
   const [searchTerm, setSearchTerm] = useState("");
@@ -22,16 +25,20 @@ function PathologistDashboard() {
   useEffect(() => {
     let isMounted = true;
 
-    getPathologistReports()
-      .then((data) => {
-        if (isMounted) setReports(data);
+    Promise.all([getPathologistReports(), getPathologistProfile()])
+      .then(([reportData, profileData]) => {
+        if (isMounted) {
+          setReports(reportData);
+          setProfile(profileData);
+          updateUser({ ...user, ...profileData });
+        }
       })
-      .catch(() => alert("Unable to load reports"));
+      .catch(() => alert("Unable to load pathologist dashboard"));
 
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filteredReports = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
@@ -64,17 +71,13 @@ function PathologistDashboard() {
       : pendingReports;
 
   const handleApprove = async (reportId, pathologistRemarks) => {
-    if (!signature.trim()) {
-      alert("Enter pathologist signature");
+    if (!profile.signatureUrl) {
+      alert("Upload your digital signature before approving a report");
       return;
     }
 
     try {
-      const data = await approveReport(reportId, {
-        pathologistSignature: signature.trim(),
-        pathologistRemarks,
-        pathologistSignatureImage: signatureImage
-      });
+      const data = await approveReport(reportId, { pathologistRemarks });
       alert(data.message);
       setSelectedReport(null);
       await loadReports();
@@ -102,10 +105,42 @@ function PathologistDashboard() {
   const handleSignatureUpload = (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    const extension = file.name.split(".").pop()?.toLowerCase();
+    if (!["image/png", "image/jpeg"].includes(file.type) || !["png", "jpg", "jpeg"].includes(extension)) {
+      setSignatureMessage({ type: "error", text: "Only PNG, JPG and JPEG files are allowed." });
+      event.target.value = "";
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setSignatureMessage({ type: "error", text: "Signature image must be 2 MB or smaller." });
+      event.target.value = "";
+      return;
+    }
+    if (signaturePreview) URL.revokeObjectURL(signaturePreview);
+    setSignatureFile(file);
+    setSignaturePreview(URL.createObjectURL(file));
+    setSignatureMessage({ type: "", text: "" });
+  };
 
-    const reader = new FileReader();
-    reader.onload = () => setSignatureImage(reader.result);
-    reader.readAsDataURL(file);
+  const saveSignature = async () => {
+    if (!signatureFile) return setSignatureMessage({ type: "error", text: "Choose a signature image first." });
+    if (!profile.qualification?.trim() || !profile.registrationNumber?.trim()) {
+      return setSignatureMessage({ type: "error", text: "Qualification and registration number are required." });
+    }
+    try {
+      setUploadingSignature(true);
+      const data = await uploadPathologistSignature({ file: signatureFile, qualification: profile.qualification.trim(), registrationNumber: profile.registrationNumber.trim() });
+      setProfile(data.user);
+      updateUser({ ...user, ...data.user });
+      setSignatureFile(null);
+      if (signaturePreview) URL.revokeObjectURL(signaturePreview);
+      setSignaturePreview("");
+      setSignatureMessage({ type: "success", text: data.message });
+    } catch (error) {
+      setSignatureMessage({ type: "error", text: error.response?.data?.message || "Signature upload failed." });
+    } finally {
+      setUploadingSignature(false);
+    }
   };
 
   const handleLogout = () => {
@@ -140,22 +175,6 @@ function PathologistDashboard() {
         </section>
 
         <section className="mb-6 rounded-lg border border-slate-200 bg-white p-5">
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div>
-              <label className="mb-2 block text-sm font-bold text-slate-600">Pathologist Signature</label>
-              <input value={signature} onChange={(e) => setSignature(e.target.value)} placeholder="Dr. Name, Qualification" className="w-full rounded-md border border-slate-200 p-3 outline-none focus:border-blue-500" />
-            </div>
-            <div>
-              <label className="mb-2 block text-sm font-bold text-slate-600">Upload Signature Image</label>
-              <label className="flex cursor-pointer items-center gap-2 rounded-md border border-slate-200 p-3 text-sm font-semibold text-slate-600 hover:bg-slate-50">
-                <Upload size={18} /> {signatureImage ? "Signature image selected" : "Choose image"}
-                <input type="file" accept="image/*" onChange={handleSignatureUpload} className="hidden" />
-              </label>
-            </div>
-          </div>
-        </section>
-
-        <section className="mb-6 rounded-lg border border-slate-200 bg-white p-5">
           <div className="grid gap-3 md:grid-cols-[1fr_170px_190px_220px]">
             <label className="flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2">
               <Search size={18} className="text-slate-400" />
@@ -176,12 +195,39 @@ function PathologistDashboard() {
           </div>
         </section>
 
-        <section className="rounded-lg border border-slate-200 bg-white p-6">
+        <section className="mb-6 rounded-lg border border-slate-200 bg-white p-6">
           <div className="mb-5 flex items-center justify-between">
             <h2 className="text-lg font-bold">{sectionTitle(activeSection)}</h2>
             <StatusBadge value={sectionStatus(activeSection)} />
           </div>
           <ReportsTable reports={activeReports} section={activeSection} onView={setSelectedReport} />
+        </section>
+
+        <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+          <div className="flex items-center gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4">
+            <div className="rounded-lg bg-blue-100 p-2 text-blue-700"><ShieldCheck size={22} /></div>
+            <div><h2 className="font-bold text-slate-900">Digital Signature</h2><p className="text-xs text-slate-500">This signature is securely applied when you approve a report.</p></div>
+          </div>
+          <div className="grid gap-6 p-5 lg:grid-cols-[1fr_280px]">
+            <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="text-sm font-bold text-slate-600">Qualification<input value={profile.qualification || ""} onChange={(e) => setProfile({...profile, qualification: e.target.value})} placeholder="MD Pathology" className="mt-2 w-full rounded-md border border-slate-200 p-3 font-normal outline-none focus:border-blue-500" /></label>
+                <label className="text-sm font-bold text-slate-600">Registration Number<input value={profile.registrationNumber || ""} onChange={(e) => setProfile({...profile, registrationNumber: e.target.value})} placeholder="Medical council registration no." className="mt-2 w-full rounded-md border border-slate-200 p-3 font-normal outline-none focus:border-blue-500" /></label>
+              </div>
+              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border-2 border-dashed border-slate-300 p-4 text-sm font-semibold text-slate-600 hover:border-blue-400 hover:bg-blue-50">
+                <Upload size={18} /> {signatureFile ? signatureFile.name : profile.signatureUrl ? "Choose replacement signature" : "Choose signature image"}
+                <input type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" onChange={handleSignatureUpload} className="hidden" />
+              </label>
+              <p className="text-xs text-slate-500">PNG, JPG or JPEG only. Maximum file size: 2 MB.</p>
+              {signatureMessage.text && <p className={`rounded-md px-3 py-2 text-sm font-semibold ${signatureMessage.type === "success" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>{signatureMessage.text}</p>}
+              <button type="button" disabled={!signatureFile || uploadingSignature} onClick={saveSignature} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
+                <Upload size={16} /> {uploadingSignature ? "Uploading..." : profile.signatureUrl ? "Replace Signature" : "Upload Signature"}
+              </button>
+            </div>
+            <div className="flex min-h-44 items-center justify-center rounded-lg border border-slate-200 bg-white p-4">
+              {(signaturePreview || profile.signatureUrl) ? <div className="text-center"><img src={signaturePreview || signatureSource(profile.signatureUrl)} alt="Pathologist signature preview" className="mx-auto max-h-24 max-w-full object-contain" /><p className="mt-3 text-xs font-bold text-slate-500">{signaturePreview ? "Preview - not uploaded yet" : "Current digital signature"}</p></div> : <div className="text-center text-slate-400"><FileImage className="mx-auto mb-2" size={36} /><p className="text-sm">No signature uploaded</p></div>}
+            </div>
+          </div>
         </section>
       </main>
 
@@ -310,9 +356,12 @@ function ReportModal({ report, onClose, onApprove, onReject }) {
 
         {report.status === "Rejected" && <Detail label="Rejection Reason" value={report.rejectionReason || "N/A"} />}
         {report.status === "Approved" && (
-          <div className="mt-5 grid gap-4 md:grid-cols-2">
-            <Detail label="Pathologist Signature" value={report.pathologistSignature || "N/A"} />
-            <Detail label="Approved Date" value={formatDate(report.approvedAt)} />
+          <div className="mt-6 flex justify-end border-t border-slate-200 pt-5">
+            <div className="w-full max-w-sm rounded-lg border border-slate-200 bg-slate-50 p-4 text-center">
+              {report.pathologistSignatureImage && <img src={signatureSource(report.pathologistSignatureImage)} alt="Approving pathologist signature" className="mx-auto mb-2 max-h-20 max-w-48 object-contain" />}
+              <p className="font-bold text-slate-900">{report.approvedPathologistName || report.approvedBy?.name || report.pathologistSignature || "Pathologist"}</p>
+              <p className="mt-2 text-xs font-semibold text-slate-500">Approved: {formatDateTime(report.approvedAt)}</p>
+            </div>
           </div>
         )}
 
@@ -378,6 +427,16 @@ function sectionStatus(section) {
 function formatDate(value) {
   if (!value) return "N/A";
   return new Date(value).toLocaleDateString("en-IN");
+}
+
+function formatDateTime(value) {
+  if (!value) return "N/A";
+  return new Date(value).toLocaleString("en-IN");
+}
+
+function signatureSource(signatureUrl) {
+  if (!signatureUrl || signatureUrl.startsWith("http") || signatureUrl.startsWith("blob:")) return signatureUrl || "";
+  return `http://localhost:5000${signatureUrl}`;
 }
 
 function formatInputDate(value) {
