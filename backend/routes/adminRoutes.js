@@ -11,6 +11,7 @@ const {
   getPackages,
   addPackage,
   deletePackage
+  ,updatePackage
 } = require("../controllers/adminController");
 const { protect, allowRoles } = require("../middleware/authMiddleware");
 
@@ -27,5 +28,6 @@ router.delete("/test/:id", protect, allowRoles("admin"), deleteTest);
 router.get("/packages", protect, allowRoles("admin"), getPackages);
 router.post("/packages", protect, allowRoles("admin"), addPackage);
 router.delete("/packages/:id", protect, allowRoles("admin"), deletePackage);
+router.put("/packages/:id", protect, allowRoles("admin"), updatePackage);
 
 module.exports = router;

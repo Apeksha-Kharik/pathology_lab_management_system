@@ -36,8 +36,11 @@ const AdminDashboard = () => {
     const [metrics, setMetrics] = useState(null);
     const [loading, setLoading] = useState(true);
     const [adminNotice, setAdminNotice] = useState("");
+    const [templateMode, setTemplateMode] = useState(false);
+    const [templateTargetId, setTemplateTargetId] = useState("");
 
-    const [testForm, setTestForm] = useState({ testName: '', price: '', category: '', conditions: '', description: '' });
+    const [testForm, setTestForm] = useState({ testName: '', price: '', category: '', conditions: '', description: '', reportDescription: '', reportLetterhead: '' });
+    const [templateRows, setTemplateRows] = useState([]);
     const [packageForm, setPackageForm] = useState({ packageName: '', price: '', category: 'Health Checkup', description: '', imageUrl: '', includedTests: [], parametersCount: '', homeCollection: true });
     const [userForm, setUserForm] = useState({
         name: '', email: '', password: '', phone: '', qualification: '', role: 'technician'
@@ -106,9 +109,25 @@ const AdminDashboard = () => {
     const handleAddTest = async (e) => {
         e.preventDefault();
         try {
-            await api.post('/api/admin/add-test', testForm);
-            alert("Test added successfully.");
-            setTestForm({ testName: '', price: '', category: '', conditions: '', description: '' });
+            const reportTemplate = templateRows
+                .map((row) => ({ parameter: row.parameter.trim(), unit: row.unit.trim(), referenceRange: row.referenceRange.trim() }))
+                .filter((row) => row.parameter);
+            if (templateMode && !reportTemplate.length) {
+                alert("Add at least one required report parameter.");
+                return;
+            }
+            const payload = { ...testForm, reportTemplate };
+            if (templateMode && templateTargetId) {
+                const [type, id] = templateTargetId.split(':');
+                await api.put(type === 'package' ? `/api/admin/packages/${id}` : `/api/admin/test/${id}`, payload);
+                alert("Report template saved successfully.");
+            } else {
+                await api.post('/api/admin/add-test', payload);
+                alert("Test added successfully.");
+            }
+            setTestForm({ testName: '', price: '', category: '', conditions: '', description: '', reportDescription: '', reportLetterhead: '' });
+            setTemplateRows([]);
+            setTemplateTargetId("");
             setView('availableTests');
             fetchData();
         } catch (err) {
@@ -160,6 +179,30 @@ const AdminDashboard = () => {
         }
     };
 
+    const editTemplate = (type, item) => {
+        setTemplateTargetId(`${type}:${item._id}`);
+        setTestForm({ ...item, testName: item.testName || item.packageName });
+        setTemplateRows((item.reportTemplate || []).map((row) => ({ parameter: row.parameter || '', unit: row.unit || '', referenceRange: row.referenceRange || '' })));
+        setView('addTest');
+        setTemplateMode(true);
+    };
+
+    const deleteTemplate = async (type, item) => {
+        if (!window.confirm(`Remove the report template for ${item.testName || item.packageName}? The test/package will not be deleted.`)) return;
+        try {
+            const payload = { ...item, reportTemplate: [], reportLetterhead: '', reportDescription: '' };
+            await api.put(type === 'package' ? `/api/admin/packages/${item._id}` : `/api/admin/test/${item._id}`, payload);
+            if (templateTargetId === `${type}:${item._id}`) {
+                setTemplateTargetId('');
+                setTemplateRows([]);
+            }
+            await fetchData();
+            alert('Report template deleted.');
+        } catch (err) {
+            alert(err.response?.data?.message || 'Unable to delete report template.');
+        }
+    };
+
     const deletePackage = async (id) => {
         if (!window.confirm('Permanently remove this health package?')) return;
         try {
@@ -187,7 +230,8 @@ const AdminDashboard = () => {
                     <nav className="flex gap-2 overflow-x-auto pb-2 lg:flex-col lg:overflow-visible lg:pb-0">
                         <SidebarBtn active={view === 'dashboard'} onClick={() => setView('dashboard')} icon={<LayoutDashboard className="w-5 h-5" />} text="Dashboard" />
                         <SidebarBtn active={view === 'availableTests'} onClick={() => setView('availableTests')} icon={<FlaskConical className="w-5 h-5" />} text="Available Tests" />
-                        <SidebarBtn active={view === 'addTest'} onClick={() => setView('addTest')} icon={<TestTube2 className="w-5 h-5" />} text="Add New Test" />
+                        <SidebarBtn active={view === 'addTest' && !templateMode} onClick={() => { setTemplateMode(false); setView('addTest'); }} icon={<TestTube2 className="w-5 h-5" />} text="Add New Test" />
+                        <SidebarBtn active={view === 'addTest' && templateMode} onClick={() => { setTemplateMode(true); setTemplateTargetId(""); setTestForm({ testName: '', price: '', category: '', conditions: '', description: '', reportDescription: '', reportLetterhead: '' }); setTemplateRows([]); setView('addTest'); }} icon={<ClipboardList className="w-5 h-5" />} text="Report Templates" />
                         <SidebarBtn active={view === 'availablePackages'} onClick={() => setView('availablePackages')} icon={<Boxes className="w-5 h-5" />} text="Health Packages" />
                         <SidebarBtn active={view === 'addPackage'} onClick={() => setView('addPackage')} icon={<PackagePlus className="w-5 h-5" />} text="Add New Package" />
                         <SidebarBtn active={view === 'addUser'} onClick={() => setView('addUser')} icon={<UserPlus className="w-5 h-5" />} text="Add Staff User" />
@@ -436,21 +480,27 @@ const AdminDashboard = () => {
                 {/* Add Test View */}
                 {view === 'addTest' && (
                     <div className="max-w-2xl mx-auto space-y-8">
-                        <h1 className="text-3xl font-bold text-emerald-950 text-center">Create Lab Test</h1>
+                        <h1 className="text-3xl font-bold text-emerald-950 text-center">{templateMode ? 'Create Test Report Template' : 'Create Lab Test'}</h1>
+                        {templateMode && <p className="text-center text-slate-500">Set up the test details and the parameter rows technicians will use when entering results.</p>}
                         <form onSubmit={handleAddTest} className="bg-white p-5 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+                            {templateMode && <div className="space-y-2"><label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Choose Test or Package</label><select required value={templateTargetId} onChange={(e) => { const [type, id] = e.target.value.split(':'); const selected = type === 'package' ? packages.find((item) => item._id === id) : tests.find((item) => item._id === id); setTemplateTargetId(e.target.value); if (selected) { setTestForm({ ...selected, testName: selected.testName || selected.packageName }); setTemplateRows((selected.reportTemplate || []).map((row) => ({ parameter: row.parameter || '', unit: row.unit || '', referenceRange: row.referenceRange || '' }))); } }} className="w-full rounded-xl border border-slate-200 bg-slate-50 p-4 outline-none focus:ring-2 focus:ring-emerald-500"><option value="">Select an existing test or package</option><optgroup label="Tests">{tests.map((test) => <option key={test._id} value={`test:${test._id}`}>{test.testName}</option>)}</optgroup><optgroup label="Packages">{packages.map((item) => <option key={item._id} value={`package:${item._id}`}>{item.packageName}</option>)}</optgroup></select></div>}
                             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                                 <FormInput label="Test Name" value={testForm.testName} onChange={(e) => setTestForm({...testForm, testName: e.target.value})} required />
                                 <FormInput label="Price (INR)" type="number" value={testForm.price} onChange={(e) => setTestForm({...testForm, price: e.target.value})} required />
                             </div>
                             <FormInput label="Category" value={testForm.category} onChange={(e) => setTestForm({...testForm, category: e.target.value})} required />
-                            <FormInput label="Conditions" value={testForm.conditions} onChange={(e) => setTestForm({...testForm, conditions: e.target.value})} />
-                            <div className="space-y-2">
+                            {!templateMode && <FormInput label="Conditions" value={testForm.conditions} onChange={(e) => setTestForm({...testForm, conditions: e.target.value})} />}
+                            {!templateMode && <div className="space-y-2">
                                 <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Description</label>
                                 <textarea className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none h-32" 
                                     value={testForm.description} onChange={(e) => setTestForm({...testForm, description: e.target.value})} required />
-                            </div>
-                            <button type="submit" className="w-full bg-emerald-800 text-white py-4 rounded-xl font-bold hover:bg-emerald-900 transition-all">Publish Test</button>
+                            </div>}
+                            <div className="space-y-2"><label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Report Letterhead</label><textarea className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none h-24" value={testForm.reportLetterhead || ''} onChange={(e) => setTestForm({...testForm, reportLetterhead: e.target.value})} placeholder={'INDIPATH DIAGNOSTIC LAB\n22 Mahapurush Complex, Kankavali\nPhone: 02367-231970'} /><p className="text-xs text-slate-400">This is shown at the top of the technician entry form and saved with the report.</p></div>
+                            <div className="space-y-2"><label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Report Description (optional)</label><textarea className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none h-24" value={testForm.reportDescription} onChange={(e) => setTestForm({...testForm, reportDescription: e.target.value})} placeholder="This description will appear above the results on the report." /></div>
+                            <div className="space-y-3"><div className="flex items-center justify-between"><label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Required Report Parameters</label><button type="button" onClick={() => setTemplateRows([...templateRows, { parameter: '', unit: '', referenceRange: '' }])} className="rounded-lg border border-emerald-200 px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-50">Add parameter</button></div>{templateRows.length === 0 && <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">Add each required parameter here. The technician can enter only the result value later.</p>}{templateRows.map((row, index) => <div key={index} className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 md:grid-cols-[1.4fr_1fr_1fr_auto]"><input required placeholder="Parameter name (e.g., Hemoglobin)" value={row.parameter} onChange={(e) => setTemplateRows(templateRows.map((item, i) => i === index ? { ...item, parameter: e.target.value } : item))} className="rounded-lg border border-slate-200 bg-white p-2 text-sm outline-none" /><input placeholder="Unit (e.g., g/dL)" value={row.unit} onChange={(e) => setTemplateRows(templateRows.map((item, i) => i === index ? { ...item, unit: e.target.value } : item))} className="rounded-lg border border-slate-200 bg-white p-2 text-sm outline-none" /><input placeholder="Reference range" value={row.referenceRange} onChange={(e) => setTemplateRows(templateRows.map((item, i) => i === index ? { ...item, referenceRange: e.target.value } : item))} className="rounded-lg border border-slate-200 bg-white p-2 text-sm outline-none" /><button type="button" onClick={() => setTemplateRows(templateRows.filter((_, i) => i !== index))} className="rounded-lg px-3 text-xs font-bold text-red-600 hover:bg-red-50">Remove</button></div>)}<p className="text-xs text-slate-400">Parameter name, unit, and reference range are saved by the admin and pre-filled in the technician report.</p></div>
+                            <button type="submit" className="w-full bg-emerald-800 text-white py-4 rounded-xl font-bold hover:bg-emerald-900 transition-all">{templateMode ? 'Save Test Template' : 'Publish Test'}</button>
                         </form>
+                        {templateMode && <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><h2 className="text-lg font-bold text-emerald-950">Saved Report Templates</h2><div className="mt-4 space-y-3">{[...tests.map((item) => ({ type: 'test', item })), ...packages.map((item) => ({ type: 'package', item }))].filter(({ item }) => item.reportTemplate?.length || item.reportLetterhead || item.reportDescription).map(({ type, item }) => <div key={`${type}-${item._id}`} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-4"><div><p className="font-bold text-slate-800">{item.testName || item.packageName}</p><p className="text-xs text-slate-500">{item.reportTemplate?.length || 0} required parameter(s)</p></div><div className="flex gap-2"><button type="button" onClick={() => editTemplate(type, item)} className="rounded-lg border border-emerald-200 px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-50">Edit</button><button type="button" onClick={() => deleteTemplate(type, item)} className="rounded-lg border border-red-200 px-3 py-2 text-sm font-bold text-red-700 hover:bg-red-50">Delete</button></div></div>)}{![...tests, ...packages].some((item) => item.reportTemplate?.length || item.reportLetterhead || item.reportDescription) && <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">No report templates saved yet.</p>}</div></section>}
                     </div>
                 )}
 

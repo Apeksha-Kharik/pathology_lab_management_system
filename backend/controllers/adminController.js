@@ -216,6 +216,9 @@ const buildTestPayload = (body) => ({
   conditions: body.conditions || "",
   sampleType: body.sampleType || "",
   turnaroundTime: body.turnaroundTime || "",
+  reportDescription: body.reportDescription || "",
+  reportLetterhead: body.reportLetterhead || "",
+  reportTemplate: Array.isArray(body.reportTemplate) ? body.reportTemplate.filter((row) => row.parameter) : [],
   isActive: body.isActive !== undefined ? Boolean(body.isActive) : true
 });
 
@@ -310,6 +313,9 @@ const buildPackagePayload = (body) => ({
   category: body.category || "Health Checkup",
   price: Number(body.price),
   description: body.description || "",
+  reportDescription: body.reportDescription || "",
+  reportLetterhead: body.reportLetterhead || "",
+  reportTemplate: Array.isArray(body.reportTemplate) ? body.reportTemplate.filter((row) => row.parameter) : [],
   imageUrl: body.imageUrl || "",
   includedTests: Array.isArray(body.includedTests) ? body.includedTests : [],
   parametersCount: Number(body.parametersCount || 0),
@@ -351,4 +357,12 @@ const deletePackage = async (req, res) => {
   }
 };
 
-module.exports = { getDashboardMetrics, createUser, getUsers, deleteUser, addTest, getTests, updateTest, deleteTest, getPackages, addPackage, deletePackage };
+const updatePackage = async (req, res) => {
+  try {
+    const packageItem = await Package.findByIdAndUpdate(req.params.id, buildPackagePayload(req.body), { new: true, runValidators: true });
+    if (!packageItem) return res.status(404).json({ message: "Package not found" });
+    res.json({ message: "Package updated successfully", package: packageItem });
+  } catch (error) { res.status(500).json({ message: "Error updating package", error: error.message }); }
+};
+
+module.exports = { getDashboardMetrics, createUser, getUsers, deleteUser, addTest, getTests, updateTest, deleteTest, getPackages, addPackage, deletePackage, updatePackage };

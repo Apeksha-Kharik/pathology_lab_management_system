@@ -1,5 +1,7 @@
 const Booking = require("../models/Booking");
 const Report = require("../models/Report");
+const Test = require("../models/Test");
+const Package = require("../models/Package");
 
 const normalizeResults = (results = []) => {
   return results
@@ -20,26 +22,50 @@ const getAssignedBooking = async (bookingId, technicianId) => {
   });
 };
 
+const getReportTemplateDetails = (booking) => {
+  const source = booking.testId || booking.packageId;
+  return {
+    reportLetterhead: source?.reportLetterhead || "",
+    reportDescription: source?.reportDescription || ""
+  };
+};
+
+const normalizeTemplateName = (name = "") => name.toLowerCase().replace(/[^a-z0-9]/g, "");
+
 const getTechnicianBookings = async (req, res) => {
   try {
     const bookings = await Booking.find({
       assignedTechnician: req.user._id,
       bookingStatus: { $in: ["Technician Assigned", "Sample Collected", "Processing", "Pending Report Approval", "Completed", "Report Ready"] }
-    }).sort({ updatedAt: -1 });
+    }).populate("testId", "reportTemplate reportDescription reportLetterhead").populate("packageId", "reportTemplate reportDescription reportLetterhead").sort({ updatedAt: -1 });
 
     const reports = await Report.find({
       bookingId: { $in: bookings.map((booking) => booking._id) }
     });
+    const bookingNames = bookings.map((booking) => booking.testName).filter(Boolean);
+    const [fallbackTests, fallbackPackages] = await Promise.all([
+      Test.find({ testName: { $in: bookingNames } }).select("testName reportTemplate reportDescription reportLetterhead"),
+      Package.find({ packageName: { $in: bookingNames } }).select("packageName reportTemplate reportDescription reportLetterhead")
+    ]);
+    const testByName = new Map(fallbackTests.map((test) => [normalizeTemplateName(test.testName), test]));
+    const packageByName = new Map(fallbackPackages.map((packageItem) => [normalizeTemplateName(packageItem.packageName), packageItem]));
 
     const reportByBooking = reports.reduce((acc, report) => {
       acc[report.bookingId.toString()] = report;
       return acc;
     }, {});
 
-    res.json(bookings.map((booking) => ({
-      ...booking.toObject(),
-      report: reportByBooking[booking._id.toString()] || null
-    })));
+    res.json(bookings.map((booking) => {
+      const bookingData = booking.toObject();
+      const hasTestTemplate = Boolean(bookingData.testId?.reportTemplate?.length || bookingData.testId?.reportLetterhead || bookingData.testId?.reportDescription);
+      const hasPackageTemplate = Boolean(bookingData.packageId?.reportTemplate?.length || bookingData.packageId?.reportLetterhead || bookingData.packageId?.reportDescription);
+      return {
+        ...bookingData,
+        testId: hasTestTemplate ? bookingData.testId : (testByName.get(normalizeTemplateName(booking.testName)) || bookingData.testId),
+        packageId: hasPackageTemplate ? bookingData.packageId : (packageByName.get(normalizeTemplateName(booking.testName)) || bookingData.packageId),
+        report: reportByBooking[booking._id.toString()] || null
+      };
+    }));
   } catch (error) {
     res.status(500).json({ message: "Error fetching technician bookings" });
   }
@@ -52,7 +78,6 @@ const startTest = async (req, res) => {
     if (!booking) {
       return res.status(404).json({ message: "Assigned booking not found" });
     }
-
     if (booking.sampleStatus !== "Collected" && booking.bookingStatus !== "Sample Collected") {
       return res.status(400).json({ message: "Test can be started only after technician assignment and sample collection" });
     }
@@ -110,6 +135,9 @@ const saveReportDraft = async (req, res) => {
     if (!booking) {
       return res.status(404).json({ message: "Assigned booking not found" });
     }
+    await booking.populate("testId", "reportDescription reportLetterhead");
+    await booking.populate("packageId", "reportDescription reportLetterhead");
+    const templateDetails = getReportTemplateDetails(booking);
 
     const existingReport = await Report.findOne({ bookingId: booking._id });
     if (existingReport && ["Pending Approval", "Pending Review", "Approved"].includes(existingReport.status)) {
@@ -123,6 +151,7 @@ const saveReportDraft = async (req, res) => {
         bookingId: booking._id,
         technicianId: req.user._id,
         testName: booking.testName,
+        ...templateDetails,
         results: cleanResults,
         technicianRemarks,
         status: "Draft",
@@ -158,6 +187,9 @@ const submitReport = async (req, res) => {
     if (!booking) {
       return res.status(404).json({ message: "Assigned booking not found" });
     }
+    await booking.populate("testId", "reportDescription reportLetterhead");
+    await booking.populate("packageId", "reportDescription reportLetterhead");
+    const templateDetails = getReportTemplateDetails(booking);
 
     const existingReport = await Report.findOne({ bookingId: booking._id });
     if (existingReport && ["Pending Approval", "Pending Review", "Approved"].includes(existingReport.status)) {
@@ -171,6 +203,7 @@ const submitReport = async (req, res) => {
         bookingId: booking._id,
         technicianId: req.user._id,
         testName: booking.testName,
+        ...templateDetails,
         results: cleanResults,
         technicianRemarks,
         status: "Pending Approval",

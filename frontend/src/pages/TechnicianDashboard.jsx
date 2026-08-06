@@ -9,7 +9,50 @@ import {
   updateTechnicianStatus
 } from "../services/technicianService";
 
-const blankResult = { parameter: "", value: "", normalRange: "" };
+const blankResult = { parameter: "", value: "", unit: "", normalRange: "" };
+
+const getReportTemplate = (booking) => {
+  const templates = [booking.testId?.reportTemplate, booking.packageId?.reportTemplate];
+  return templates.find((template) => Array.isArray(template) && template.length > 0) || [];
+};
+
+const getReportTemplateDetails = (booking) => {
+  const source = [booking.testId, booking.packageId].find((item) => item?.reportTemplate?.length || item?.reportLetterhead || item?.reportDescription);
+  return {
+    letterhead: booking.report?.reportLetterhead || source?.reportLetterhead || "",
+    description: booking.report?.reportDescription || source?.reportDescription || "",
+    hasTemplate: Boolean(source?.reportTemplate?.length)
+  };
+};
+
+const toResultRow = (row = {}) => ({
+  parameter: row.parameter || "",
+  value: row.value || "",
+  unit: row.unit || "",
+  normalRange: row.normalRange || row.referenceRange || ""
+});
+
+const buildReportRows = (booking) => {
+  const savedResults = booking.report?.results || [];
+  const template = getReportTemplate(booking);
+
+  if (!template.length) return savedResults.length ? savedResults.map(toResultRow) : [blankResult];
+
+  const savedByParameter = new Map(
+    savedResults
+      .filter((row) => row.parameter)
+      .map((row) => [row.parameter.trim().toLowerCase(), row])
+  );
+  const templateRows = template.map((templateRow) => {
+    const savedRow = savedByParameter.get((templateRow.parameter || "").trim().toLowerCase());
+    return toResultRow({ ...templateRow, ...savedRow });
+  });
+  const additionalRows = savedResults.filter((row) => !template.some(
+    (templateRow) => (templateRow.parameter || "").trim().toLowerCase() === (row.parameter || "").trim().toLowerCase()
+  ));
+
+  return [...templateRows, ...additionalRows.map(toResultRow)];
+};
 
 function TechnicianDashboard() {
   const { logout } = useAuth();
@@ -311,15 +354,9 @@ function DetailsModal({ booking, onClose }) {
 
 function ReportModal({ booking, onClose, onDone }) {
   const isLocked = ["Pending Approval", "Pending Review", "Approved"].includes(booking.report?.status);
+  const templateDetails = getReportTemplateDetails(booking);
   const [technicianRemarks, setTechnicianRemarks] = useState(booking.report?.technicianRemarks || "");
-  const [results, setResults] = useState(() => {
-    if (!booking.report?.results?.length) return [blankResult];
-    return booking.report.results.map((row) => ({
-      parameter: row.parameter || "",
-      value: row.value || "",
-      normalRange: row.normalRange || row.referenceRange || ""
-    }));
-  });
+  const [results, setResults] = useState(() => buildReportRows(booking));
 
   const updateResult = (index, field, value) => {
     setResults(results.map((row, i) => i === index ? { ...row, [field]: value } : row));
@@ -331,7 +368,7 @@ function ReportModal({ booking, onClose, onDone }) {
       .map((row) => ({
         parameter: row.parameter.trim(),
         value: row.value.trim(),
-        normalRange: row.normalRange.trim()
+        normalRange: row.normalRange.trim(), unit: row.unit.trim()
       }))
       .filter((row) => row.parameter && row.value)
   });
@@ -370,11 +407,29 @@ function ReportModal({ booking, onClose, onDone }) {
 
   return (
     <Modal title={`Result Entry - ${booking.testName}`} onClose={onClose}>
+      {templateDetails.letterhead && (
+        <div className="mb-5 border-b-2 border-blue-700 pb-4 text-center whitespace-pre-line">
+          <p className="text-lg font-black text-blue-900">{templateDetails.letterhead}</p>
+          <p className="mt-2 text-sm text-slate-600">{templateDetails.description}</p>
+        </div>
+      )}
+      {!templateDetails.hasTemplate && (
+        <p className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">No admin report template is configured for this test. Ask an admin to add the required parameters in Report Templates.</p>
+      )}
       {booking.report?.rejectionReason && (
         <div className="mb-4 rounded-md border border-red-100 bg-red-50 p-3 text-sm font-semibold text-red-700">
           Correction needed: {booking.report.rejectionReason}
         </div>
       )}
+
+      <div className="mb-5 grid gap-3 rounded-md border border-slate-200 bg-slate-50 p-4 text-sm md:grid-cols-3">
+        <Detail label="Patient Name" value={booking.name || "N/A"} />
+        <Detail label="Age / Gender" value={[booking.age, booking.gender].filter(Boolean).join(" / ") || "N/A"} />
+        <Detail label="Phone" value={booking.phone || "N/A"} />
+        <Detail label="Booking ID" value={displayBookingId(booking)} />
+        <Detail label="Test / Package" value={booking.testName || "N/A"} />
+        <Detail label="Sample Type" value={booking.sampleType || "N/A"} />
+      </div>
 
       <div className="overflow-x-auto rounded-md border border-slate-200">
         <table className="w-full text-left text-sm">
@@ -382,15 +437,15 @@ function ReportModal({ booking, onClose, onDone }) {
             <tr>
               <th className="p-3">Parameter</th>
               <th className="p-3">Result</th>
-              <th className="p-3">Normal Range</th>
+              <th className="p-3">Unit</th><th className="p-3">Normal Range</th>
             </tr>
           </thead>
           <tbody>
             {results.map((row, index) => (
               <tr key={index} className="border-t border-slate-100">
-                <td className="p-2"><Input disabled={isLocked} placeholder="Hemoglobin" value={row.parameter} onChange={(e) => updateResult(index, "parameter", e.target.value)} /></td>
-                <td className="p-2"><Input disabled={isLocked} placeholder="12.5" value={row.value} onChange={(e) => updateResult(index, "value", e.target.value)} /></td>
-                <td className="p-2"><Input disabled={isLocked} placeholder="12-16" value={row.normalRange} onChange={(e) => updateResult(index, "normalRange", e.target.value)} /></td>
+                <td className="p-2"><Input disabled={isLocked} placeholder="Parameter" value={row.parameter} onChange={(e) => updateResult(index, "parameter", e.target.value)} /></td>
+                <td className="p-2"><Input disabled={isLocked} placeholder="Result" value={row.value} onChange={(e) => updateResult(index, "value", e.target.value)} /></td>
+                <td className="p-2"><Input disabled={isLocked} placeholder="Unit" value={row.unit} onChange={(e) => updateResult(index, "unit", e.target.value)} /></td><td className="p-2"><Input disabled={isLocked} placeholder="Reference range" value={row.normalRange} onChange={(e) => updateResult(index, "normalRange", e.target.value)} /></td>
               </tr>
             ))}
           </tbody>

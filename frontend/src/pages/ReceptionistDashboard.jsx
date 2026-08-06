@@ -49,6 +49,7 @@ function ReceptionistDashboard() {
   const pendingBookings = useMemo(() => bookings.filter((booking) => booking.bookingStatus === "Pending Approval"), [bookings]);
   const todaysBookings = useMemo(() => bookings.filter((booking) => booking.bookingDate === today), [bookings, today]);
   const pendingPayments = useMemo(() => bookings.filter((booking) => ["Confirmed", "Arrived"].includes(booking.bookingStatus) && booking.paymentStatus === "Unpaid"), [bookings]);
+  const readyForAssignment = useMemo(() => bookings.filter((booking) => (booking.patientArrived || booking.bookingStatus === "Arrived") && booking.paymentStatus === "Paid" && !booking.assignedTechnician && !["Processing", "Pending Report Approval", "Report Ready"].includes(booking.bookingStatus)), [bookings]);
   const assignedPatients = useMemo(() => bookings.filter((booking) => booking.bookingStatus === "Technician Assigned"), [bookings]);
   const notifications = useMemo(() => [
     pendingBookings.length ? `${pendingBookings.length} new booking request(s)` : "No new booking requests",
@@ -135,6 +136,7 @@ function ReceptionistDashboard() {
           <Summary label="Total Pending Bookings" value={pendingBookings.length} />
           <Summary label="Today's Patients" value={todaysBookings.length} />
           <Summary label="Pending Payments" value={pendingPayments.length} />
+          <Summary label="Ready to Assign" value={readyForAssignment.length} />
           <Summary label="Assigned to Technician" value={assignedPatients.length} />
         </section>
 
@@ -167,6 +169,7 @@ function ReceptionistDashboard() {
             <PendingBookingsTable bookings={pendingBookings} onStatus={handleStatus} />
             <BookingSection title="Today's Bookings" bookings={todaysBookings} technicians={technicians} onAssignTechnician={handleAssignTechnician} onArrived={(id) => handleStatus(id, "Arrived")} onPaid={setPaymentBooking} onReceipt={handleReceipt} />
             <BookingSection title="Pending Payments" bookings={pendingPayments} technicians={technicians} onAssignTechnician={handleAssignTechnician} onArrived={(id) => handleStatus(id, "Arrived")} onPaid={setPaymentBooking} onReceipt={handleReceipt} />
+            <BookingSection title="Ready for Technician Assignment" bookings={readyForAssignment} technicians={technicians} onAssignTechnician={handleAssignTechnician} onArrived={(id) => handleStatus(id, "Arrived")} onPaid={setPaymentBooking} onReceipt={handleReceipt} />
             <BookingSection title="Assigned to Technician" bookings={assignedPatients} technicians={technicians} onAssignTechnician={handleAssignTechnician} onArrived={(id) => handleStatus(id, "Arrived")} onPaid={setPaymentBooking} onReceipt={handleReceipt} />
           </div>
         )}

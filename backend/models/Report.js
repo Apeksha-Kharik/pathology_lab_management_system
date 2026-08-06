@@ -13,6 +13,8 @@ const reportSchema = new mongoose.Schema({
   bookingId: { type: mongoose.Schema.Types.ObjectId, ref: "Booking", required: true },
   technicianId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   testName: { type: String, required: true },
+  reportLetterhead: { type: String, default: "" },
+  reportDescription: { type: String, default: "" },
   results: [resultSchema],
   technicianRemarks: { type: String },
   pathologistId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
