@@ -5,17 +5,74 @@ const getProfile = async (req, res) => {
   res.json(req.user);
 };
 
+const getPasswordValidationErrors = (password) => {
+  const errors = [];
+
+  if (!password || password.length < 8) {
+    errors.push("Password must be at least 8 characters");
+  }
+
+  if (!/[A-Z]/.test(password || "")) {
+    errors.push("Password must include at least one uppercase character");
+  }
+
+  if (!/[a-z]/.test(password || "")) {
+    errors.push("Password must include at least one lowercase character");
+  }
+
+  if (!/[0-9]/.test(password || "")) {
+    errors.push("Password must include at least one number");
+  }
+
+  if (!/[!@#$%^&*(),.?":{}|<>]/.test(password || "")) {
+    errors.push("Password must include at least one special character");
+  }
+
+  return errors;
+};
+
 const updateProfile = async (req, res) => {
   try {
-    const { name, phone } = req.body;
+    const {
+      address,
+      age,
+      city,
+      dateOfBirth,
+      emergencyContactName,
+      emergencyContactPhone,
+      gender,
+      name,
+      phone,
+      pincode,
+      referredBy,
+      state
+    } = req.body;
 
     if (!name || !phone) {
       return res.status(400).json({ message: "Name and phone are required" });
     }
 
+    const patientAge = age === "" || age === undefined ? undefined : Number(age);
+    if (patientAge !== undefined && (!Number.isInteger(patientAge) || patientAge < 18 || patientAge > 120)) {
+      return res.status(400).json({ message: "Age must be a whole number between 18 and 120" });
+    }
+
     const user = await User.findByIdAndUpdate(
       req.user._id,
-      { name, phone },
+      {
+        address,
+        age: patientAge,
+        city,
+        dateOfBirth: dateOfBirth || undefined,
+        emergencyContactName,
+        emergencyContactPhone,
+        gender,
+        name,
+        phone,
+        pincode,
+        referredBy,
+        state
+      },
       { new: true, runValidators: true }
     ).select("-password");
 
@@ -33,8 +90,9 @@ const changePassword = async (req, res) => {
       return res.status(400).json({ message: "Current and new password are required" });
     }
 
-    if (newPassword.length < 6) {
-      return res.status(400).json({ message: "New password must be at least 6 characters" });
+    const passwordErrors = getPasswordValidationErrors(newPassword);
+    if (passwordErrors.length) {
+      return res.status(400).json({ message: passwordErrors.join(". ") });
     }
 
     const user = await User.findById(req.user._id);

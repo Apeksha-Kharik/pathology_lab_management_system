@@ -28,6 +28,7 @@ const buildUserResponse = (user) => ({
   dateOfBirth: user.dateOfBirth || "",
   address: user.address || "",
   city: user.city || "",
+  state: user.state || "",
   pincode: user.pincode || "",
   emergencyContactName: user.emergencyContactName || "",
   emergencyContactPhone: user.emergencyContactPhone || "",
@@ -41,6 +42,8 @@ const buildUserResponse = (user) => ({
 const generateOtp = () => String(Math.floor(100000 + Math.random() * 900000));
 
 const getOtpExpiry = () => new Date(Date.now() + 10 * 60 * 1000);
+
+const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const getPasswordValidationErrors = (password) => {
   const errors = [];
@@ -77,12 +80,18 @@ const cleanupPendingRegistration = async (email) => {
 
 const register = async (req, res) => {
   try {
-    const { name, email, password, phone, mobile, city, address } = req.body;
+    const { name, email, password, phone, mobile, age, city, address } = req.body;
+    const normalizedName = String(name || "").trim().replace(/\s+/g, " ");
     const userPhone = phone || mobile;
     const normalizedEmail = String(email || "").toLowerCase().trim();
+    const patientAge = Number(age);
 
-    if (!name || !normalizedEmail || !password || !userPhone || !city || !address) {
-      return res.status(400).json({ message: "Name, email, phone, city, address and password are required" });
+    if (!normalizedName || !normalizedEmail || !password || !userPhone || !age || !city || !address) {
+      return res.status(400).json({ message: "Name, age, email, phone, city, address and password are required" });
+    }
+
+    if (!Number.isInteger(patientAge) || patientAge < 18 || patientAge > 120) {
+      return res.status(400).json({ message: "Age must be a whole number between 18 and 120" });
     }
 
     const passwordErrors = getPasswordValidationErrors(password);
@@ -99,6 +108,15 @@ const register = async (req, res) => {
       return res.status(400).json({ message: "Email already registered. Please login instead." });
     }
 
+    const nameExists = await User.findOne({
+      role: "patient",
+      name: { $regex: `^${escapeRegex(normalizedName)}$`, $options: "i" }
+    });
+
+    if (nameExists) {
+      return res.status(400).json({ message: "Name already exists" });
+    }
+
     await User.deleteMany({
       email: normalizedEmail,
       isVerified: false
@@ -107,9 +125,10 @@ const register = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const otp = generateOtp();
     const user = await User.create({
-      name,
+      name: normalizedName,
       email: normalizedEmail,
       phone: userPhone,
+      age: patientAge,
       city,
       address,
       password: hashedPassword,
@@ -119,7 +138,7 @@ const register = async (req, res) => {
       otpExpiry: getOtpExpiry()
     });
 
-    const emailResult = await sendOtpEmail({
+    await sendOtpEmail({
       to: user.email,
       subject: "Verify your INDIPATH account",
       otp
@@ -127,10 +146,14 @@ const register = async (req, res) => {
 
     res.status(201).json({
       message: "Registration successful. OTP sent to your email.",
-      user: buildUserResponse(user),
-      devOtp: emailResult.devOtp
+      user: buildUserResponse(user)
     });
   } catch (error) {
+    if (error.name === "ValidationError") {
+      const message = Object.values(error.errors)[0]?.message || "Registration validation failed";
+      return res.status(400).json({ message });
+    }
+
     res.status(500).json({ message: "Registration failed", error: error.message });
   }
 };
@@ -351,15 +374,14 @@ const forgotPassword = async (req, res) => {
     user.resetPasswordExpiry = undefined;
     await user.save();
 
-    const emailResult = await sendOtpEmail({
+    await sendOtpEmail({
       to: user.email,
       subject: "Reset your INDIPATH password",
       otp
     });
 
     res.json({
-      message: "Password reset OTP sent to your email",
-      devOtp: emailResult.devOtp
+      message: "Password reset OTP sent to your email"
     });
   } catch (error) {
     res.status(500).json({ message: "Forgot password failed", error: error.message });
