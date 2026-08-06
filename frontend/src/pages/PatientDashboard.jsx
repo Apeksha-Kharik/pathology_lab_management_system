@@ -212,6 +212,41 @@ const popularTestCards = [
   { id: "test-15", type: "test", title: "ESR", icon: BadgeCheck, chips: ["Inflammation", "Same day", "Blood"], price: 149 }
 ];
 
+const packageImages = [bg2, bg1, bg3];
+const testIcons = [TestTube2, HeartPulse, FlaskConical, ShieldCheck, BadgeCheck];
+
+const mapPackageToCard = (item, index) => ({
+  id: `package-${item._id}`,
+  sourceId: item._id,
+  type: "package",
+  bookingType: "Package",
+  title: item.packageName,
+  imageUrl: item.imageUrl || packageImages[index % packageImages.length],
+  chips: [
+    `${item.includedTests?.length || item.parametersCount || 0} parameters`,
+    item.homeCollection ? "Home collection" : "Visit lab",
+    "Pending approval"
+  ],
+  price: Number(item.price || 0),
+  oldPrice: item.oldPrice || Math.round(Number(item.price || 0) * 1.8),
+  discount: item.discount || "Best value"
+});
+
+const mapTestToCard = (item, index) => ({
+  id: `test-${item._id}`,
+  sourceId: item._id,
+  type: "test",
+  bookingType: "Test",
+  title: item.testName,
+  icon: testIcons[index % testIcons.length],
+  chips: [
+    item.category || "Lab test",
+    item.sampleType || "Sample",
+    "Pending approval"
+  ],
+  price: Number(item.price || 0)
+});
+
 const filterShowcaseItems = (items, searchTerm) => {
   const search = searchTerm.trim().toLowerCase();
 
@@ -263,6 +298,7 @@ const buildBookingHistoryRows = (localRequests, serverBookings) => {
   const localRows = localRequests.map((booking) => ({
     id: booking.bookingId,
     code: booking.bookingId,
+    patientCode: booking.patientCode || "Pending",
     status: booking.status || "Pending Approval",
     paymentStatus: booking.paymentStatus || "Pending",
     testName: booking.itemTitle,
@@ -283,11 +319,12 @@ const buildBookingHistoryRows = (localRequests, serverBookings) => {
   const serverRows = serverBookings.map((booking) => ({
     id: booking._id,
     code: booking.bookingCode || booking._id,
+    patientCode: booking.patientCode || "Pending",
     status: booking.bookingStatus || booking.status || "Pending Approval",
     paymentStatus: booking.paymentStatus || "Pending",
     testName: booking.testName,
     bookingType: booking.bookingType || "Test",
-    patientName: booking.patientName || "",
+    patientName: booking.name || booking.patientName || "",
     age: booking.age || "",
     gender: booking.gender || "",
     mobile: booking.phone || "",
@@ -317,7 +354,7 @@ function PatientDashboard() {
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [cartItems, setCartItems] = useState(() => readStoredCart(cartStorageKey));
-  const [bookingRequests] = useState(() => readStoredBookingRequests(bookingRequestsStorageKey));
+  const [bookingRequests, setBookingRequests] = useState(() => readStoredBookingRequests(bookingRequestsStorageKey));
   const [bookingItem, setBookingItem] = useState(null);
 
   const loadDashboard = async () => {
@@ -354,28 +391,24 @@ function PatientDashboard() {
     });
   }, [tests, searchTerm]);
 
+  const healthPackageRows = useMemo(
+    () => packages.length ? packages.map(mapPackageToCard) : healthPackageCards,
+    [packages]
+  );
+
+  const popularTestRows = useMemo(
+    () => tests.length ? tests.map(mapTestToCard) : popularTestCards,
+    [tests]
+  );
+
   const filteredHealthPackages = useMemo(
-    () => filterShowcaseItems(packages.map((item, index) => ({
-      id: item._id,
-      type: "package",
-      title: item.packageName,
-      imageUrl: item.imageUrl || healthPackageCards[index % healthPackageCards.length]?.imageUrl,
-      chips: [item.category, `${item.parametersCount || 0} parameters`, item.homeCollection ? "Home collection" : "Visit lab"].filter(Boolean),
-      price: item.price
-    })), searchTerm),
-    [packages, searchTerm]
+    () => filterShowcaseItems(healthPackageRows, searchTerm),
+    [healthPackageRows, searchTerm]
   );
 
   const filteredPopularTests = useMemo(
-    () => filterShowcaseItems(tests.map((item, index) => ({
-      id: item._id,
-      type: "test",
-      title: item.testName,
-      icon: popularTestCards[index % popularTestCards.length]?.icon || TestTube2,
-      chips: [item.category, item.sampleType, item.turnaroundTime].filter(Boolean),
-      price: item.price
-    })), searchTerm),
-    [tests, searchTerm]
+    () => filterShowcaseItems(popularTestRows, searchTerm),
+    [popularTestRows, searchTerm]
   );
 
   const handleLogout = () => {
@@ -412,7 +445,16 @@ function PatientDashboard() {
   };
 
   const handleBookingRequested = (request) => {
-    setBookings((currentBookings) => [request, ...currentBookings.filter((booking) => booking._id !== request._id)]);
+    if (request?.serverBooking) {
+      loadDashboard();
+      return;
+    }
+
+    setBookingRequests((currentRequests) => {
+      const nextRequests = [request, ...currentRequests];
+      localStorage.setItem(bookingRequestsStorageKey, JSON.stringify(nextRequests));
+      return nextRequests;
+    });
   };
 
   const bookingHistoryRows = useMemo(
@@ -441,8 +483,8 @@ function PatientDashboard() {
           <button onClick={() => setPatientView("history")} className={`rounded-2xl px-5 py-3 text-sm font-black shadow-sm transition-colors ${patientView === "history" ? "bg-emerald-700 text-white" : "border border-emerald-100 bg-white text-emerald-800 hover:bg-emerald-50"}`}>
             Booking History
           </button>
-          <button onClick={() => setPatientView("reports")} className={`inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-black shadow-sm transition-colors ${patientView === "reports" ? "bg-emerald-700 text-white" : "border border-emerald-100 bg-white text-emerald-800 hover:bg-emerald-50"}`}>
-            <FileText size={17} /> View / Download Reports
+          <button onClick={() => setPatientView("downloads")} className={`inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-black shadow-sm transition-colors ${patientView === "downloads" ? "bg-emerald-700 text-white" : "border border-emerald-100 bg-white text-emerald-800 hover:bg-emerald-50"}`}>
+            <FileText size={17} /> Reports & Receipts
           </button>
         </div>
 
@@ -473,8 +515,8 @@ function PatientDashboard() {
           <BookingHistoryTable bookings={bookingHistoryRows} />
         )}
 
-        {!loading && patientView === "reports" && (
-          <ApprovedReportsPanel reports={reports} />
+        {!loading && patientView === "downloads" && (
+          <DownloadsSection bookings={bookings} reports={reports} user={user} />
         )}
 
         {showLegacyDashboardSections && (
@@ -499,6 +541,13 @@ function PatientDashboard() {
           </>
         )}
       </main>
+
+      <PatientDashboardFooter
+        onDownloads={() => setPatientView("downloads")}
+        onHistory={() => setPatientView("history")}
+        onProfile={() => navigate("/patient/profile")}
+        onTests={() => setPatientView("book")}
+      />
 
       {bookingItem && (
         <BookingWizardModal
@@ -615,6 +664,62 @@ function PatientNavbar({ cartItems, onBookNow, onLogout, onRemoveItem, onSearchC
         </div>
       </div>
     </header>
+  );
+}
+
+function PatientDashboardFooter({ onDownloads, onHistory, onProfile, onTests }) {
+  return (
+    <footer className="mt-10 border-t border-emerald-100 bg-[#063326] text-white">
+      <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:px-6 md:grid-cols-[1.1fr_0.9fr_0.9fr] lg:px-8">
+        <div>
+          <div className="flex items-center gap-3">
+            <img src={logo} alt="INDIPATH logo" className="h-12 w-12 rounded-xl bg-white object-contain" />
+            <div>
+              <h2 className="text-2xl font-black">INDIPATH</h2>
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-200">Super Speciality Pathology Lab</p>
+            </div>
+          </div>
+          <p className="mt-5 max-w-md text-sm font-semibold leading-7 text-emerald-50/75">
+            Secure patient booking, receptionist approval, payment receipts, and pathologist-approved diagnostic reports in one portal.
+          </p>
+          <div className="mt-5 flex flex-wrap gap-2">
+            <span className="rounded-full border border-white/10 bg-white/8 px-3 py-1.5 text-xs font-bold text-emerald-50">Pending approval tracking</span>
+            <span className="rounded-full border border-white/10 bg-white/8 px-3 py-1.5 text-xs font-bold text-emerald-50">PDF reports</span>
+            <span className="rounded-full border border-white/10 bg-white/8 px-3 py-1.5 text-xs font-bold text-emerald-50">Paid receipts</span>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-sm font-black uppercase tracking-[0.2em] text-emerald-200">Patient Actions</h3>
+          <div className="mt-5 grid gap-2">
+            <FooterButton label="Book Tests" onClick={onTests} />
+            <FooterButton label="Booking History" onClick={onHistory} />
+            <FooterButton label="Downloads" onClick={onDownloads} />
+            <FooterButton label="Profile" onClick={onProfile} />
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-sm font-black uppercase tracking-[0.2em] text-emerald-200">Support</h3>
+          <div className="mt-5 space-y-4 text-sm font-semibold leading-7 text-emerald-50/80">
+            <p className="flex gap-3"><Phone className="mt-1 shrink-0 text-emerald-200" size={17} /> 02367-231970, 7448231970</p>
+            <p className="flex gap-3"><FileText className="mt-1 shrink-0 text-emerald-200" size={17} /> Reports appear after pathologist approval.</p>
+            <p className="flex gap-3"><MapPin className="mt-1 shrink-0 text-emerald-200" size={17} /> 22 Mahapurush Complex, BazarPeth Kankavali, Tal. Kankavali - 416 602</p>
+          </div>
+        </div>
+      </div>
+      <div className="border-t border-white/10 px-4 py-4 text-center text-xs font-semibold text-emerald-50/60">
+        Copyright 2026 INDIPATH. Patient IDs are generated after receptionist confirmation.
+      </div>
+    </footer>
+  );
+}
+
+function FooterButton({ label, onClick }) {
+  return (
+    <button onClick={onClick} className="rounded-xl border border-white/10 px-4 py-3 text-left text-sm font-bold text-emerald-50/85 transition-colors hover:bg-white/8 hover:text-white">
+      {label}
+    </button>
   );
 }
 
@@ -851,6 +956,7 @@ function BookingWizardModal({ item, onBookingRequested, onClose, user }) {
   };
 
   const confirmBooking = async () => {
+    const id = `IND-${Date.now().toString().slice(-6)}`;
     const location = collectionType === "home"
       ? `${form.houseNo}, ${form.building ? `${form.building}, ` : ""}${form.street}, ${form.landmark ? `${form.landmark}, ` : ""}${form.area}, ${form.city}, ${form.taluka}, ${form.district}, ${form.state} - ${form.pinCode}`
       : `${nearestLab.name}, ${nearestLab.address}`;
@@ -858,27 +964,58 @@ function BookingWizardModal({ item, onBookingRequested, onClose, user }) {
     try {
       setSubmitting(true);
       setError("");
-      const data = await createBooking({
-        testId: item.type === "test" ? item.id : undefined,
-        packageId: item.type === "package" ? item.id : undefined,
-        bookingDate: form.preferredDate,
-        timeSlot: form.timeSlot,
-        notes: form.notes,
-        name: form.name,
-        phone: form.mobile,
-        email: form.email,
-        age: form.age,
-        gender: form.gender,
-        prescribedBy: form.prescribedBy,
+
+      if (item.sourceId) {
+        const data = await createBooking({
+          ...(item.bookingType === "Package" ? { packageId: item.sourceId } : { testId: item.sourceId }),
+          age: form.age,
+          gender: form.gender,
+          patientName: form.name,
+          phone: form.mobile,
+          email: form.email,
+          bookingDate: form.preferredDate,
+          timeSlot: form.timeSlot,
+          notes: form.notes,
+          doctorNotes: form.prescribedBy,
+          homeSample: collectionType === "home",
+          collectionType: collectionType === "home" ? "Home Collection" : "Visit Lab",
+          address: location,
+          sampleType: ""
+        });
+
+        setBookingId(data.booking?.bookingCode || id);
+        onBookingRequested({ serverBooking: data.booking });
+        setStep(4);
+        return;
+      }
+
+      onBookingRequested({
+        bookingId: id,
+        status: "Pending Approval",
+        paymentStatus: "Pending",
+        itemId: item.id,
+        itemTitle: item.title,
+        itemType: item.type === "package" ? "Package" : "Test",
+        amount: totalAmount,
+        patient: {
+          name: form.name,
+          age: form.age,
+          gender: form.gender,
+          mobile: form.mobile,
+          email: form.email,
+          prescribedBy: form.prescribedBy,
+          notes: form.notes
+        },
         collectionType: collectionType === "home" ? "Home Collection" : "Visit Lab",
-        address: location,
-        homeSample: collectionType === "home"
+        location,
+        preferredDate: form.preferredDate,
+        timeSlot: form.timeSlot,
+        createdAt: new Date().toISOString()
       });
-      onBookingRequested(data.booking);
-      setBookingId(data.booking.bookingCode || data.booking._id);
+      setBookingId(id);
       setStep(4);
-    } catch (requestError) {
-      setError(requestError.response?.data?.message || "Booking request could not be submitted. Please try again.");
+    } catch (error) {
+      setError(error.response?.data?.message || "Booking request failed");
     } finally {
       setSubmitting(false);
     }
@@ -1023,7 +1160,7 @@ function BookingWizardModal({ item, onBookingRequested, onClose, user }) {
               <button type="button" onClick={() => step === 1 ? onClose() : setStep((current) => current - 1)} className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50">
                 {step === 1 ? "Cancel" : "Back"}
               </button>
-              <button type="button" disabled={submitting} onClick={step === 3 ? confirmBooking : goNext} className="rounded-2xl bg-emerald-700 px-6 py-3 text-sm font-black text-white shadow-lg shadow-emerald-950/10 transition hover:bg-emerald-800 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60">
+              <button type="button" onClick={step === 3 ? confirmBooking : goNext} disabled={submitting} className="rounded-2xl bg-emerald-700 px-6 py-3 text-sm font-black text-white shadow-lg shadow-emerald-950/10 transition hover:bg-emerald-800 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60">
                 {step === 3 ? (submitting ? "Submitting..." : "Submit Request") : "Next"}
               </button>
             </div>
@@ -1179,6 +1316,44 @@ function BookingSuccess({ bookingId, collectionType, form, item, onBookMore, onD
   );
 }
 
+const safeFilePart = (value) => String(value || "patient").trim().replace(/[^a-z0-9-_]+/gi, "-").replace(/^-+|-+$/g, "") || "patient";
+
+const buildPatientDownloadName = (name, patientCode) => {
+  return `${safeFilePart(name)}-${safeFilePart(patientCode || "pending-patient-id")}.pdf`;
+};
+
+function DownloadsSection({ bookings, reports, user }) {
+  const paidBookings = bookings.filter((booking) => booking.paymentStatus === "Paid");
+
+  return (
+    <section className="grid gap-6 lg:grid-cols-2">
+      <div className="overflow-hidden rounded-3xl border border-emerald-100 bg-white shadow-xl shadow-emerald-950/8">
+        <div className="border-b border-emerald-100 px-5 py-5 sm:px-7">
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-700">Downloads</p>
+          <h2 className="mt-1 text-3xl font-black text-emerald-950">Reports</h2>
+        </div>
+        <div className="p-5 sm:p-7">
+          {reports.length ? reports.map((report) => (
+            <ReportButton key={report._id} report={report} user={user} />
+          )) : <EmptyState text="Reports will appear here after pathologist approval." />}
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-3xl border border-emerald-100 bg-white shadow-xl shadow-emerald-950/8">
+        <div className="border-b border-emerald-100 px-5 py-5 sm:px-7">
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-700">Downloads</p>
+          <h2 className="mt-1 text-3xl font-black text-emerald-950">Receipts</h2>
+        </div>
+        <div className="p-5 sm:p-7">
+          {paidBookings.length ? paidBookings.map((booking) => (
+            <ReceiptButton key={booking._id} booking={booking} user={user} />
+          )) : <EmptyState text="Receipts will appear here after payment is marked paid." />}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function AvailableTests({ tests, searchTerm, setSearchTerm, onBook }) {
   return (
     <div>
@@ -1238,6 +1413,7 @@ function BookingHistoryTable({ bookings }) {
           <thead className="bg-emerald-50 text-xs uppercase tracking-[0.12em] text-emerald-900">
             <tr>
               <th className="px-4 py-4">Booking ID</th>
+              <th className="px-4 py-4">Patient ID</th>
               <th className="px-4 py-4">Status</th>
               <th className="px-4 py-4">Payment</th>
               <th className="px-4 py-4">Test / Package</th>
@@ -1259,6 +1435,7 @@ function BookingHistoryTable({ bookings }) {
             {bookings.map((booking) => (
               <tr key={booking.id} className="border-t border-emerald-50 align-top">
                 <td className="px-4 py-4 font-black text-emerald-950">{booking.code}</td>
+                <td className="px-4 py-4 font-black text-emerald-800">{booking.patientCode || "Pending"}</td>
                 <td className="px-4 py-4"><StatusBadge value={booking.status} /></td>
                 <td className="px-4 py-4"><StatusBadge value={booking.paymentStatus} /></td>
                 <td className="px-4 py-4 font-bold text-slate-900">{booking.testName}</td>
@@ -1359,7 +1536,7 @@ function ReportsAndReceipts({ bookings, reports }) {
   );
 }
 
-function ReportButton({ report }) {
+function ReportButton({ report, user }) {
   const [reportAction, setReportAction] = useState("");
 
   const handleView = async () => {
@@ -1379,7 +1556,6 @@ function ReportButton({ report }) {
       setReportAction("");
     }
   };
-
   const handleDownload = async () => {
     try {
       setReportAction("download");
@@ -1387,7 +1563,7 @@ function ReportButton({ report }) {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `report-${report._id}.pdf`;
+      link.download = buildPatientDownloadName(report.bookingId?.name || user?.name, report.bookingId?.patientCode || user?.patientCode);
       link.click();
       window.URL.revokeObjectURL(url);
     } catch (error) {
@@ -1415,14 +1591,14 @@ function ReportButton({ report }) {
   );
 }
 
-function ReceiptButton({ booking }) {
+function ReceiptButton({ booking, user }) {
   const handleDownload = async () => {
     try {
       const blob = await downloadReceipt(booking._id);
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `receipt-${booking.bookingCode || booking._id}.pdf`;
+      link.download = buildPatientDownloadName(booking.name || user?.name, booking.patientCode || user?.patientCode);
       link.click();
       window.URL.revokeObjectURL(url);
     } catch (error) {

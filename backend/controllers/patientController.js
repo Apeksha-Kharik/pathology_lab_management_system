@@ -9,6 +9,25 @@ const Package = require("../models/Package");
 
 const letterheadImagePath = path.join(__dirname, "..", "assets", "indipath-letterhead.png");
 const brandLogoPath = path.join(__dirname, "..", "..", "frontend", "src", "assets", "logo.png");
+const patientCodeStatuses = ["Confirmed", "Arrived", "Technician Assigned", "Sample Collected", "Processing", "Pending Report Approval", "Completed", "Report Ready"];
+
+const generatePatientCode = () => `PID${Date.now().toString().slice(-8)}${Math.floor(10 + Math.random() * 90)}`;
+
+const ensurePatientCode = async (booking) => {
+  if (!booking || booking.patientCode || !patientCodeStatuses.includes(booking.bookingStatus || booking.status)) {
+    return booking;
+  }
+
+  booking.patientCode = generatePatientCode();
+  await booking.save();
+  return booking;
+};
+
+const safeFilePart = (value) => String(value || "patient").trim().replace(/[^a-z0-9-_]+/gi, "-").replace(/^-+|-+$/g, "") || "patient";
+
+const buildPatientPdfFilename = (name, patientCode) => {
+  return `${safeFilePart(name)}-${safeFilePart(patientCode || "pending-patient-id")}.pdf`;
+};
 
 const drawLetterhead = (doc) => {
   if (fs.existsSync(letterheadImagePath)) {
@@ -96,7 +115,8 @@ const createBooking = async (req, res) => {
   try {
     const {
       testId, packageId, bookingDate, timeSlot, notes, age, gender, sampleType,
-      name, phone, email, prescribedBy, collectionType, address, homeSample
+      name, patientName: requestedPatientName, phone, email, prescribedBy, doctorNotes,
+      collectionType, address, homeSample
     } = req.body;
 
     if ((!testId && !packageId) || !bookingDate || !timeSlot) {
@@ -111,7 +131,7 @@ const createBooking = async (req, res) => {
       return res.status(404).json({ message: `Selected ${bookingType.toLowerCase()} not found` });
     }
 
-    const patientName = String(name || req.user.name || "").trim();
+    const patientName = String(name || requestedPatientName || req.user.name || "").trim();
     const patientPhone = String(phone || req.user.phone || "").trim();
     const patientEmail = String(email || req.user.email || "").trim();
     const patientAge = Number(age || req.user.age || 0);
@@ -136,6 +156,7 @@ const createBooking = async (req, res) => {
       timeSlot,
       notes,
       prescribedBy: prescribedBy || "",
+      doctorNotes: doctorNotes || prescribedBy || "",
       collectionType: collectionType === "Home Collection" ? "Home Collection" : "Visit Lab",
       address: address || "",
       sampleType: sampleType || "",
@@ -165,7 +186,8 @@ const createBooking = async (req, res) => {
 const getBookings = async (req, res) => {
   try {
     const bookings = await Booking.find({ userId: req.user._id }).sort({ createdAt: -1 });
-    res.json(bookings);
+    const bookingsWithPatientIds = await Promise.all(bookings.map((booking) => ensurePatientCode(booking)));
+    res.json(bookingsWithPatientIds);
   } catch (error) {
     res.status(500).json({ message: "Error fetching booking history" });
   }
@@ -173,7 +195,9 @@ const getBookings = async (req, res) => {
 
 const getReports = async (req, res) => {
   try {
-    const reports = await Report.find({ userId: req.user._id, status: "Approved" }).sort({ approvedAt: -1 });
+    const reports = await Report.find({ userId: req.user._id, status: "Approved" })
+      .populate("bookingId", "name patientCode bookingCode testName")
+      .sort({ approvedAt: -1 });
     res.json(reports);
   } catch (error) {
     res.status(500).json({ message: "Error fetching reports" });
@@ -195,7 +219,7 @@ const downloadReport = async (req, res) => {
     const booking = report.bookingId || {};
     const results = Array.isArray(report.results) ? report.results : [];
     const doc = new PDFDocument({ size: "A4", margin: 50, autoFirstPage: true });
-    const filename = `report-${booking.bookingCode || report._id}.pdf`;
+    const filename = buildPatientPdfFilename(booking.name || req.user.name, booking.patientCode || booking.bookingCode);
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
@@ -208,8 +232,8 @@ const downloadReport = async (req, res) => {
     const infoTop = doc.y + 12;
     const patientDetails = [
       ["Patient Name", booking.name || req.user.name], ["Age / Gender", `${booking.age || req.user.age || "N/A"} / ${booking.gender || req.user.gender || "N/A"}`],
-      ["Phone", booking.phone || req.user.phone], ["Booking ID", booking.bookingCode || "N/A"],
-      ["Test", report.testName]
+      ["Phone", booking.phone || req.user.phone], ["Patient ID", booking.patientCode || "Pending"],
+      ["Booking ID", booking.bookingCode || "N/A"], ["Test", report.testName]
     ];
     doc.rect(50, infoTop, 455, 18).fill("#187b4b");
     doc.fillColor("#ffffff").fontSize(10).font("Helvetica-Bold").text("PATIENT & TEST INFORMATION", 60, infoTop + 5);
@@ -305,7 +329,7 @@ const downloadReceipt = async (req, res) => {
     }
 
     const doc = new PDFDocument({ margin: 50 });
-    const filename = `receipt-${booking.bookingCode || booking._id}.pdf`;
+    const filename = buildPatientPdfFilename(booking.name, booking.patientCode);
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
@@ -319,6 +343,7 @@ const downloadReceipt = async (req, res) => {
     doc.moveDown(1.5);
     doc.fontSize(11);
     doc.text(`Receipt Number: ${booking.receiptNumber}`);
+    doc.text(`Patient ID: ${booking.patientCode || "Pending"}`);
     doc.text(`Booking ID: ${booking.bookingCode}`);
     doc.text(`Patient Name: ${booking.name}`);
     doc.text(`Test Name: ${booking.testName}`);

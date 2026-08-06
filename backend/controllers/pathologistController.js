@@ -4,6 +4,7 @@ const User = require("../models/User");
 const fs = require("fs");
 const { sendEmail } = require("../config/email");
 const { writeAuditLog } = require("../utils/auditLogger");
+const { sendWhatsAppMessage } = require("../services/whatsappService");
 
 const signerFields = "name qualification registrationNumber signatureUrl";
 
@@ -74,6 +75,7 @@ const uploadDigitalSignature = async (req, res) => {
     res.status(500).json({ message: "Signature upload failed", error: error.message });
   }
 };
+const generatePatientCode = () => `PID${Date.now().toString().slice(-8)}${Math.floor(10 + Math.random() * 90)}`;
 
 const getPendingReports = async (req, res) => {
   try {
@@ -182,6 +184,7 @@ const approveReport = async (req, res) => {
 
     const booking = await Booking.findById(report.bookingId._id);
     if (booking) {
+      if (!booking.patientCode) booking.patientCode = generatePatientCode();
       booking.bookingStatus = "Report Ready";
       booking.status = "Report Ready";
       await booking.save();
@@ -202,6 +205,20 @@ const approveReport = async (req, res) => {
         subject: "Your report is ready",
         text: "Your report is ready.\nPlease login to dashboard to download report."
       }).catch((error) => console.error("Report notification email failed:", error.message));
+    }
+    const reportPhone = report.bookingId?.phone || report.userId?.phone;
+    if (reportPhone && booking) {
+      sendWhatsAppMessage({
+        to: reportPhone,
+        body: [
+          "INDIPATH report is ready.",
+          "",
+          `Patient ID: ${booking.patientCode || "Pending"}`,
+          `Booking ID: ${booking.bookingCode}`,
+          `Test: ${booking.testName}`,
+          "Please login to your dashboard to download the report."
+        ].join("\n")
+      }).catch((error) => console.error("Report WhatsApp notification failed:", error.message));
     }
 
     await report.populate("approvedBy", signerFields);

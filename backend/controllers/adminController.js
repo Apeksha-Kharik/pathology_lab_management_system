@@ -6,7 +6,6 @@ const Payment = require("../models/Payment");
 const Report = require("../models/Report");
 const bcrypt = require("bcryptjs");
 const { normalizeRole } = require("./authController");
-const { sendEmail } = require("../config/email");
 const { writeAuditLog } = require("../utils/auditLogger");
 
 const getDashboardMetrics = async (req, res) => {
@@ -168,19 +167,6 @@ const createUser = async (req, res) => {
       isVerified: true,
       mustChangePassword: ["receptionist", "technician", "pathologist"].includes(userRole)
     });
-
-    if (["receptionist", "technician", "pathologist"].includes(user.role)) {
-      await sendEmail({
-        to: user.email,
-        subject: `Your INDIPATH ${user.role} account is created`,
-        text: [
-          `Your ${user.role} account is created.`,
-          "",
-          `Email: ${user.email}`,
-          "Please login and change your temporary password."
-        ].join("\n")
-      });
-    }
 
     await writeAuditLog({
       actor: req.user,

@@ -14,6 +14,8 @@ const bookingSchema = new mongoose.Schema({
   email: { type: String },
   date: { type: String, required: true },
   homeSample: { type: Boolean, default: false },
+  collectionType: { type: String },
+  address: { type: String },
   amount: { type: Number, required: true },
   bookingDate: { type: String, required: true },
   timeSlot: { type: String, required: true },
@@ -56,6 +58,7 @@ const bookingSchema = new mongoose.Schema({
   paymentDate: { type: Date },
   paidAt: { type: Date },
   receiptNumber: { type: String },
+  patientCode: { type: String },
   bookingCode: { type: String, unique: true }
 }, { timestamps: true });
 
