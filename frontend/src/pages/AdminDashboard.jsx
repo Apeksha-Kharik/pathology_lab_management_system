@@ -4,7 +4,8 @@ import packageFallbackImage from '../assets/bg1.png';
 import { 
     LayoutDashboard, TestTube2, UserPlus, LogOut, Trash2,
     Activity, FlaskConical, IndianRupee, Plus,
-    CalendarDays, ClipboardList, FileCheck2, WalletCards, PackagePlus, Boxes
+    CalendarDays, ClipboardList, FileCheck2, WalletCards, PackagePlus, Boxes,
+    UserRound, Microscope, Headphones, Stethoscope, ArrowRight, CheckCircle2
 } from 'lucide-react';
 
 const loadAdminPayload = async () => {
@@ -42,9 +43,13 @@ const AdminDashboard = () => {
     const [testForm, setTestForm] = useState({ testName: '', price: '', category: '', conditions: '', description: '', reportDescription: '', reportLetterhead: '' });
     const [templateRows, setTemplateRows] = useState([]);
     const [packageForm, setPackageForm] = useState({ packageName: '', price: '', category: 'Health Checkup', description: '', imageUrl: '', includedTests: [], parametersCount: '', homeCollection: true });
-    const [userForm, setUserForm] = useState({
-        name: '', email: '', password: '', phone: '', qualification: '', role: 'technician'
+    const emptyUserForm = (role = '') => ({
+        name: '', email: '', password: '', phone: '', qualification: '', role,
+        age: '', gender: '', dateOfBirth: '', address: '', city: '', state: '',
+        pincode: '', emergencyContactName: '', emergencyContactPhone: '', referredBy: ''
     });
+    const [userForm, setUserForm] = useState(() => emptyUserForm());
+    const [creatingUser, setCreatingUser] = useState(false);
 
     const fetchData = async () => {
         try {
@@ -95,16 +100,27 @@ const AdminDashboard = () => {
 
     const handleAddUser = async (e) => {
         e.preventDefault();
+        if (creatingUser) return;
         try {
+            setCreatingUser(true);
             const response = await api.post('/api/admin/users', userForm);
             alert(response.data.message);
-            setUserForm({ name: '', email: '', password: '', phone: '', qualification: '', role: 'technician' });
+            setUserForm(emptyUserForm());
             setView('dashboard');
-            fetchData();
+            await fetchData();
         } catch (err) {
             alert(err.response?.data?.message || "Registration failed.");
+        } finally {
+            setCreatingUser(false);
         }
     };
+
+    const openAddUser = () => {
+        setUserForm(emptyUserForm());
+        setView('addUser');
+    };
+
+    const selectUserRole = (role) => setUserForm(emptyUserForm(role));
 
     const handleAddTest = async (e) => {
         e.preventDefault();
@@ -234,34 +250,7 @@ const AdminDashboard = () => {
                         <SidebarBtn active={view === 'addTest' && templateMode} onClick={() => { setTemplateMode(true); setTemplateTargetId(""); setTestForm({ testName: '', price: '', category: '', conditions: '', description: '', reportDescription: '', reportLetterhead: '' }); setTemplateRows([]); setView('addTest'); }} icon={<ClipboardList className="w-5 h-5" />} text="Report Templates" />
                         <SidebarBtn active={view === 'availablePackages'} onClick={() => setView('availablePackages')} icon={<Boxes className="w-5 h-5" />} text="Health Packages" />
                         <SidebarBtn active={view === 'addPackage'} onClick={() => setView('addPackage')} icon={<PackagePlus className="w-5 h-5" />} text="Add New Package" />
-                        <SidebarBtn active={view === 'addUser'} onClick={() => setView('addUser')} icon={<UserPlus className="w-5 h-5" />} text="Add Staff User" />
-                        <SidebarBtn
-                            active={view === 'addTechnician'}
-                            onClick={() => {
-                                setUserForm({ name: '', email: '', password: '', phone: '', qualification: '', role: 'technician' });
-                                setView('addTechnician');
-                            }}
-                            icon={<UserPlus className="w-5 h-5" />}
-                            text="Add Technician"
-                        />
-                        <SidebarBtn
-                            active={view === 'addReceptionist'}
-                            onClick={() => {
-                                setUserForm({ name: '', email: '', password: '', phone: '', qualification: '', role: 'receptionist' });
-                                setView('addReceptionist');
-                            }}
-                            icon={<UserPlus className="w-5 h-5" />}
-                            text="Add Receptionist"
-                        />
-                        <SidebarBtn
-                            active={view === 'addPathologist'}
-                            onClick={() => {
-                                setUserForm({ name: '', email: '', password: '', phone: '', qualification: '', role: 'pathologist' });
-                                setView('addPathologist');
-                            }}
-                            icon={<UserPlus className="w-5 h-5" />}
-                            text="Add Pathologist"
-                        />
+                        <SidebarBtn active={view === 'addUser'} onClick={openAddUser} icon={<UserPlus className="w-5 h-5" />} text="Add User" />
                     </nav>
                 </div>
                 <div className="mt-auto p-6">
@@ -506,84 +495,89 @@ const AdminDashboard = () => {
 
                 {/* Add User View */}
                 {view === 'addUser' && (
-                    <div className="max-w-2xl mx-auto space-y-8">
-                        <h1 className="text-3xl font-bold text-emerald-950 text-center">Staff Registration</h1>
-                        <form onSubmit={handleAddUser} className="bg-white p-5 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+                    <div className="mx-auto max-w-5xl space-y-6">
+                        <section className="overflow-hidden rounded-3xl border border-emerald-100 bg-white shadow-sm">
+                            <div className="relative overflow-hidden bg-gradient-to-r from-emerald-950 via-emerald-900 to-teal-800 px-6 py-8 text-white sm:px-10">
+                                <div className="absolute -right-16 -top-20 h-56 w-56 rounded-full bg-white/5" />
+                                <div className="absolute -bottom-24 right-24 h-52 w-52 rounded-full bg-emerald-300/10" />
+                                <div className="relative flex items-center gap-4">
+                                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/20">
+                                        <UserPlus className="h-7 w-7" />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-bold uppercase tracking-[0.22em] text-emerald-200">User management</p>
+                                        <h1 className="mt-1 text-2xl font-bold sm:text-3xl">Create a new account</h1>
+                                        <p className="mt-1 text-sm text-emerald-100">Select a role to continue with the correct registration form.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="grid gap-4 p-5 sm:grid-cols-2 sm:p-8 lg:grid-cols-4">
+                                {[
+                                    { role: 'patient', label: 'Patient', description: 'Register a patient and their contact details.', icon: UserRound, tone: 'bg-sky-50 text-sky-700' },
+                                    { role: 'technician', label: 'Technician', description: 'Create access for sample and report work.', icon: Microscope, tone: 'bg-violet-50 text-violet-700' },
+                                    { role: 'receptionist', label: 'Receptionist', description: 'Create access for bookings and front desk.', icon: Headphones, tone: 'bg-amber-50 text-amber-700' },
+                                    { role: 'pathologist', label: 'Pathologist', description: 'Create access for report review and approval.', icon: Stethoscope, tone: 'bg-rose-50 text-rose-700' }
+                                ].map(({ role, label, description, icon: RoleIcon, tone }) => {
+                                    const selected = userForm.role === role;
+                                    return <button key={role} type="button" onClick={() => selectUserRole(role)}
+                                        className={`group relative min-h-48 rounded-2xl border p-5 text-left transition-all duration-200 ${selected ? 'border-emerald-600 bg-emerald-50 shadow-md ring-2 ring-emerald-600/10' : 'border-slate-200 bg-white hover:-translate-y-1 hover:border-emerald-300 hover:shadow-lg'}`}>
+                                        {selected && <CheckCircle2 className="absolute right-4 top-4 h-5 w-5 text-emerald-600" />}
+                                        <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${selected ? 'bg-emerald-700 text-white' : tone}`}>
+                                            {React.createElement(RoleIcon, { className: 'h-6 w-6' })}
+                                        </div>
+                                        <h2 className="mt-5 text-lg font-bold text-slate-900">{label}</h2>
+                                        <p className="mt-1 min-h-10 text-xs leading-5 text-slate-500">{description}</p>
+                                        <span className={`mt-4 flex items-center gap-1 text-xs font-bold ${selected ? 'text-emerald-700' : 'text-slate-500 group-hover:text-emerald-700'}`}>
+                                            {selected ? 'Selected' : `Add ${label}`} <ArrowRight className="h-3.5 w-3.5" />
+                                        </span>
+                                    </button>;
+                                })}
+                            </div>
+                        </section>
+
+                        {!userForm.role && <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-100/70 px-6 py-5 text-center text-sm text-slate-500">
+                            Select one of the account types above to open its registration form.
+                        </div>
+                        }
+
+                        {userForm.role && <form onSubmit={handleAddUser} className="space-y-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
+                            <div className="flex items-center gap-3 border-b border-slate-100 pb-5">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-800"><UserPlus className="h-5 w-5" /></div>
+                                <div><h2 className="text-xl font-bold capitalize text-emerald-950">New {userForm.role} details</h2><p className="text-xs text-slate-500">Fields marked by your browser as required must be completed.</p></div>
+                            </div>
                             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                                 <FormInput label="Full Name" value={userForm.name} onChange={(e) => setUserForm({...userForm, name: e.target.value})} required />
                                 <FormInput label="Email" type="email" value={userForm.email} onChange={(e) => setUserForm({...userForm, email: e.target.value})} required />
+                                <FormInput label="Phone" type="tel" value={userForm.phone} onChange={(e) => setUserForm({...userForm, phone: e.target.value})} required />
+                                <FormInput label={userForm.role === 'patient' ? 'Password' : 'Temporary Password'} type="password" minLength="8" value={userForm.password} onChange={(e) => setUserForm({...userForm, password: e.target.value})} required />
                             </div>
-                            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                                <FormInput label="Password" type="password" value={userForm.password} onChange={(e) => setUserForm({...userForm, password: e.target.value})} required />
-                                <FormInput label="Phone" value={userForm.phone} onChange={(e) => setUserForm({...userForm, phone: e.target.value})} required />
-                            </div>
-                            {userForm.role === 'pathologist' && (
-                                <FormInput label="Qualification" value={userForm.qualification} onChange={(e) => setUserForm({...userForm, qualification: e.target.value})} required />
-                            )}
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Role</label>
-                                <select className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl font-medium outline-none focus:ring-2 focus:ring-emerald-500"
-                                    value={userForm.role} onChange={(e) => setUserForm({...userForm, role: e.target.value})}>
-                                    <option value="technician">Technician</option>
-                                    <option value="pathologist">Pathologist</option>
-                                    <option value="receptionist">Receptionist</option>
-                                    <option value="admin">Admin</option>
-                                </select>
-                            </div>
-                            <button type="submit" className="w-full bg-emerald-700 text-white py-4 rounded-xl font-bold hover:bg-emerald-800 transition-all">Register Staff</button>
-                        </form>
-                    </div>
-                )}
 
-                {view === 'addReceptionist' && (
-                    <div className="max-w-2xl mx-auto space-y-8">
-                        <h1 className="text-3xl font-bold text-emerald-950 text-center">Add Receptionist</h1>
-                        <form onSubmit={handleAddUser} className="bg-white p-5 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
-                            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                                <FormInput label="Receptionist Name" value={userForm.name} onChange={(e) => setUserForm({...userForm, name: e.target.value, role: 'receptionist'})} required />
-                                <FormInput label="Email" type="email" value={userForm.email} onChange={(e) => setUserForm({...userForm, email: e.target.value, role: 'receptionist'})} required />
-                            </div>
-                            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                                <FormInput label="Phone" value={userForm.phone} onChange={(e) => setUserForm({...userForm, phone: e.target.value, role: 'receptionist'})} required />
-                                <FormInput label="Temporary Password" type="password" value={userForm.password} onChange={(e) => setUserForm({...userForm, password: e.target.value, role: 'receptionist'})} required />
-                            </div>
-                            <button type="submit" className="w-full bg-emerald-700 text-white py-4 rounded-xl font-bold hover:bg-emerald-800 transition-all">Create Receptionist Account</button>
-                        </form>
-                    </div>
-                )}
+                            {userForm.role === 'pathologist' && <FormInput label="Qualification" value={userForm.qualification} onChange={(e) => setUserForm({...userForm, qualification: e.target.value})} required />}
 
-                {view === 'addTechnician' && (
-                    <div className="max-w-2xl mx-auto space-y-8">
-                        <h1 className="text-3xl font-bold text-emerald-950 text-center">Add Technician</h1>
-                        <form onSubmit={handleAddUser} className="bg-white p-5 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
-                            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                                <FormInput label="Technician Name" value={userForm.name} onChange={(e) => setUserForm({...userForm, name: e.target.value, role: 'technician'})} required />
-                                <FormInput label="Email" type="email" value={userForm.email} onChange={(e) => setUserForm({...userForm, email: e.target.value, role: 'technician'})} required />
-                            </div>
-                            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                                <FormInput label="Phone" value={userForm.phone} onChange={(e) => setUserForm({...userForm, phone: e.target.value, role: 'technician'})} required />
-                                <FormInput label="Temporary Password" type="password" value={userForm.password} onChange={(e) => setUserForm({...userForm, password: e.target.value, role: 'technician'})} required />
-                            </div>
-                            <button type="submit" className="w-full bg-emerald-700 text-white py-4 rounded-xl font-bold hover:bg-emerald-800 transition-all">Create Technician Account</button>
-                        </form>
-                    </div>
-                )}
+                            {userForm.role === 'patient' && <div className="space-y-6 border-t border-slate-100 pt-6">
+                                <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+                                    <FormInput label="Age" type="number" min="18" max="120" value={userForm.age} onChange={(e) => setUserForm({...userForm, age: e.target.value})} required />
+                                    <FormInput label="Date of Birth" type="date" value={userForm.dateOfBirth} onChange={(e) => setUserForm({...userForm, dateOfBirth: e.target.value})} />
+                                    <SelectInput label="Gender" value={userForm.gender} onChange={(e) => setUserForm({...userForm, gender: e.target.value})} options={['Male', 'Female', 'Other', 'Prefer not to say']} />
+                                </div>
+                                <FormInput label="Address" value={userForm.address} onChange={(e) => setUserForm({...userForm, address: e.target.value})} required />
+                                <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+                                    <FormInput label="City" value={userForm.city} onChange={(e) => setUserForm({...userForm, city: e.target.value})} required />
+                                    <FormInput label="State" value={userForm.state} onChange={(e) => setUserForm({...userForm, state: e.target.value})} />
+                                    <FormInput label="Pincode" value={userForm.pincode} onChange={(e) => setUserForm({...userForm, pincode: e.target.value})} />
+                                </div>
+                                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                                    <FormInput label="Emergency Contact Name" value={userForm.emergencyContactName} onChange={(e) => setUserForm({...userForm, emergencyContactName: e.target.value})} />
+                                    <FormInput label="Emergency Contact Phone" type="tel" value={userForm.emergencyContactPhone} onChange={(e) => setUserForm({...userForm, emergencyContactPhone: e.target.value})} />
+                                </div>
+                                <FormInput label="Referred By" value={userForm.referredBy} onChange={(e) => setUserForm({...userForm, referredBy: e.target.value})} />
+                            </div>}
 
-                {view === 'addPathologist' && (
-                    <div className="max-w-2xl mx-auto space-y-8">
-                        <h1 className="text-3xl font-bold text-emerald-950 text-center">Add Pathologist</h1>
-                        <form onSubmit={handleAddUser} className="bg-white p-5 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
-                            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                                <FormInput label="Pathologist Name" value={userForm.name} onChange={(e) => setUserForm({...userForm, name: e.target.value, role: 'pathologist'})} required />
-                                <FormInput label="Email" type="email" value={userForm.email} onChange={(e) => setUserForm({...userForm, email: e.target.value, role: 'pathologist'})} required />
-                            </div>
-                            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                                <FormInput label="Phone" value={userForm.phone} onChange={(e) => setUserForm({...userForm, phone: e.target.value, role: 'pathologist'})} required />
-                                <FormInput label="Qualification" value={userForm.qualification} onChange={(e) => setUserForm({...userForm, qualification: e.target.value, role: 'pathologist'})} required />
-                            </div>
-                            <FormInput label="Temporary Password" type="password" value={userForm.password} onChange={(e) => setUserForm({...userForm, password: e.target.value, role: 'pathologist'})} required />
-                            <button type="submit" className="w-full bg-emerald-700 text-white py-4 rounded-xl font-bold hover:bg-emerald-800 transition-all">Create Pathologist Account</button>
-                        </form>
+                            <button disabled={creatingUser} type="submit" className="w-full rounded-xl bg-emerald-700 py-4 font-bold text-white transition-all hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60">
+                                {creatingUser ? 'Creating Account...' : `Create ${userForm.role.charAt(0).toUpperCase() + userForm.role.slice(1)} Account`}
+                            </button>
+                        </form>}
                     </div>
                 )}
             </div>
@@ -648,6 +642,16 @@ const FormInput = ({ label, ...props }) => (
     <div className="space-y-2 flex-1">
         <label className="text-xs font-bold text-slate-400 uppercase tracking-widest px-1">{label}</label>
         <input {...props} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none font-medium" />
+    </div>
+);
+
+const SelectInput = ({ label, options, ...props }) => (
+    <div className="flex-1 space-y-2">
+        <label className="px-1 text-xs font-bold uppercase tracking-widest text-slate-400">{label}</label>
+        <select {...props} className="w-full rounded-xl border border-slate-200 bg-slate-50 p-4 font-medium outline-none focus:ring-2 focus:ring-emerald-500">
+            <option value="">Select {label.toLowerCase()}</option>
+            {options.map((option) => <option key={option} value={option}>{option}</option>)}
+        </select>
     </div>
 );
 

@@ -112,12 +112,31 @@ const getDashboardMetrics = async (req, res) => {
 
 const createUser = async (req, res) => {
   try {
-    const { name, email, password, phone, mobile, role, qualification } = req.body;
+    const {
+      name, email, password, phone, mobile, role, qualification,
+      age, gender, dateOfBirth, address, city, state, pincode,
+      emergencyContactName, emergencyContactPhone, referredBy
+    } = req.body;
     const userPhone = phone || mobile;
-    const userRole = normalizeRole(role);
+    const requestedRole = String(role || "").trim().toLowerCase();
+    const creatableRoles = ["patient", "receptionist", "technician", "pathologist"];
 
     if (!name || !email || !password || !userPhone || !role) {
       return res.status(400).json({ message: "Name, email, phone, password and role are required" });
+    }
+
+    if (!creatableRoles.includes(requestedRole)) {
+      return res.status(400).json({ message: "Role must be patient, technician, receptionist or pathologist" });
+    }
+
+    const userRole = normalizeRole(requestedRole);
+
+    if (password.length < 8) {
+      return res.status(400).json({ message: "Password must be at least 8 characters" });
+    }
+
+    if (userRole === "patient" && (!age || !address || !city)) {
+      return res.status(400).json({ message: "Patient age, address and city are required" });
     }
 
     if (userRole === "pathologist" && !qualification) {
@@ -133,6 +152,16 @@ const createUser = async (req, res) => {
       name,
       email,
       phone: userPhone,
+      age: userRole === "patient" ? Number(age) : undefined,
+      gender: userRole === "patient" ? gender : undefined,
+      dateOfBirth: userRole === "patient" && dateOfBirth ? dateOfBirth : undefined,
+      address: userRole === "patient" ? address : undefined,
+      city: userRole === "patient" ? city : undefined,
+      state: userRole === "patient" ? state : undefined,
+      pincode: userRole === "patient" ? pincode : undefined,
+      emergencyContactName: userRole === "patient" ? emergencyContactName : undefined,
+      emergencyContactPhone: userRole === "patient" ? emergencyContactPhone : undefined,
+      referredBy: userRole === "patient" ? referredBy : undefined,
       qualification: userRole === "pathologist" ? qualification : undefined,
       password: await bcrypt.hash(password, 10),
       role: userRole,
