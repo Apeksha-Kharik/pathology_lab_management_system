@@ -3,7 +3,33 @@ const Payment = require("../models/Payment");
 const Test = require("../models/Test");
 const User = require("../models/User");
 const PDFDocument = require("pdfkit");
-const { sendEmail } = require("../config/email");
+const { sendWhatsAppMessage } = require("../services/whatsappService");
+
+const generatePatientCode = () => `PID${Date.now().toString().slice(-8)}${Math.floor(10 + Math.random() * 90)}`;
+const patientCodeStatuses = ["Confirmed", "Arrived", "Technician Assigned", "Sample Collected", "Processing", "Pending Report Approval", "Completed", "Report Ready"];
+
+const ensurePatientCode = async (booking) => {
+  if (!booking || booking.patientCode || !patientCodeStatuses.includes(booking.bookingStatus || booking.status)) {
+    return booking;
+  }
+
+  booking.patientCode = generatePatientCode();
+  await booking.save();
+  return booking;
+};
+
+const safeFilePart = (value) => String(value || "patient").trim().replace(/[^a-z0-9-_]+/gi, "-").replace(/^-+|-+$/g, "") || "patient";
+
+const buildPatientPdfFilename = (name, patientCode) => `${safeFilePart(name)}-${safeFilePart(patientCode || "pending-patient-id")}.pdf`;
+
+const notifyPatient = async (booking, lines) => {
+  const phone = booking.phone || booking.userId?.phone;
+  if (!phone) return;
+  await sendWhatsAppMessage({
+    to: phone,
+    body: lines.filter(Boolean).join("\n")
+  });
+};
 
 const getPendingBookings = async (req, res) => {
   try {
@@ -32,7 +58,8 @@ const getAllBookings = async (req, res) => {
     const bookings = await Booking.find(query)
       .populate("userId", "name email phone")
       .sort({ createdAt: -1 });
-    res.json(bookings);
+    const bookingsWithPatientIds = await Promise.all(bookings.map((booking) => ensurePatientCode(booking)));
+    res.json(bookingsWithPatientIds);
   } catch (error) {
     res.status(500).json({ message: "Error fetching bookings" });
   }
@@ -86,6 +113,7 @@ const createWalkInBooking = async (req, res) => {
       bookingStatus: "Confirmed",
       status: "Confirmed",
       paymentStatus: "Unpaid",
+      patientCode: generatePatientCode(),
       bookingCode: `BK${Date.now().toString().slice(-6)}`
     });
 
@@ -95,6 +123,16 @@ const createWalkInBooking = async (req, res) => {
       method: "cash",
       status: "pending"
     });
+
+    await notifyPatient(booking, [
+      "INDIPATH booking confirmed.",
+      "",
+      `Patient ID: ${booking.patientCode}`,
+      `Booking ID: ${booking.bookingCode}`,
+      `Test: ${booking.testName}`,
+      `Date: ${booking.bookingDate}`,
+      `Time Slot: ${booking.timeSlot}`
+    ]);
 
     res.status(201).json({ message: "Walk-in booking created successfully", booking });
   } catch (error) {
@@ -118,6 +156,9 @@ const updateBookingStatus = async (req, res) => {
 
     booking.bookingStatus = status;
     booking.status = status;
+    if (["Confirmed", "Arrived"].includes(status) && !booking.patientCode) {
+      booking.patientCode = generatePatientCode();
+    }
     if (status === "Arrived") {
       booking.patientArrived = true;
     }
@@ -130,32 +171,25 @@ const updateBookingStatus = async (req, res) => {
     await booking.save();
 
     if (status === "Confirmed") {
-      await sendEmail({
-        to: booking.email || booking.userId.email,
-        subject: "Your pathology test booking is confirmed",
-        text: [
-          "Your pathology test booking has been confirmed.",
-          "",
-          `Booking ID: ${booking.bookingCode}`,
-          `Test: ${booking.testName}`,
-          `Date: ${booking.bookingDate}`,
-          `Time Slot: ${booking.timeSlot}`
-        ].join("\n")
-      });
+      await notifyPatient(booking, [
+        "INDIPATH booking confirmed.",
+        "",
+        `Patient ID: ${booking.patientCode}`,
+        `Booking ID: ${booking.bookingCode}`,
+        `Test: ${booking.testName}`,
+        `Date: ${booking.bookingDate}`,
+        `Time Slot: ${booking.timeSlot}`
+      ]);
     }
 
     if (status === "Rejected") {
-      await sendEmail({
-        to: booking.email || booking.userId.email,
-        subject: "Your pathology test booking was rejected",
-        text: [
-          "Your pathology test booking was rejected.",
-          "",
-          `Booking ID: ${booking.bookingCode}`,
-          `Test: ${booking.testName}`,
-          `Reason: ${booking.rejectionReason}`
-        ].join("\n")
-      });
+      await notifyPatient(booking, [
+        "INDIPATH booking request rejected.",
+        "",
+        `Booking ID: ${booking.bookingCode}`,
+        `Test: ${booking.testName}`,
+        `Reason: ${booking.rejectionReason}`
+      ]);
     }
 
     res.json({ message: `Booking ${status.toLowerCase()} successfully`, booking });
@@ -187,6 +221,9 @@ const assignTechnician = async (req, res) => {
     }
 
     booking.assignedTechnician = technician._id;
+    if (!booking.patientCode) {
+      booking.patientCode = generatePatientCode();
+    }
     booking.bookingStatus = "Technician Assigned";
     booking.status = "Technician Assigned";
     await booking.save();
@@ -219,6 +256,9 @@ const markPaymentPaid = async (req, res) => {
     }
 
     booking.amount = paidAmount;
+    if (!booking.patientCode && patientCodeStatuses.includes(booking.bookingStatus || booking.status)) {
+      booking.patientCode = generatePatientCode();
+    }
     booking.paymentStatus = "Paid";
     booking.paymentMethod = paymentMethod;
     booking.receiptNumber = receiptNumber;
@@ -240,21 +280,15 @@ const markPaymentPaid = async (req, res) => {
       { upsert: true, new: true }
     );
 
-    const paymentEmail = booking.email || booking.userId?.email;
-    if (paymentEmail) {
-      await sendEmail({
-        to: paymentEmail,
-        subject: "Payment received successfully",
-        text: [
-          "Payment received successfully.",
-          "",
-          `Booking ID: ${booking.bookingCode}`,
-          `Test: ${booking.testName}`,
-          `Amount: INR ${paidAmount}`,
-          "Receipt is available in your dashboard."
-        ].join("\n")
-      });
-    }
+    await notifyPatient(booking, [
+      "INDIPATH payment received successfully.",
+      "",
+      `Patient ID: ${booking.patientCode || "Pending"}`,
+      `Booking ID: ${booking.bookingCode}`,
+      `Test: ${booking.testName}`,
+      `Amount: INR ${paidAmount}`,
+      "Receipt is available in your dashboard."
+    ]);
 
     res.json({ message: "Payment marked as paid and receipt generated", booking });
   } catch (error) {
@@ -274,7 +308,7 @@ const downloadReceptionistReceipt = async (req, res) => {
     }
 
     const doc = new PDFDocument({ margin: 50 });
-    const filename = `receipt-${booking.bookingCode || booking._id}.pdf`;
+    const filename = buildPatientPdfFilename(booking.name, booking.patientCode);
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
@@ -286,6 +320,7 @@ const downloadReceptionistReceipt = async (req, res) => {
     doc.moveDown(1.5);
     doc.fontSize(11);
     doc.text(`Receipt Number: ${booking.receiptNumber}`);
+    doc.text(`Patient ID: ${booking.patientCode || "Pending"}`);
     doc.text(`Booking ID: ${booking.bookingCode}`);
     doc.text(`Patient Name: ${booking.name}`);
     doc.text(`Test: ${booking.testName}`);

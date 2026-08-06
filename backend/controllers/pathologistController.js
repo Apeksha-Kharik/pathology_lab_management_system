@@ -1,6 +1,8 @@
 const Booking = require("../models/Booking");
 const Report = require("../models/Report");
-const { sendEmail } = require("../config/email");
+const { sendWhatsAppMessage } = require("../services/whatsappService");
+
+const generatePatientCode = () => `PID${Date.now().toString().slice(-8)}${Math.floor(10 + Math.random() * 90)}`;
 
 const getPendingReports = async (req, res) => {
   try {
@@ -94,16 +96,25 @@ const approveReport = async (req, res) => {
     await report.save();
 
     const booking = await Booking.findById(report.bookingId._id);
+    if (!booking.patientCode) {
+      booking.patientCode = generatePatientCode();
+    }
     booking.bookingStatus = "Report Ready";
     booking.status = "Report Ready";
     await booking.save();
 
-    const reportEmail = report.userId?.email || report.bookingId?.email;
-    if (reportEmail) {
-      await sendEmail({
-        to: reportEmail,
-        subject: "Your report is ready",
-        text: "Your report is ready.\nPlease login to dashboard to download report."
+    const reportPhone = report.bookingId?.phone || report.userId?.phone;
+    if (reportPhone) {
+      await sendWhatsAppMessage({
+        to: reportPhone,
+        body: [
+          "INDIPATH report is ready.",
+          "",
+          `Patient ID: ${booking.patientCode || "Pending"}`,
+          `Booking ID: ${booking.bookingCode}`,
+          `Test: ${booking.testName}`,
+          "Please login to your dashboard to download the report."
+        ].join("\n")
       });
     }
 
