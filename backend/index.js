@@ -26,12 +26,19 @@ connectDB();
 const app = express();
 
 // Middleware
+const allowedOrigins = [
+  /^http:\/\/localhost:51\d{2}$/,
+  /^http:\/\/127\.0\.0\.1:51\d{2}$/
+];
+
 app.use(cors({
-  origin: [
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "http://localhost:5175"
-  ],
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.some((allowedOrigin) => allowedOrigin.test(origin))) {
+      return callback(null, true);
+    }
+
+    return callback(new Error("Not allowed by CORS"));
+  },
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   credentials: true
 }));
