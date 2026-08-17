@@ -5,6 +5,7 @@ const path = require("path");
 
 const connectDB = require("./config/db");
 const { verifyTransporter } = require("./config/email");
+const ensureDefaultPackages = require("./utils/ensureDefaultPackages");
 
 const authRoutes = require("./routes/authRoutes");
 const adminRoutes = require("./routes/adminRoutes");
@@ -14,18 +15,11 @@ const technicianRoutes = require("./routes/technicianRoutes");
 const pathologistRoutes = require("./routes/pathologistRoutes");
 const profileRoutes = require("./routes/profileRoutes");
 
-// Load environment variables
 dotenv.config();
-
-// Verify SMTP Connection
 verifyTransporter();
-
-// Connect MongoDB
-connectDB();
 
 const app = express();
 
-// Middleware
 const allowedOrigins = [
   /^http:\/\/localhost:51\d{2}$/,
   /^http:\/\/127\.0\.0\.1:51\d{2}$/
@@ -56,12 +50,10 @@ app.use("/uploads/signatures", express.static(path.join(__dirname, "uploads", "s
   }
 }));
 
-// Test Route
 app.get("/", (req, res) => {
   res.send("Pathology Lab Server Running");
 });
 
-// Routes
 app.use("/", authRoutes);
 app.use("/", patientRoutes);
 app.use("/", profileRoutes);
@@ -70,9 +62,18 @@ app.use("/api/receptionist", receptionistRoutes);
 app.use("/api/technician", technicianRoutes);
 app.use("/api/pathologist", pathologistRoutes);
 
-// Start Server
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`🚀 Server active on port ${PORT}`);
+const startServer = async () => {
+  await connectDB();
+  await ensureDefaultPackages();
+
+  app.listen(PORT, () => {
+    console.log(`Server active on port ${PORT}`);
+  });
+};
+
+startServer().catch((error) => {
+  console.error(`Server startup failed: ${error.message}`);
+  process.exit(1);
 });

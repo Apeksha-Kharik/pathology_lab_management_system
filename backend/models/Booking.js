@@ -25,6 +25,7 @@ const bookingSchema = new mongoose.Schema({
   address: { type: String },
   doctorNotes: { type: String },
   sampleType: { type: String },
+  sampleId: { type: String },
   rejectionReason: { type: String },
   sampleStatus: {
     type: String,
@@ -58,6 +59,7 @@ const bookingSchema = new mongoose.Schema({
   paymentDate: { type: Date },
   paidAt: { type: Date },
   receiptNumber: { type: String },
+  receiptId: { type: String },
   patientCode: { type: String },
   bookingCode: { type: String, unique: true }
 }, { timestamps: true });

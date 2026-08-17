@@ -15,6 +15,11 @@ export const startTechnicianTest = async (bookingId) => {
   return response.data;
 };
 
+export const startTechnicianReportEntry = async (bookingId) => {
+  const response = await api.post(`/api/technician/bookings/${bookingId}/report/start`);
+  return response.data;
+};
+
 export const saveTechnicianReportDraft = async (bookingId, payload) => {
   const response = await api.post(`/api/technician/bookings/${bookingId}/report/draft`, payload);
   return response.data;

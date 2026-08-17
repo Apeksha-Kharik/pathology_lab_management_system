@@ -2,6 +2,10 @@ const Booking = require("../models/Booking");
 const Report = require("../models/Report");
 const Test = require("../models/Test");
 const Package = require("../models/Package");
+const User = require("../models/User");
+
+const generateSampleId = () => `SMP${Date.now().toString().slice(-8)}${Math.floor(10 + Math.random() * 90)}`;
+const generateReportId = () => `RPT${Date.now().toString().slice(-8)}${Math.floor(10 + Math.random() * 90)}`;
 
 const normalizeResults = (results = []) => {
   return results
@@ -28,6 +32,48 @@ const getReportTemplateDetails = (booking) => {
     reportLetterhead: source?.reportLetterhead || "",
     reportDescription: source?.reportDescription || ""
   };
+};
+
+const selectFairPathologist = async () => {
+  const pathologists = await User.find({ role: "pathologist" }).select("name email phone role").sort({ name: 1 });
+
+  if (!pathologists.length) {
+    return null;
+  }
+
+  const [workloads, recentAssignments] = await Promise.all([
+    Report.aggregate([
+      {
+        $match: {
+          pathologistId: { $ne: null },
+          status: { $in: ["Pending Approval", "Pending Review"] }
+        }
+      },
+      { $group: { _id: "$pathologistId", count: { $sum: 1 } } }
+    ]),
+    Report.find({ pathologistId: { $ne: null } }).select("pathologistId updatedAt").sort({ updatedAt: -1 })
+  ]);
+
+  const workloadByPathologist = new Map(workloads.map((item) => [String(item._id), item.count]));
+  const lastAssignedByPathologist = new Map();
+  recentAssignments.forEach((report) => {
+    const pathologistId = String(report.pathologistId);
+    if (!lastAssignedByPathologist.has(pathologistId)) {
+      lastAssignedByPathologist.set(pathologistId, report.updatedAt?.getTime?.() || 0);
+    }
+  });
+
+  return pathologists
+    .map((pathologist) => ({
+      pathologist,
+      workload: workloadByPathologist.get(String(pathologist._id)) || 0,
+      lastAssignedAt: lastAssignedByPathologist.get(String(pathologist._id)) || 0
+    }))
+    .sort((a, b) => (
+      a.workload - b.workload ||
+      a.lastAssignedAt - b.lastAssignedAt ||
+      a.pathologist.name.localeCompare(b.pathologist.name)
+    ))[0].pathologist;
 };
 
 const normalizeTemplateName = (name = "") => name.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -82,6 +128,9 @@ const startTest = async (req, res) => {
       return res.status(400).json({ message: "Test can be started only after technician assignment and sample collection" });
     }
 
+    if (!booking.sampleId) {
+      booking.sampleId = generateSampleId();
+    }
     booking.testStarted = true;
     booking.testStartedAt = new Date();
     booking.bookingStatus = "Processing";
@@ -91,6 +140,49 @@ const startTest = async (req, res) => {
     res.json({ message: "Test started successfully", booking });
   } catch (error) {
     res.status(500).json({ message: "Unable to start test", error: error.message });
+  }
+};
+
+const startReportEntry = async (req, res) => {
+  try {
+    const booking = await getAssignedBooking(req.params.bookingId, req.user._id);
+    if (!booking) {
+      return res.status(404).json({ message: "Assigned booking not found" });
+    }
+
+    if (!booking.testStarted && booking.bookingStatus !== "Processing") {
+      return res.status(400).json({ message: "Start the test before report entry" });
+    }
+
+    await booking.populate("testId", "reportDescription reportLetterhead");
+    await booking.populate("packageId", "reportDescription reportLetterhead");
+    const templateDetails = getReportTemplateDetails(booking);
+    const existingReport = await Report.findOne({ bookingId: booking._id });
+
+    if (existingReport && ["Pending Approval", "Pending Review", "Approved"].includes(existingReport.status)) {
+      return res.status(400).json({ message: "Submitted reports cannot be edited by technician" });
+    }
+
+    const report = await Report.findOneAndUpdate(
+      { bookingId: booking._id },
+      {
+        userId: booking.userId || booking.patientId,
+        bookingId: booking._id,
+        reportId: existingReport?.reportId || generateReportId(),
+        technicianId: req.user._id,
+        testName: booking.testName,
+        ...templateDetails,
+        status: "Draft",
+        reportStatus: "Draft",
+        finalStatus: "Draft",
+        rejectionReason: existingReport?.rejectionReason || ""
+      },
+      { upsert: true, new: true, runValidators: true }
+    );
+
+    res.json({ message: "Report entry started", report });
+  } catch (error) {
+    res.status(500).json({ message: "Report entry start failed", error: error.message });
   }
 };
 
@@ -149,6 +241,7 @@ const saveReportDraft = async (req, res) => {
       {
         userId: booking.userId || booking.patientId,
         bookingId: booking._id,
+        reportId: existingReport?.reportId || generateReportId(),
         technicianId: req.user._id,
         testName: booking.testName,
         ...templateDetails,
@@ -196,12 +289,19 @@ const submitReport = async (req, res) => {
       return res.status(400).json({ message: "Report has already been submitted" });
     }
 
+    const pathologist = await selectFairPathologist();
+    if (!pathologist) {
+      return res.status(404).json({ message: "No pathologist users are available for report review" });
+    }
+
     const report = await Report.findOneAndUpdate(
       { bookingId: booking._id },
       {
         userId: booking.userId || booking.patientId,
         bookingId: booking._id,
+        reportId: existingReport?.reportId || generateReportId(),
         technicianId: req.user._id,
+        pathologistId: pathologist._id,
         testName: booking.testName,
         ...templateDetails,
         results: cleanResults,
@@ -219,10 +319,10 @@ const submitReport = async (req, res) => {
     booking.status = "Pending Report Approval";
     await booking.save();
 
-    res.json({ message: "Report submitted and marked pending approval", report });
+    res.json({ message: `Report submitted to pathologist ${pathologist.name}`, report });
   } catch (error) {
     res.status(500).json({ message: "Report submission failed", error: error.message });
   }
 };
 
-module.exports = { getTechnicianBookings, updateSampleStatus, startTest, saveReportDraft, submitReport };
+module.exports = { getTechnicianBookings, updateSampleStatus, startTest, startReportEntry, saveReportDraft, submitReport };

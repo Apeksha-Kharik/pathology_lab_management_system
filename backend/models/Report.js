@@ -11,6 +11,7 @@ const resultSchema = new mongoose.Schema({
 const reportSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   bookingId: { type: mongoose.Schema.Types.ObjectId, ref: "Booking", required: true },
+  reportId: { type: String },
   technicianId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   testName: { type: String, required: true },
   reportLetterhead: { type: String, default: "" },

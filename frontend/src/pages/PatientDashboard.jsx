@@ -222,6 +222,7 @@ const mapPackageToCard = (item, index) => ({
   bookingType: "Package",
   title: item.packageName,
   imageUrl: item.imageUrl || packageImages[index % packageImages.length],
+  fallbackImageUrl: packageImages[index % packageImages.length],
   chips: [
     `${item.includedTests?.length || item.parametersCount || 0} parameters`,
     item.homeCollection ? "Home collection" : "Visit lab",
@@ -294,6 +295,15 @@ const readStoredBookingRequests = (storageKey) => {
   }
 };
 
+const getSampleCollectionLabel = (collectionType) => {
+  const value = String(collectionType || "").trim().toLowerCase();
+
+  if (value.includes("home")) return "Home Visit";
+  if (value.includes("lab") || value.includes("visit")) return "Lab Visit";
+
+  return "N/A";
+};
+
 const buildBookingHistoryRows = (localRequests, serverBookings) => {
   const localRows = localRequests.map((booking) => ({
     id: booking.bookingId,
@@ -308,12 +318,10 @@ const buildBookingHistoryRows = (localRequests, serverBookings) => {
     gender: booking.patient?.gender || "",
     mobile: booking.patient?.mobile || "",
     email: booking.patient?.email || "",
-    collectionType: booking.collectionType,
-    location: booking.location,
+    sampleCollection: getSampleCollectionLabel(booking.collectionType),
     date: booking.preferredDate,
     timeSlot: booking.timeSlot,
-    amount: booking.amount,
-    notes: booking.patient?.notes || ""
+    amount: booking.amount
   }));
 
   const serverRows = serverBookings.map((booking) => ({
@@ -329,12 +337,10 @@ const buildBookingHistoryRows = (localRequests, serverBookings) => {
     gender: booking.gender || "",
     mobile: booking.phone || "",
     email: booking.email || "",
-    collectionType: booking.collectionType || "Lab",
-    location: booking.address || nearestLab.address,
+    sampleCollection: getSampleCollectionLabel(booking.collectionType || "Lab"),
     date: booking.bookingDate || booking.date || "",
     timeSlot: booking.timeSlot || "",
-    amount: booking.amount || "",
-    notes: booking.notes || ""
+    amount: booking.amount || ""
   }));
 
   return [...localRows, ...serverRows];
@@ -784,12 +790,22 @@ function ShowcaseRow({ cartItems, eyebrow, items, onAddToCart, onBookNow, subtit
 
 function ShowcaseCard({ item, isInCart, onAddToCart, onBookNow }) {
   const Icon = item.icon || CalendarDays;
+  const imageSrc = item.imageUrl || item.fallbackImageUrl;
 
   return (
     <article className="flex min-h-[31rem] shrink-0 basis-[88%] flex-col overflow-hidden rounded-3xl border border-emerald-100 bg-white shadow-[0_10px_35px_rgba(2,44,34,0.07)] transition-shadow duration-300 hover:border-emerald-300 hover:shadow-[0_18px_45px_rgba(2,44,34,0.12)] sm:basis-[calc((100%_-_24px)/2)] lg:basis-[calc((100%_-_48px)/3)]">
       <div className="relative h-48 overflow-hidden bg-emerald-50">
-        {item.imageUrl ? (
-          <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" />
+        {imageSrc ? (
+          <img
+            src={imageSrc}
+            alt={item.title}
+            onError={(event) => {
+              if (!item.fallbackImageUrl || event.currentTarget.dataset.fallbackApplied) return;
+              event.currentTarget.dataset.fallbackApplied = "true";
+              event.currentTarget.src = item.fallbackImageUrl;
+            }}
+            className="h-full w-full object-cover"
+          />
         ) : (
           <div className="flex h-full items-center justify-center bg-[linear-gradient(135deg,#ecfdf5,#f8fafc)]">
             <span className="flex h-24 w-24 items-center justify-center rounded-3xl bg-white text-emerald-700 shadow-lg shadow-emerald-950/10">
@@ -1318,8 +1334,8 @@ function BookingSuccess({ bookingId, collectionType, form, item, onBookMore, onD
 
 const safeFilePart = (value) => String(value || "patient").trim().replace(/[^a-z0-9-_]+/gi, "-").replace(/^-+|-+$/g, "") || "patient";
 
-const buildPatientDownloadName = (name, patientCode) => {
-  return `${safeFilePart(name)}-${safeFilePart(patientCode || "pending-patient-id")}.pdf`;
+const buildPatientDownloadName = (name, patientCode, documentType) => {
+  return `${safeFilePart(name)}-${safeFilePart(patientCode || "pending-patient-id")}-${safeFilePart(documentType).toUpperCase()}.pdf`;
 };
 
 function DownloadsSection({ bookings, reports, user }) {
@@ -1409,7 +1425,7 @@ function BookingHistoryTable({ bookings }) {
         <h2 className="mt-1 text-3xl font-black text-emerald-950">Booking History</h2>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1180px] text-left text-sm">
+        <table className="w-full min-w-[980px] text-left text-sm">
           <thead className="bg-emerald-50 text-xs uppercase tracking-[0.12em] text-emerald-900">
             <tr>
               <th className="px-4 py-4">Booking ID</th>
@@ -1423,12 +1439,10 @@ function BookingHistoryTable({ bookings }) {
               <th className="px-4 py-4">Gender</th>
               <th className="px-4 py-4">Mobile</th>
               <th className="px-4 py-4">Email</th>
-              <th className="px-4 py-4">Collection</th>
-              <th className="px-4 py-4">Location</th>
+              <th className="px-4 py-4">Sample Collection</th>
               <th className="px-4 py-4">Date</th>
               <th className="px-4 py-4">Time</th>
               <th className="px-4 py-4">Amount</th>
-              <th className="px-4 py-4">Notes</th>
             </tr>
           </thead>
           <tbody>
@@ -1445,12 +1459,10 @@ function BookingHistoryTable({ bookings }) {
                 <td className="px-4 py-4 text-slate-600">{booking.gender || "N/A"}</td>
                 <td className="px-4 py-4 text-slate-600">{booking.mobile || "N/A"}</td>
                 <td className="px-4 py-4 text-slate-600">{booking.email || "N/A"}</td>
-                <td className="px-4 py-4 text-slate-600">{booking.collectionType || "N/A"}</td>
-                <td className="max-w-xs px-4 py-4 text-slate-600">{booking.location || "N/A"}</td>
+                <td className="px-4 py-4 text-slate-600">{booking.sampleCollection || "N/A"}</td>
                 <td className="px-4 py-4 text-slate-600">{booking.date || "N/A"}</td>
                 <td className="px-4 py-4 text-slate-600">{booking.timeSlot || "N/A"}</td>
                 <td className="px-4 py-4 font-black text-emerald-950">INR {booking.amount || 0}</td>
-                <td className="max-w-xs px-4 py-4 text-slate-600">{booking.notes || "N/A"}</td>
               </tr>
             ))}
           </tbody>
@@ -1563,7 +1575,7 @@ function ReportButton({ report, user }) {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = buildPatientDownloadName(report.bookingId?.name || user?.name, report.bookingId?.patientCode || user?.patientCode);
+      link.download = buildPatientDownloadName(report.bookingId?.name || user?.name, report.bookingId?.patientCode || user?.patientCode, "RPT");
       link.click();
       window.URL.revokeObjectURL(url);
     } catch (error) {
@@ -1592,28 +1604,68 @@ function ReportButton({ report, user }) {
 }
 
 function ReceiptButton({ booking, user }) {
-  const handleDownload = async () => {
+  const [receiptAction, setReceiptAction] = useState("");
+
+  const handleView = async () => {
     try {
+      setReceiptAction("view");
       const blob = await downloadReceipt(booking._id);
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = buildPatientDownloadName(booking.name || user?.name, booking.patientCode || user?.patientCode);
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.click();
+      window.setTimeout(() => window.URL.revokeObjectURL(url), 60000);
+    } catch (error) {
+      alert(error.response?.data?.message || "Receipt preview failed");
+    } finally {
+      setReceiptAction("");
+    }
+  };
+
+  const handleDownload = async () => {
+    try {
+      setReceiptAction("download");
+      const blob = await downloadReceipt(booking._id);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = buildPatientDownloadName(booking.name || user?.name, booking.patientCode || user?.patientCode, "RCT");
       link.click();
       window.URL.revokeObjectURL(url);
     } catch (error) {
       alert(error.response?.data?.message || "Receipt download failed");
+    } finally {
+      setReceiptAction("");
     }
   };
 
   return (
-    <button
-      onClick={handleDownload}
-      disabled={booking.paymentStatus !== "Paid"}
-      className="mb-3 flex w-full items-center justify-between rounded-md border border-slate-200 p-4 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-    >
-      {booking.testName} {booking.paymentStatus === "Paid" ? <Download size={16} /> : <span className="text-xs">Unpaid</span>}
-    </button>
+    <div className="mb-3 rounded-xl border border-emerald-100 bg-white p-4 shadow-sm">
+      <div className="mb-3">
+        <p className="font-bold text-slate-800">{booking.testName || "Payment receipt"}</p>
+        <p className="mt-1 text-xs text-slate-500">{booking.paymentStatus === "Paid" ? "Paid receipt" : "Receipt available after payment"}</p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={handleView}
+          disabled={booking.paymentStatus !== "Paid" || Boolean(receiptAction)}
+          className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <Eye size={16} /> {receiptAction === "view" ? "Opening..." : "View Receipt"}
+        </button>
+        <button
+          type="button"
+          onClick={handleDownload}
+          disabled={booking.paymentStatus !== "Paid" || Boolean(receiptAction)}
+          className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <Download size={16} /> {receiptAction === "download" ? "Downloading..." : "Download"}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -1625,8 +1677,8 @@ function BookingRow({ booking }) {
           <p className="text-xs font-bold uppercase text-slate-400">{booking.bookingCode}</p>
           <p className="font-bold text-slate-900">{booking.testName}</p>
           <p className="text-sm text-slate-500">Requested: {booking.bookingDate || booking.date} | {booking.timeSlot}</p>
+          <p className="text-sm text-slate-500">Sample Collection: {getSampleCollectionLabel(booking.collectionType || "Lab")}</p>
           <p className="text-sm text-slate-500">Amount: INR {booking.amount}</p>
-          {booking.notes && <p className="text-sm text-slate-500">Notes: {booking.notes}</p>}
           {booking.rejectionReason && <p className="text-sm text-red-600">Rejection reason: {booking.rejectionReason}</p>}
         </div>
         <div className="flex flex-wrap gap-2">

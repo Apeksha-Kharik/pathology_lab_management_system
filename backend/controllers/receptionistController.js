@@ -3,9 +3,19 @@ const Payment = require("../models/Payment");
 const Test = require("../models/Test");
 const User = require("../models/User");
 const PDFDocument = require("pdfkit");
+const fs = require("fs");
+const path = require("path");
 const { sendWhatsAppMessage } = require("../services/whatsappService");
 
+const letterheadImagePath = path.join(__dirname, "..", "assets", "indipath-letterhead.png");
+const pdfLayout = {
+  left: 56,
+  right: 506,
+  contentTop: 124
+};
+
 const generatePatientCode = () => `PID${Date.now().toString().slice(-8)}${Math.floor(10 + Math.random() * 90)}`;
+const generateReceiptId = () => `RCT${Date.now().toString().slice(-8)}${Math.floor(10 + Math.random() * 90)}`;
 const patientCodeStatuses = ["Confirmed", "Arrived", "Technician Assigned", "Sample Collected", "Processing", "Pending Report Approval", "Completed", "Report Ready"];
 
 const ensurePatientCode = async (booking) => {
@@ -20,7 +30,74 @@ const ensurePatientCode = async (booking) => {
 
 const safeFilePart = (value) => String(value || "patient").trim().replace(/[^a-z0-9-_]+/gi, "-").replace(/^-+|-+$/g, "") || "patient";
 
-const buildPatientPdfFilename = (name, patientCode) => `${safeFilePart(name)}-${safeFilePart(patientCode || "pending-patient-id")}.pdf`;
+const buildPatientPdfFilename = (name, patientCode, documentType = "RCT") => `${safeFilePart(name)}-${safeFilePart(patientCode || "pending-patient-id")}-${safeFilePart(documentType).toUpperCase()}.pdf`;
+
+const formatDateTime = (value) => value ? new Date(value).toLocaleString("en-IN") : "N/A";
+const formatCurrency = (value) => `INR ${Number(value || 0).toLocaleString("en-IN")}`;
+
+const drawLetterhead = (doc) => {
+  if (!fs.existsSync(letterheadImagePath)) {
+    doc.y = 72;
+    return false;
+  }
+
+  doc.image(letterheadImagePath, 0, 0, {
+    cover: [doc.page.width, doc.page.height],
+    align: "center",
+    valign: "center"
+  });
+  doc.y = pdfLayout.contentTop;
+  return true;
+};
+
+const drawTitleBlock = (doc, title, subtitle) => {
+  const top = doc.y;
+  doc.roundedRect(pdfLayout.left, top, pdfLayout.right - pdfLayout.left, 38, 4).fill("#173b8f");
+  doc.fillColor("#ffffff").fontSize(16).font("Helvetica-Bold").text(title, pdfLayout.left + 10, top + 10, { width: 430, align: "center" });
+  doc.fillColor("#dff7ea").fontSize(7.5).font("Helvetica-Bold").text(subtitle, pdfLayout.left + 10, top + 28, { width: 430, align: "center" });
+  doc.y = top + 52;
+};
+
+const drawInfoGrid = (doc, title, rows) => {
+  const width = pdfLayout.right - pdfLayout.left;
+  const left = pdfLayout.left;
+  const startY = doc.y;
+  const rowHeight = 22;
+  const headerHeight = 22;
+  const bodyHeight = Math.ceil(rows.length / 2) * rowHeight;
+
+  doc.roundedRect(left, startY, width, headerHeight + bodyHeight + 10, 5).fill("#ffffff").strokeColor("#cfe4d8").stroke();
+  doc.rect(left, startY, width, headerHeight).fill("#187b4b");
+  doc.fillColor("#ffffff").fontSize(9).font("Helvetica-Bold").text(title, left + 12, startY + 7);
+
+  rows.forEach(([label, value], index) => {
+    const column = index % 2;
+    const row = Math.floor(index / 2);
+    const x = column ? 284 : left + 12;
+    const y = startY + headerHeight + 11 + (row * rowHeight);
+    doc.fillColor("#173b8f").fontSize(7.5).font("Helvetica-Bold").text(label.toUpperCase(), x, y, { width: 82 });
+    doc.fillColor("#1f2937").fontSize(8.8).font("Helvetica").text(String(value || "N/A"), x + 86, y, { width: 128, height: 18, ellipsis: true });
+  });
+
+  doc.y = startY + headerHeight + bodyHeight + 24;
+};
+
+const drawReceiptBox = (doc, rows) => {
+  const left = 80;
+  const top = doc.y;
+  const width = 395;
+  const rowHeight = 28;
+
+  doc.roundedRect(left, top, width, (rows.length * rowHeight) + 20, 6).fill("#ffffff").strokeColor("#cfe4d8").stroke();
+  rows.forEach(([label, value], index) => {
+    const y = top + 12 + (index * rowHeight);
+    if (index) doc.moveTo(left + 16, y - 7).lineTo(left + width - 16, y - 7).strokeColor("#edf7f1").stroke();
+    doc.fillColor("#64748b").fontSize(8).font("Helvetica-Bold").text(label.toUpperCase(), left + 20, y, { width: 140 });
+    doc.fillColor("#111827").fontSize(10).font("Helvetica-Bold").text(String(value || "N/A"), left + 180, y - 1, { width: 200, align: "right" });
+  });
+
+  doc.y = top + (rows.length * rowHeight) + 36;
+};
 
 const notifyPatient = async (booking, lines) => {
   const phone = booking.phone || booking.userId?.phone;
@@ -83,12 +160,75 @@ const getTechnicians = async (req, res) => {
   }
 };
 
+const selectFairTechnician = async () => {
+  const technicians = await User.find({ role: "technician" }).select("name email phone role").sort({ name: 1 });
+
+  if (!technicians.length) {
+    return null;
+  }
+
+  const activeAssignmentStatuses = ["Technician Assigned", "Sample Collected", "Processing", "Pending Report Approval"];
+  const [workloads, recentAssignments] = await Promise.all([
+    Booking.aggregate([
+      {
+        $match: {
+          assignedTechnician: { $ne: null },
+          bookingStatus: { $in: activeAssignmentStatuses }
+        }
+      },
+      { $group: { _id: "$assignedTechnician", count: { $sum: 1 } } }
+    ]),
+    Booking.find({ assignedTechnician: { $ne: null } })
+      .select("assignedTechnician updatedAt")
+      .sort({ updatedAt: -1 })
+  ]);
+
+  const workloadByTechnician = new Map(workloads.map((item) => [String(item._id), item.count]));
+  const lastAssignedByTechnician = new Map();
+  recentAssignments.forEach((booking) => {
+    const technicianId = String(booking.assignedTechnician);
+    if (!lastAssignedByTechnician.has(technicianId)) {
+      lastAssignedByTechnician.set(technicianId, booking.updatedAt?.getTime?.() || 0);
+    }
+  });
+
+  return technicians
+    .map((technician) => ({
+      technician,
+      workload: workloadByTechnician.get(String(technician._id)) || 0,
+      lastAssignedAt: lastAssignedByTechnician.get(String(technician._id)) || 0
+    }))
+    .sort((a, b) => (
+      a.workload - b.workload ||
+      a.lastAssignedAt - b.lastAssignedAt ||
+      a.technician.name.localeCompare(b.technician.name)
+    ))[0].technician;
+};
+
 const createWalkInBooking = async (req, res) => {
   try {
-    const { name, phone, testId, bookingDate, timeSlot = "Walk-in", notes = "", gender = "", sampleType = "" } = req.body;
+    const {
+      name,
+      phone,
+      email = "",
+      testId,
+      bookingDate,
+      timeSlot = "Walk-in",
+      notes = "",
+      gender = "",
+      prescribedBy = "",
+      collectionType = "Visit Lab",
+      address = "",
+      homeSample = false
+    } = req.body;
 
-    if (!name || !phone || !testId || !bookingDate) {
-      return res.status(400).json({ message: "Patient name, phone, test and date are required" });
+    if (!name || !phone || !email || !testId || !bookingDate || !timeSlot) {
+      return res.status(400).json({ message: "Patient name, phone, email, test, date and time slot are required" });
+    }
+
+    const normalizedCollectionType = collectionType === "Home Collection" ? "Home Collection" : "Visit Lab";
+    if (normalizedCollectionType === "Home Collection" && !String(address || "").trim()) {
+      return res.status(400).json({ message: "Home visit address is required" });
     }
 
     const test = await Test.findById(testId);
@@ -102,14 +242,18 @@ const createWalkInBooking = async (req, res) => {
       phone,
       age: Number(req.body.age || 0),
       gender,
-      email: req.body.email || "",
+      email,
       testName: test.testName,
       amount: Number(test.price),
       date: bookingDate,
       bookingDate,
       timeSlot,
       notes,
-      sampleType,
+      prescribedBy,
+      doctorNotes: prescribedBy,
+      collectionType: normalizedCollectionType,
+      homeSample: Boolean(homeSample) || normalizedCollectionType === "Home Collection",
+      address,
       bookingStatus: "Confirmed",
       status: "Confirmed",
       paymentStatus: "Unpaid",
@@ -200,17 +344,6 @@ const updateBookingStatus = async (req, res) => {
 
 const assignTechnician = async (req, res) => {
   try {
-    const { technicianId } = req.body;
-
-    if (!technicianId) {
-      return res.status(400).json({ message: "Technician is required" });
-    }
-
-    const technician = await User.findOne({ _id: technicianId, role: "technician" });
-    if (!technician) {
-      return res.status(404).json({ message: "Technician not found" });
-    }
-
     const booking = await Booking.findById(req.params.id);
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
@@ -218,6 +351,15 @@ const assignTechnician = async (req, res) => {
 
     if ((!booking.patientArrived && booking.bookingStatus !== "Arrived") || booking.paymentStatus !== "Paid") {
       return res.status(400).json({ message: "Patient must be arrived and payment must be paid before assigning technician" });
+    }
+
+    if (booking.assignedTechnician) {
+      return res.status(400).json({ message: "Technician is already assigned for this booking" });
+    }
+
+    const technician = await selectFairTechnician();
+    if (!technician) {
+      return res.status(404).json({ message: "No technician users are available for assignment" });
     }
 
     booking.assignedTechnician = technician._id;
@@ -228,7 +370,7 @@ const assignTechnician = async (req, res) => {
     booking.status = "Technician Assigned";
     await booking.save();
 
-    res.json({ message: "Technician assigned successfully", booking });
+    res.json({ message: `Technician assigned fairly to ${technician.name}`, booking });
   } catch (error) {
     res.status(500).json({ message: "Technician assignment failed", error: error.message });
   }
@@ -249,6 +391,7 @@ const markPaymentPaid = async (req, res) => {
     }
 
     const receiptNumber = booking.receiptNumber || `RCPT-${Date.now()}`;
+    const receiptId = booking.receiptId || generateReceiptId();
     const paidAmount = Number(amount || booking.amount);
 
     if (!paidAmount || paidAmount <= 0) {
@@ -262,6 +405,7 @@ const markPaymentPaid = async (req, res) => {
     booking.paymentStatus = "Paid";
     booking.paymentMethod = paymentMethod;
     booking.receiptNumber = receiptNumber;
+    booking.receiptId = receiptId;
     booking.paymentDate = new Date();
     booking.paidAt = booking.paymentDate;
     await booking.save();
@@ -274,6 +418,7 @@ const markPaymentPaid = async (req, res) => {
         method: paymentMethod,
         status: "paid",
         receiptNumber,
+        receiptId,
         paymentDate: booking.paymentDate,
         paidAt: booking.paidAt
       },
@@ -285,6 +430,7 @@ const markPaymentPaid = async (req, res) => {
       "",
       `Patient ID: ${booking.patientCode || "Pending"}`,
       `Booking ID: ${booking.bookingCode}`,
+      `Receipt ID: ${booking.receiptId}`,
       `Test: ${booking.testName}`,
       `Amount: INR ${paidAmount}`,
       "Receipt is available in your dashboard."
@@ -307,26 +453,44 @@ const downloadReceptionistReceipt = async (req, res) => {
       return res.status(400).json({ message: "Receipt can be generated only after payment is paid" });
     }
 
-    const doc = new PDFDocument({ margin: 50 });
-    const filename = buildPatientPdfFilename(booking.name, booking.patientCode);
+    if (!booking.receiptId) {
+      booking.receiptId = generateReceiptId();
+      await booking.save();
+      await Payment.findOneAndUpdate(
+        { bookingId: booking._id },
+        { receiptId: booking.receiptId },
+        { new: true }
+      );
+    }
+
+    const doc = new PDFDocument({ size: "A4", margin: 50 });
+    const filename = buildPatientPdfFilename(booking.name, booking.patientCode, "RCT");
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
 
     doc.pipe(res);
-    doc.fontSize(20).text("INDIPATH Super Speciality Lab", { align: "center" });
-    doc.moveDown(0.5);
-    doc.fontSize(16).text("Payment Receipt", { align: "center" });
-    doc.moveDown(1.5);
-    doc.fontSize(11);
-    doc.text(`Receipt Number: ${booking.receiptNumber}`);
-    doc.text(`Patient ID: ${booking.patientCode || "Pending"}`);
-    doc.text(`Booking ID: ${booking.bookingCode}`);
-    doc.text(`Patient Name: ${booking.name}`);
-    doc.text(`Test: ${booking.testName}`);
-    doc.text(`Amount: INR ${booking.amount}`);
-    doc.text(`Payment Method: ${booking.paymentMethod.toUpperCase()}`);
-    doc.text(`Payment Date: ${booking.paidAt ? booking.paidAt.toLocaleString("en-IN") : "N/A"}`);
+    drawLetterhead(doc);
+    drawTitleBlock(doc, "PAYMENT RECEIPT", "Official receipt for paid diagnostic booking");
+    drawInfoGrid(doc, "PATIENT & BOOKING INFORMATION", [
+      ["Patient Name", booking.name],
+      ["Patient ID", booking.patientCode || "Pending"],
+      ["Booking ID", booking.bookingCode],
+      ["Receipt ID", booking.receiptId || booking.receiptNumber],
+      ["Receipt No.", booking.receiptNumber],
+      ["Test / Package", booking.testName],
+      ["Appointment", `${booking.bookingDate || "N/A"} | ${booking.timeSlot || "N/A"}`]
+    ]);
+    drawReceiptBox(doc, [
+      ["Total Amount", formatCurrency(booking.amount)],
+      ["Payment Method", String(booking.paymentMethod || "N/A").toUpperCase()],
+      ["Payment Status", booking.paymentStatus],
+      ["Payment Date", formatDateTime(booking.paidAt)]
+    ]);
+    const acknowledgementTop = doc.y;
+    doc.roundedRect(80, acknowledgementTop, 395, 46, 6).fill("#f0fdf4").strokeColor("#bbf7d0").stroke();
+    doc.fillColor("#166534").fontSize(11).font("Helvetica-Bold").text("Payment received successfully.", 100, acknowledgementTop + 11, { width: 355, align: "center" });
+    doc.fillColor("#334155").fontSize(8.5).font("Helvetica").text("Thank you for choosing INDIPATH Super Speciality Pathology Lab.", 100, acknowledgementTop + 28, { width: 355, align: "center" });
     doc.end();
   } catch (error) {
     res.status(500).json({ message: "Receipt generation failed" });

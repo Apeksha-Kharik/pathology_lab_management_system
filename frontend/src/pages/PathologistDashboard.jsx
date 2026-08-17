@@ -254,6 +254,7 @@ function ReportsTable({ reports, section, onView }) {
         <thead className="bg-slate-50 text-xs uppercase text-slate-500">
           <tr>
             <th className="p-3">Booking ID</th>
+            <th className="p-3">Report ID</th>
             <th className="p-3">Patient Name</th>
             <th className="p-3">Test Name</th>
             {section === "approved" ? <th className="p-3">Approved Date</th> : <th className="p-3">Technician Name</th>}
@@ -265,6 +266,7 @@ function ReportsTable({ reports, section, onView }) {
           {reports.map((report) => (
             <tr key={report._id} className="border-t border-slate-100">
               <td className="p-3 font-bold">{report.bookingId?.bookingCode || report.bookingId?._id || "N/A"}</td>
+              <td className="p-3 font-bold text-blue-700">{report.reportId || "N/A"}</td>
               <td className="p-3">{report.userId?.name || report.bookingId?.name || "N/A"}</td>
               <td className="p-3">{report.testName}</td>
               <td className="p-3">{section === "approved" ? formatDate(report.approvedAt) : report.technicianId?.name || "N/A"}</td>
@@ -294,6 +296,7 @@ function ReportModal({ report, onClose, onApprove, onReject }) {
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-slate-400">{report.bookingId?.bookingCode || report.bookingId?._id}</p>
             <h2 className="text-xl font-bold">{report.testName}</h2>
+            <p className="text-sm font-bold text-blue-700">Report ID: {report.reportId || "N/A"}</p>
             <p className="text-sm text-slate-500">Patient: {report.userId?.name || report.bookingId?.name || "N/A"}</p>
           </div>
           <button onClick={onClose} className="rounded-md px-3 py-1 text-sm font-bold text-slate-500 hover:bg-slate-100">Close</button>
@@ -301,6 +304,7 @@ function ReportModal({ report, onClose, onApprove, onReject }) {
 
         <div className="mb-5 grid gap-3 text-sm md:grid-cols-3">
           <Detail label="Patient Name" value={report.userId?.name || report.bookingId?.name || "N/A"} />
+          <Detail label="Report ID" value={report.reportId || "N/A"} />
           <Detail label="Age" value={report.bookingId?.age || "N/A"} />
           <Detail label="Gender" value={report.bookingId?.gender || "N/A"} />
           <Detail label="Test Name" value={report.testName} />

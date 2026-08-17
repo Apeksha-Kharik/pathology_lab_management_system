@@ -79,7 +79,7 @@ const generatePatientCode = () => `PID${Date.now().toString().slice(-8)}${Math.f
 
 const getPendingReports = async (req, res) => {
   try {
-    const reports = await Report.find({ status: { $in: ["Pending Approval", "Pending Review"] } })
+    const reports = await Report.find({ pathologistId: req.user._id, status: { $in: ["Pending Approval", "Pending Review"] } })
       .populate("bookingId")
       .populate("userId", "name email phone")
       .populate("technicianId", "name email phone")
@@ -93,7 +93,10 @@ const getPendingReports = async (req, res) => {
 
 const getAllReports = async (req, res) => {
   try {
-    const reports = await Report.find({ status: { $in: ["Pending Approval", "Pending Review", "Approved", "Rejected"] } })
+    const reports = await Report.find({
+      $or: [{ pathologistId: req.user._id }, { approvedBy: req.user._id }],
+      status: { $in: ["Pending Approval", "Pending Review", "Approved", "Rejected"] }
+    })
       .populate("bookingId")
       .populate("userId", "name email phone")
       .populate("technicianId", "name email phone")
@@ -117,6 +120,9 @@ const rejectReport = async (req, res) => {
     const report = await Report.findById(req.params.reportId).populate("bookingId");
     if (!report) {
       return res.status(404).json({ message: "Report not found" });
+    }
+    if (String(report.pathologistId || "") !== String(req.user._id)) {
+      return res.status(403).json({ message: "This report is assigned to another pathologist" });
     }
 
     report.status = "Rejected";
@@ -161,6 +167,9 @@ const approveReport = async (req, res) => {
 
     if (!report) {
       return res.status(404).json({ message: "Report not found" });
+    }
+    if (String(report.pathologistId || "") !== String(req.user._id)) {
+      return res.status(403).json({ message: "This report is assigned to another pathologist" });
     }
 
     if (!["Pending Approval", "Pending Review"].includes(report.status)) {

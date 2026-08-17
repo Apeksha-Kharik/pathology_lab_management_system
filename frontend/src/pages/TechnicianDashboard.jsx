@@ -1,15 +1,18 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Edit3, Eye, LogOut, PlayCircle, Save, Search, Send } from "lucide-react";
+import { AlertCircle, ClipboardList, Edit3, Eye, FileText, FlaskConical, LogOut, PlayCircle, Save, Search, Send } from "lucide-react";
 import { useAuth } from "../context/useAuth";
 import {
   getTechnicianBookings,
   saveTechnicianReportDraft,
+  startTechnicianReportEntry,
   startTechnicianTest,
   submitTechnicianReport,
   updateTechnicianStatus
 } from "../services/technicianService";
+import logo from "../assets/logo.png";
 
 const blankResult = { parameter: "", value: "", unit: "", normalRange: "" };
+const technicianFont = "Aptos, 'Avenir Next', Inter, 'Segoe UI', system-ui, sans-serif";
 
 const getReportTemplate = (booking) => {
   const templates = [booking.testId?.reportTemplate, booking.packageId?.reportTemplate];
@@ -55,13 +58,14 @@ const buildReportRows = (booking) => {
 };
 
 function TechnicianDashboard() {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const [bookings, setBookings] = useState([]);
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [reportBooking, setReportBooking] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState("");
   const [testFilter, setTestFilter] = useState("");
+  const [activeView, setActiveView] = useState("assigned");
 
   const loadBookings = async () => {
     setBookings(await getTechnicianBookings());
@@ -122,6 +126,35 @@ function TechnicianDashboard() {
     return [...new Set(bookings.map((booking) => booking.testName).filter(Boolean))].sort();
   }, [bookings]);
 
+  const technicianViews = [
+    {
+      id: "assigned",
+      label: "Sample Queue",
+      description: "Assigned patients waiting for sample collection or test start.",
+      icon: FlaskConical
+    },
+    {
+      id: "entry",
+      label: "Result Entry",
+      description: "Started tests ready for draft or final report submission.",
+      icon: Edit3
+    },
+    {
+      id: "corrections",
+      label: "Corrections",
+      description: "Rejected reports that need technician updates.",
+      icon: AlertCircle
+    },
+    {
+      id: "submitted",
+      label: "Submitted Reports",
+      description: "Reports already sent for pathologist review or approval.",
+      icon: FileText
+    }
+  ];
+
+  const activeViewDetails = technicianViews.find((view) => view.id === activeView) || technicianViews[0];
+
   const handleStartTest = async (bookingId) => {
     try {
       const data = await startTechnicianTest(bookingId);
@@ -134,7 +167,7 @@ function TechnicianDashboard() {
 
   const replaceBooking = (updatedBooking) => {
     if (!updatedBooking?._id) return;
-    setBookings((current) => current.map((booking) => booking._id === updatedBooking._id ? { ...booking, ...updatedBooking, report: booking.report } : booking));
+    setBookings((current) => current.map((booking) => booking._id === updatedBooking._id ? { ...booking, ...updatedBooking, report: updatedBooking.report || booking.report } : booking));
   };
 
   const handleSampleCollected = async (bookingId) => {
@@ -147,70 +180,85 @@ function TechnicianDashboard() {
     }
   };
 
+  const handleOpenReportEntry = async (booking) => {
+    try {
+      const data = await startTechnicianReportEntry(booking._id);
+      const nextBooking = { ...booking, report: { ...(booking.report || {}), ...(data.report || {}) } };
+      setReportBooking(nextBooking);
+      replaceBooking(nextBooking);
+    } catch (error) {
+      alert(error.response?.data?.message || "Unable to start report entry");
+    }
+  };
+
   const handleLogout = () => {
     logout();
     window.location.href = "/login";
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-widest text-blue-600">INDIPATH</p>
-            <h1 className="text-2xl font-bold">Technician Dashboard</h1>
+    <div className="min-h-screen bg-[#f6fbf8] text-slate-900" style={{ fontFamily: technicianFont }}>
+      <header className="sticky top-0 z-40 border-b border-emerald-100 bg-white/95 shadow-lg shadow-emerald-950/5 backdrop-blur">
+        <div className="mx-auto grid max-w-7xl gap-4 px-4 py-4 lg:grid-cols-[auto_minmax(320px,1fr)_auto] lg:items-center lg:px-6">
+          <div className="flex items-center gap-3">
+            <img src={logo} alt="INDIPATH logo" className="h-12 w-12 rounded-xl object-contain shadow-sm" />
+            <div>
+              <span className="block text-xl font-black leading-none tracking-tight text-emerald-950">INDIPATH</span>
+              <span className="mt-1 block text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">Technician Lab Desk</span>
+            </div>
           </div>
-          <button onClick={handleLogout} className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700">
-            <LogOut size={18} /> Logout
-          </button>
-        </div>
-      </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
-        <section className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-4">
-          <Summary label="Newly Assigned" value={assignedTests.length} />
-          <Summary label="Pending Submissions" value={pendingSubmissions.length} />
-          <Summary label="Rejected Reports" value={correctionNeeded.length} />
-          <Summary label="Submitted Reports" value={completedReports.length} />
-        </section>
-
-        <section className="mb-6 rounded-lg border border-slate-200 bg-white p-5">
-          <div className="grid gap-3 md:grid-cols-[1fr_180px_220px]">
-            <label className="flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2">
-              <Search size={18} className="text-slate-400" />
+          <div className="mx-auto grid w-full max-w-3xl gap-2 md:grid-cols-[minmax(180px,1fr)_150px_180px]">
+            <label className="flex min-w-0 items-center gap-2 rounded-2xl border border-emerald-100 bg-emerald-50/70 px-3 py-2 shadow-inner shadow-emerald-950/5 focus-within:border-emerald-500 focus-within:bg-white focus-within:ring-4 focus-within:ring-emerald-100">
+              <Search size={18} className="shrink-0 text-emerald-700" />
               <input
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Search booking ID, patient, test"
-                className="w-full outline-none"
+                className="w-full bg-transparent font-semibold outline-none placeholder:text-slate-400"
               />
             </label>
-            <input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="rounded-md border border-slate-200 px-3 py-2 outline-none" />
-            <select value={testFilter} onChange={(e) => setTestFilter(e.target.value)} className="rounded-md border border-slate-200 px-3 py-2 outline-none">
+            <input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="min-w-0 rounded-2xl border border-emerald-100 bg-emerald-50/70 px-3 py-2 text-sm font-semibold outline-none focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100" />
+            <select value={testFilter} onChange={(e) => setTestFilter(e.target.value)} className="min-w-0 rounded-2xl border border-emerald-100 bg-emerald-50/70 px-3 py-2 text-sm font-semibold outline-none focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100">
               <option value="">All tests</option>
               {testOptions.map((testName) => <option key={testName} value={testName}>{testName}</option>)}
             </select>
           </div>
-        </section>
 
-        <section className="mb-6 rounded-lg border border-slate-200 bg-white p-6">
-          <h2 className="mb-5 text-lg font-bold">Newly Assigned Tests</h2>
-          <AssignedTable bookings={assignedTests} onView={setSelectedBooking} onSampleCollected={handleSampleCollected} onStart={handleStartTest} />
-        </section>
+          <div className="flex items-center justify-between gap-3 lg:justify-end">
+            <div className="hidden items-center gap-3 rounded-2xl border border-emerald-100 bg-white px-3 py-2 shadow-sm sm:flex">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-800">
+                <FlaskConical size={18} />
+              </span>
+              <div className="max-w-36">
+                <p className="truncate text-sm font-black text-emerald-950">{user?.name || "Technician"}</p>
+                <p className="truncate text-xs font-semibold text-slate-500">{user?.email || "Lab Desk"}</p>
+              </div>
+            </div>
+            <button onClick={handleLogout} className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-white px-4 py-2.5 text-sm font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50 focus:outline-none focus:ring-4 focus:ring-emerald-100">
+              <LogOut size={18} /> Logout
+            </button>
+          </div>
+        </div>
+      </header>
 
-        <section className="mb-6 rounded-lg border border-slate-200 bg-white p-6">
-          <h2 className="mb-5 text-lg font-bold">Pending Submissions</h2>
-          <BookingCards bookings={pendingSubmissions} onView={setSelectedBooking} onReport={setReportBooking} reportLabel="Enter Report" />
-        </section>
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
+        <TechnicianDeskNav activeView={activeView} onChange={setActiveView} views={technicianViews} />
 
-        <section className="mb-6 rounded-lg border border-red-100 bg-white p-6">
-          <h2 className="mb-5 text-lg font-bold text-red-700">Correction Needed</h2>
-          <BookingCards bookings={correctionNeeded} onView={setSelectedBooking} onReport={setReportBooking} reportLabel="Edit Report" />
-        </section>
-
-        <section className="rounded-lg border border-slate-200 bg-white p-6">
-          <h2 className="mb-5 text-lg font-bold">Submitted / Waiting Approval</h2>
-          <CompletedTable bookings={completedReports} onView={setSelectedBooking} />
+        <section className="rounded-3xl border border-emerald-100 bg-white p-5 shadow-xl shadow-emerald-950/5 sm:p-6">
+          <SectionHeader description={activeViewDetails.description} title={activeViewDetails.label} />
+          {activeView === "assigned" && (
+            <AssignedTable bookings={assignedTests} onView={setSelectedBooking} onSampleCollected={handleSampleCollected} onStart={handleStartTest} />
+          )}
+          {activeView === "entry" && (
+            <BookingCards bookings={pendingSubmissions} onView={setSelectedBooking} onReport={handleOpenReportEntry} reportLabel="Enter Report" />
+          )}
+          {activeView === "corrections" && (
+            <BookingCards bookings={correctionNeeded} onView={setSelectedBooking} onReport={handleOpenReportEntry} reportLabel="Edit Report" />
+          )}
+          {activeView === "submitted" && (
+            <CompletedTable bookings={completedReports} onView={setSelectedBooking} onReport={setReportBooking} />
+          )}
         </section>
       </main>
 
@@ -220,15 +268,56 @@ function TechnicianDashboard() {
   );
 }
 
+function TechnicianDeskNav({ activeView, onChange, views }) {
+  return (
+    <section className="mb-6 overflow-hidden rounded-3xl border border-emerald-100 bg-white shadow-xl shadow-emerald-950/5">
+      <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-4">
+        {views.map((view) => {
+          const Icon = view.icon;
+          const active = activeView === view.id;
+
+          return (
+            <button
+              key={view.id}
+              type="button"
+              onClick={() => onChange(view.id)}
+              className={`flex min-h-24 items-center gap-4 rounded-2xl px-4 py-3 text-left transition focus:outline-none focus:ring-4 focus:ring-emerald-100 ${active ? "bg-emerald-700 text-white shadow-lg shadow-emerald-950/10" : "bg-emerald-50 text-emerald-950 hover:bg-emerald-100"}`}
+            >
+              <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${active ? "bg-white/15 text-white" : "bg-white text-emerald-700"}`}>
+                <Icon size={21} />
+              </span>
+              <span>
+                <span className="block text-sm font-black">{view.label}</span>
+                <span className={`mt-1 block text-xs font-semibold ${active ? "text-emerald-50/85" : "text-slate-500"}`}>{view.description}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function SectionHeader({ description, title }) {
+  return (
+    <div className="mb-5">
+      <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">Technician Workflow</p>
+      <h2 className="mt-2 text-2xl font-black tracking-tight text-emerald-950">{title}</h2>
+      <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-500">{description}</p>
+    </div>
+  );
+}
+
 function AssignedTable({ bookings, onView, onSampleCollected, onStart }) {
   if (!bookings.length) return <Empty text="No newly assigned tests." />;
 
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto rounded-2xl border border-emerald-100">
       <table className="w-full text-left text-sm">
-        <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+        <thead className="bg-emerald-50 text-xs uppercase tracking-[0.12em] text-emerald-900">
           <tr>
             <th className="p-3">Booking ID</th>
+            <th className="p-3">Sample ID</th>
             <th className="p-3">Patient Name</th>
             <th className="p-3">Test Name</th>
             <th className="p-3">Assigned Date</th>
@@ -237,22 +326,23 @@ function AssignedTable({ bookings, onView, onSampleCollected, onStart }) {
         </thead>
         <tbody>
           {bookings.map((booking) => (
-            <tr key={booking._id} className="border-t border-slate-100">
-              <td className="p-3 font-bold">{displayBookingId(booking)}</td>
-              <td className="p-3">{booking.name}</td>
+            <tr key={booking._id} className="border-t border-emerald-100 text-slate-600 transition-colors hover:bg-emerald-50/50">
+              <td className="p-3 font-black text-emerald-800">{displayBookingId(booking)}</td>
+              <td className="p-3 font-black text-emerald-700">{booking.sampleId || "Generated on start"}</td>
+              <td className="p-3 font-bold text-slate-800">{booking.name}</td>
               <td className="p-3">{booking.testName}</td>
               <td className="p-3">{formatDate(booking.updatedAt || booking.createdAt)}</td>
               <td className="p-3">
                 <div className="flex justify-end gap-2">
-                  <button onClick={() => onView(booking)} className="flex items-center gap-1 rounded-md border border-slate-200 px-3 py-2 text-xs font-bold hover:bg-slate-50">
+                  <button onClick={() => onView(booking)} className="inline-flex items-center gap-1 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-black text-emerald-800 transition hover:bg-emerald-50">
                     <Eye size={14} /> View
                   </button>
                   {booking.sampleStatus !== "Collected" && (
-                    <button onClick={() => onSampleCollected(booking._id)} className="flex items-center gap-1 rounded-md bg-purple-600 px-3 py-2 text-xs font-bold text-white hover:bg-purple-700">
+                    <button onClick={() => onSampleCollected(booking._id)} className="inline-flex items-center gap-1 rounded-xl bg-emerald-700 px-3 py-2 text-xs font-black text-white shadow-sm transition hover:bg-emerald-800">
                       Sample Collected
                     </button>
                   )}
-                  <button onClick={() => onStart(booking._id)} disabled={booking.sampleStatus !== "Collected"} className="flex items-center gap-1 rounded-md bg-blue-600 px-3 py-2 text-xs font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
+                  <button onClick={() => onStart(booking._id)} disabled={booking.sampleStatus !== "Collected"} className="inline-flex items-center gap-1 rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50">
                     <PlayCircle size={14} /> Start Test
                   </button>
                 </div>
@@ -271,21 +361,23 @@ function BookingCards({ bookings, onView, onReport, reportLabel }) {
   return (
     <div className="grid gap-4 md:grid-cols-2">
       {bookings.map((booking) => (
-        <div key={booking._id} className="rounded-md border border-slate-200 p-4">
+        <div key={booking._id} className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-lg hover:shadow-emerald-950/5">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-xs font-bold uppercase text-slate-400">{displayBookingId(booking)}</p>
-              <h3 className="font-bold">{booking.testName}</h3>
-              <p className="text-sm text-slate-500">Patient: {booking.name}</p>
-              <p className="text-sm text-slate-500">Report: {booking.report?.status || "Not Started"}</p>
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">{displayBookingId(booking)}</p>
+              {booking.sampleId && <p className="mt-1 text-xs font-black uppercase tracking-[0.12em] text-emerald-700">Sample ID: {booking.sampleId}</p>}
+              {booking.report?.reportId && <p className="mt-1 text-xs font-black uppercase tracking-[0.12em] text-emerald-700">Report ID: {booking.report.reportId}</p>}
+              <h3 className="mt-2 text-lg font-black tracking-tight text-emerald-950">{booking.testName}</h3>
+              <p className="mt-2 text-sm font-semibold text-slate-500">Patient: {booking.name}</p>
+              <p className="text-sm font-semibold text-slate-500">Report: {booking.report?.status || "Not Started"}</p>
               {booking.report?.rejectionReason && <p className="mt-2 text-sm font-semibold text-red-600">Reason: {booking.report.rejectionReason}</p>}
             </div>
             <StatusBadge value={booking.report?.status || booking.bookingStatus} />
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
-            <button onClick={() => onView(booking)} className="rounded-md border border-slate-200 px-3 py-2 text-xs font-bold hover:bg-slate-50">View Details</button>
+            <button onClick={() => onView(booking)} className="rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-black text-emerald-800 transition hover:bg-emerald-50">View Details</button>
             {onReport && (
-              <button onClick={() => onReport(booking)} className="flex items-center gap-1 rounded-md bg-slate-900 px-3 py-2 text-xs font-bold text-white hover:bg-slate-800">
+              <button onClick={() => onReport(booking)} className="inline-flex items-center gap-1 rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white shadow-sm transition hover:bg-slate-800">
                 <Edit3 size={14} /> {reportLabel}
               </button>
             )}
@@ -296,32 +388,40 @@ function BookingCards({ bookings, onView, onReport, reportLabel }) {
   );
 }
 
-function CompletedTable({ bookings, onView }) {
+function CompletedTable({ bookings, onView, onReport }) {
   if (!bookings.length) return <Empty text="No submitted reports yet." />;
 
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto rounded-2xl border border-emerald-100">
       <table className="w-full text-left text-sm">
-        <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+        <thead className="bg-emerald-50 text-xs uppercase tracking-[0.12em] text-emerald-900">
           <tr>
             <th className="p-3">Booking ID</th>
+            <th className="p-3">Report ID</th>
             <th className="p-3">Patient Name</th>
             <th className="p-3">Test Name</th>
             <th className="p-3">Submitted Date</th>
             <th className="p-3">Status</th>
-            <th className="p-3 text-right">Action</th>
+            <th className="p-3 text-right">See Details</th>
+            <th className="p-3 text-right">See Report</th>
           </tr>
         </thead>
         <tbody>
           {bookings.map((booking) => (
-            <tr key={booking._id} className="border-t border-slate-100">
-              <td className="p-3 font-bold">{displayBookingId(booking)}</td>
-              <td className="p-3">{booking.name}</td>
+            <tr key={booking._id} className="border-t border-emerald-100 text-slate-600 transition-colors hover:bg-emerald-50/50">
+              <td className="p-3 font-black text-emerald-800">{displayBookingId(booking)}</td>
+              <td className="p-3 font-black text-emerald-700">{booking.report?.reportId || "N/A"}</td>
+              <td className="p-3 font-bold text-slate-800">{booking.name}</td>
               <td className="p-3">{booking.testName}</td>
               <td className="p-3">{formatDate(booking.report?.submittedAt || booking.report?.updatedAt)}</td>
               <td className="p-3"><StatusBadge value={booking.report?.status} /></td>
               <td className="p-3 text-right">
-                <button onClick={() => onView(booking)} className="rounded-md border border-slate-200 px-3 py-2 text-xs font-bold hover:bg-slate-50">View</button>
+                <button onClick={() => onView(booking)} className="rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-black text-emerald-800 transition hover:bg-emerald-50">See Details</button>
+              </td>
+              <td className="p-3 text-right">
+                <button onClick={() => onReport(booking)} className="inline-flex items-center gap-1 rounded-xl bg-emerald-700 px-3 py-2 text-xs font-black text-white shadow-sm transition hover:bg-emerald-800">
+                  <FileText size={14} /> See Report
+                </button>
               </td>
             </tr>
           ))}
@@ -335,17 +435,24 @@ function DetailsModal({ booking, onClose }) {
   return (
     <Modal title={`Booking Details - ${displayBookingId(booking)}`} onClose={onClose}>
       <div className="grid gap-3 text-sm md:grid-cols-2">
+        <Detail label="Booking ID" value={displayBookingId(booking)} />
+        <Detail label="Patient ID" value={booking.patientCode || "N/A"} />
+        <Detail label="Sample ID" value={booking.sampleId || "Generated when test starts"} />
+        <Detail label="Report ID" value={booking.report?.reportId || "Generated when report entry starts"} />
         <Detail label="Patient Name" value={booking.name} />
         <Detail label="Age" value={booking.age || "N/A"} />
         <Detail label="Gender" value={booking.gender || "N/A"} />
         <Detail label="Phone Number" value={booking.phone} />
+        <Detail label="Email" value={booking.email || "N/A"} />
         <Detail label="Test Name" value={booking.testName} />
-        <Detail label="Sample Type" value={booking.sampleType || "N/A"} />
         <Detail label="Booking Date" value={booking.bookingDate || booking.date} />
+        <Detail label="Time Slot" value={booking.timeSlot || "N/A"} />
+        <Detail label="Sample Collection" value={booking.collectionType || "N/A"} />
         <Detail label="Status" value={booking.bookingStatus} />
         <Detail label="Report Status" value={booking.report?.status || "Not Started"} />
+        {booking.address && <Detail label="Address" value={booking.address} wide />}
+        <Detail label="Prescribed By / Doctor" value={booking.prescribedBy || booking.doctorNotes || "N/A"} wide />
         <Detail label="Receptionist Notes" value={booking.notes || "N/A"} wide />
-        <Detail label="Doctor Notes" value={booking.doctorNotes || "N/A"} wide />
         {booking.report?.rejectionReason && <Detail label="Correction Reason" value={booking.report.rejectionReason} wide />}
       </div>
     </Modal>
@@ -408,8 +515,8 @@ function ReportModal({ booking, onClose, onDone }) {
   return (
     <Modal title={`Result Entry - ${booking.testName}`} onClose={onClose}>
       {templateDetails.letterhead && (
-        <div className="mb-5 border-b-2 border-blue-700 pb-4 text-center whitespace-pre-line">
-          <p className="text-lg font-black text-blue-900">{templateDetails.letterhead}</p>
+        <div className="mb-5 border-b-2 border-emerald-700 pb-4 text-center whitespace-pre-line">
+          <p className="text-lg font-black text-emerald-950">{templateDetails.letterhead}</p>
           <p className="mt-2 text-sm text-slate-600">{templateDetails.description}</p>
         </div>
       )}
@@ -423,12 +530,13 @@ function ReportModal({ booking, onClose, onDone }) {
       )}
 
       <div className="mb-5 grid gap-3 rounded-md border border-slate-200 bg-slate-50 p-4 text-sm md:grid-cols-3">
+        <Detail label="Report ID" value={booking.report?.reportId || "Generating"} />
+        <Detail label="Sample ID" value={booking.sampleId || "N/A"} />
         <Detail label="Patient Name" value={booking.name || "N/A"} />
         <Detail label="Age / Gender" value={[booking.age, booking.gender].filter(Boolean).join(" / ") || "N/A"} />
         <Detail label="Phone" value={booking.phone || "N/A"} />
         <Detail label="Booking ID" value={displayBookingId(booking)} />
         <Detail label="Test / Package" value={booking.testName || "N/A"} />
-        <Detail label="Sample Type" value={booking.sampleType || "N/A"} />
       </div>
 
       <div className="overflow-x-auto rounded-md border border-slate-200">
@@ -464,7 +572,7 @@ function ReportModal({ booking, onClose, onDone }) {
         value={technicianRemarks}
         onChange={(e) => setTechnicianRemarks(e.target.value)}
         placeholder="Sample quality normal."
-        className="mt-2 min-h-24 w-full rounded-md border border-slate-200 p-3 outline-none focus:border-blue-500 disabled:bg-slate-50"
+        className="mt-2 min-h-24 w-full rounded-md border border-slate-200 p-3 outline-none focus:border-emerald-500 disabled:bg-slate-50"
       />
 
       <div className="mt-5 flex flex-wrap justify-end gap-3">
@@ -474,22 +582,13 @@ function ReportModal({ booking, onClose, onDone }) {
             <button onClick={saveDraft} className="flex items-center gap-2 rounded-md bg-slate-700 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800">
               <Save size={16} /> Save Report
             </button>
-            <button onClick={finalSubmit} className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700">
-              <Send size={16} /> Submit Report
+            <button onClick={finalSubmit} className="flex items-center gap-2 rounded-md bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-800">
+              <Send size={16} /> Submit to Pathologist
             </button>
           </>
         )}
       </div>
     </Modal>
-  );
-}
-
-function Summary({ label, value }) {
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white p-5">
-      <p className="text-xs font-bold uppercase tracking-widest text-slate-500">{label}</p>
-      <p className="mt-2 text-3xl font-black text-blue-700">{value}</p>
-    </div>
   );
 }
 
@@ -504,11 +603,11 @@ function Detail({ label, value, wide }) {
 
 function Modal({ title, children, onClose }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-      <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-emerald-950/40 p-4 backdrop-blur-md">
+      <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-3xl border border-emerald-100 bg-white p-6 shadow-2xl shadow-emerald-950/15">
         <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-lg font-bold">{title}</h2>
-          <button onClick={onClose} className="rounded-md px-3 py-1 text-sm font-bold text-slate-500 hover:bg-slate-100">Close</button>
+          <h2 className="text-lg font-black text-emerald-950">{title}</h2>
+          <button onClick={onClose} className="rounded-xl px-3 py-2 text-sm font-black text-slate-500 transition hover:bg-emerald-50 hover:text-emerald-800">Close</button>
         </div>
         {children}
       </div>
@@ -522,20 +621,20 @@ function StatusBadge({ value }) {
     : value === "Rejected"
       ? "bg-red-100 text-red-700"
       : value === "Pending Approval" || value === "Pending Review"
-        ? "bg-violet-100 text-violet-700"
+        ? "bg-emerald-100 text-emerald-700"
         : value === "Processing" || value === "Draft"
-          ? "bg-blue-100 text-blue-700"
+          ? "bg-emerald-100 text-emerald-700"
           : "bg-amber-100 text-amber-700";
 
   return <span className={`rounded px-2 py-1 text-xs font-bold uppercase ${classes}`}>{value || "N/A"}</span>;
 }
 
 function Input(props) {
-  return <input {...props} className="w-full rounded-md border border-slate-200 p-2 outline-none focus:border-blue-500 disabled:bg-slate-50" />;
+  return <input {...props} className="w-full rounded-xl border border-emerald-100 bg-emerald-50/50 p-2 font-semibold outline-none transition focus:border-emerald-500 focus:bg-white disabled:bg-slate-50" />;
 }
 
 function Empty({ text }) {
-  return <p className="rounded-md bg-slate-50 p-6 text-center text-sm text-slate-500">{text}</p>;
+  return <p className="rounded-2xl border border-emerald-100 bg-emerald-50 p-6 text-center text-sm font-bold text-slate-500">{text}</p>;
 }
 
 function displayBookingId(booking) {

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowUpDown, CheckCircle2, CreditCard, Download, History, LogOut, Plus, Search, UserCheck, UserRound, XCircle } from "lucide-react";
+import { ArrowUpDown, CheckCircle2, ClipboardList, CreditCard, Download, Eye, History, LogOut, Plus, Search, UserCheck, UserRound, XCircle } from "lucide-react";
 import { useAuth } from "../context/useAuth";
 import logo from "../assets/logo.png";
 import {
@@ -8,14 +8,13 @@ import {
   downloadReceptionistReceipt,
   getReceptionistBookings,
   getReceptionistTests,
-  getTechnicians,
   markPaymentPaid,
   updateBookingStatus
 } from "../services/receptionistService";
 
 const safeFilePart = (value) => String(value || "patient").trim().replace(/[^a-z0-9-_]+/gi, "-").replace(/^-+|-+$/g, "") || "patient";
 
-const buildPatientPdfFilename = (booking) => `${safeFilePart(booking.name)}-${safeFilePart(booking.patientCode || "pending-patient-id")}.pdf`;
+const buildPatientPdfFilename = (booking) => `${safeFilePart(booking.name)}-${safeFilePart(booking.patientCode || "pending-patient-id")}-RCT.pdf`;
 const receptionistFont = "Aptos, 'Avenir Next', Inter, 'Segoe UI', system-ui, sans-serif";
 const getPatientIdText = (booking) => {
   if (booking.patientCode) return booking.patientCode;
@@ -28,7 +27,6 @@ function ReceptionistDashboard() {
   const { user, logout } = useAuth();
   const [bookings, setBookings] = useState([]);
   const [tests, setTests] = useState([]);
-  const [technicians, setTechnicians] = useState([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [showWalkIn, setShowWalkIn] = useState(false);
@@ -40,14 +38,12 @@ function ReceptionistDashboard() {
   const loadData = useCallback(async (searchValue = "") => {
     try {
       setLoading(true);
-      const [bookingData, testData, technicianData] = await Promise.all([
+      const [bookingData, testData] = await Promise.all([
         getReceptionistBookings(searchValue),
-        getReceptionistTests(),
-        getTechnicians()
+        getReceptionistTests()
       ]);
       setBookings(bookingData || []);
       setTests(testData || []);
-      setTechnicians(technicianData || []);
     } catch (error) {
       alert(error.response?.data?.message || "Unable to load receptionist dashboard");
     } finally {
@@ -60,10 +56,38 @@ function ReceptionistDashboard() {
   }, [loadData]);
 
   const pendingBookings = useMemo(() => bookings.filter((booking) => booking.bookingStatus === "Pending Approval"), [bookings]);
-  const todaysBookings = useMemo(() => bookings.filter((booking) => booking.bookingDate === today), [bookings, today]);
+  const todaysBookings = useMemo(() => bookings.filter((booking) => booking.bookingDate === today && booking.bookingStatus !== "Rejected"), [bookings, today]);
   const pendingPayments = useMemo(() => bookings.filter((booking) => ["Confirmed", "Arrived"].includes(booking.bookingStatus) && booking.paymentStatus === "Unpaid"), [bookings]);
+  const paidAwaitingArrival = useMemo(() => bookings.filter((booking) => booking.bookingStatus === "Confirmed" && booking.paymentStatus === "Paid" && !booking.patientArrived), [bookings]);
   const readyForAssignment = useMemo(() => bookings.filter((booking) => (booking.patientArrived || booking.bookingStatus === "Arrived") && booking.paymentStatus === "Paid" && !booking.assignedTechnician && !["Processing", "Pending Report Approval", "Report Ready"].includes(booking.bookingStatus)), [bookings]);
-  const assignedPatients = useMemo(() => bookings.filter((booking) => booking.bookingStatus === "Technician Assigned"), [bookings]);
+  const workflowSections = [
+    {
+      title: "New Booking Requests",
+      description: "Patient-submitted bookings waiting for receptionist confirmation or rejection.",
+      bookings: pendingBookings,
+      variant: "pending"
+    },
+    {
+      title: "Today's Schedule",
+      description: "All non-rejected appointments dated today, including confirmed, arrived, paid, and assigned visits.",
+      bookings: todaysBookings
+    },
+    {
+      title: "Payment Due",
+      description: "Confirmed or arrived patients whose payment still needs to be collected.",
+      bookings: pendingPayments
+    },
+    {
+      title: "Paid - Awaiting Arrival",
+      description: "Payment is complete, but arrival still needs to be marked before technician assignment.",
+      bookings: paidAwaitingArrival
+    },
+    {
+      title: "Ready for Technician Assignment",
+      description: "Arrived, paid patients ready for automatic fair technician assignment.",
+      bookings: readyForAssignment
+    }
+  ];
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -103,11 +127,24 @@ function ReceptionistDashboard() {
     }
   };
 
-  const handleAssignTechnician = async (bookingId, technicianId) => {
-    if (!technicianId) return;
-
+  const handleViewReceipt = async (booking) => {
     try {
-      const data = await assignTechnician(bookingId, technicianId);
+      const blob = await downloadReceptionistReceipt(booking._id);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.click();
+      window.setTimeout(() => window.URL.revokeObjectURL(url), 60000);
+    } catch (error) {
+      alert(error.response?.data?.message || "Receipt preview failed");
+    }
+  };
+
+  const handleAssignTechnician = async (bookingId) => {
+    try {
+      const data = await assignTechnician(bookingId);
       alert(data.message);
       replaceBooking(data.booking);
     } catch (error) {
@@ -163,42 +200,24 @@ function ReceptionistDashboard() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
-        <section className="mb-7 rounded-3xl border border-emerald-100 bg-white p-5 shadow-xl shadow-emerald-950/5 sm:p-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">Live Reception Workflow</p>
-              <h1 className="mt-2 text-2xl font-black tracking-tight text-emerald-950 sm:text-3xl">{activeView === "history" ? "Patient History" : "Patient Bookings"}</h1>
-              <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-500">
-                {activeView === "history"
-                  ? "Review previous and current patient visits in a focused table with date sorting and essential booking details."
-                  : "Confirm booking requests, mark arrivals and payments, assign technicians, and generate receipts from the same workflow."}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <button onClick={() => setActiveView("workflow")} className={`inline-flex items-center justify-center rounded-2xl px-5 py-3 text-sm font-black shadow-sm transition focus:outline-none focus:ring-4 focus:ring-emerald-100 ${activeView === "workflow" ? "bg-emerald-700 text-white shadow-lg shadow-emerald-950/10" : "border border-emerald-200 bg-white text-emerald-800 hover:bg-emerald-50"}`}>
-                Bookings
-              </button>
-              <button onClick={() => setActiveView("history")} className={`inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black shadow-sm transition focus:outline-none focus:ring-4 focus:ring-emerald-100 ${activeView === "history" ? "bg-emerald-700 text-white shadow-lg shadow-emerald-950/10" : "border border-emerald-200 bg-white text-emerald-800 hover:bg-emerald-50"}`}>
-                <History size={18} /> Patient History
-              </button>
-              <button onClick={() => setShowWalkIn(true)} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-950/10 transition hover:bg-emerald-800 focus:outline-none focus:ring-4 focus:ring-emerald-100">
-                <Plus size={18} /> Add Walk-In Patient
-              </button>
-            </div>
-          </div>
-        </section>
+        <ReceptionDeskNav
+          activeView={activeView}
+          onHistory={() => setActiveView("history")}
+          onWalkIn={() => setShowWalkIn(true)}
+          onWorkflow={() => setActiveView("workflow")}
+        />
 
         {loading ? (
           <div className="rounded-3xl border border-emerald-100 bg-white p-8 text-center text-sm font-bold text-slate-500 shadow-xl shadow-emerald-950/5">Loading bookings...</div>
         ) : activeView === "history" ? (
-          <PatientHistoryTable bookings={bookings} />
+          <PatientHistoryTable bookings={bookings} onViewReceipt={handleViewReceipt} />
         ) : (
-          <div className="space-y-6">
-            <PendingBookingsTable bookings={pendingBookings} onStatus={handleStatus} />
-            <BookingSection title="Today's Bookings" bookings={todaysBookings} technicians={technicians} onAssignTechnician={handleAssignTechnician} onArrived={(id) => handleStatus(id, "Arrived")} onPaid={setPaymentBooking} onReceipt={handleReceipt} />
-            <BookingSection title="Pending Payments" bookings={pendingPayments} technicians={technicians} onAssignTechnician={handleAssignTechnician} onArrived={(id) => handleStatus(id, "Arrived")} onPaid={setPaymentBooking} onReceipt={handleReceipt} />
-            <BookingSection title="Ready for Technician Assignment" bookings={readyForAssignment} technicians={technicians} onAssignTechnician={handleAssignTechnician} onArrived={(id) => handleStatus(id, "Arrived")} onPaid={setPaymentBooking} onReceipt={handleReceipt} />
-            <BookingSection title="Assigned to Technician" bookings={assignedPatients} technicians={technicians} onAssignTechnician={handleAssignTechnician} onArrived={(id) => handleStatus(id, "Arrived")} onPaid={setPaymentBooking} onReceipt={handleReceipt} />
+          <div className="space-y-5">
+            {workflowSections.map((section) => section.variant === "pending" ? (
+              <PendingBookingsTable key={section.title} bookings={section.bookings} description={section.description} title={section.title} onStatus={handleStatus} />
+            ) : (
+              <BookingSection key={section.title} title={section.title} description={section.description} bookings={section.bookings} onAssignTechnician={handleAssignTechnician} onArrived={(id) => handleStatus(id, "Arrived")} onPaid={setPaymentBooking} onReceipt={handleReceipt} />
+            ))}
           </div>
         )}
       </main>
@@ -209,7 +228,57 @@ function ReceptionistDashboard() {
   );
 }
 
-function PatientHistoryTable({ bookings }) {
+function ReceptionDeskNav({ activeView, onHistory, onWalkIn, onWorkflow }) {
+  return (
+    <section className="mb-7 overflow-hidden rounded-3xl border border-emerald-100 bg-white shadow-xl shadow-emerald-950/5">
+      <div className="grid gap-3 border-b border-emerald-100 p-4 sm:grid-cols-3">
+        <button
+          type="button"
+          onClick={onWorkflow}
+          className={`flex min-h-24 items-center gap-4 rounded-2xl px-4 py-3 text-left transition focus:outline-none focus:ring-4 focus:ring-emerald-100 ${activeView === "workflow" ? "bg-emerald-700 text-white shadow-lg shadow-emerald-950/10" : "bg-emerald-50 text-emerald-950 hover:bg-emerald-100"}`}
+        >
+          <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${activeView === "workflow" ? "bg-white/15 text-white" : "bg-white text-emerald-700"}`}>
+            <ClipboardList size={21} />
+          </span>
+          <span>
+            <span className="block text-sm font-black">Bookings</span>
+            <span className={`mt-1 block text-xs font-semibold ${activeView === "workflow" ? "text-emerald-50/85" : "text-slate-500"}`}>Reception workflow</span>
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={onHistory}
+          className={`flex min-h-24 items-center gap-4 rounded-2xl px-4 py-3 text-left transition focus:outline-none focus:ring-4 focus:ring-emerald-100 ${activeView === "history" ? "bg-emerald-700 text-white shadow-lg shadow-emerald-950/10" : "bg-emerald-50 text-emerald-950 hover:bg-emerald-100"}`}
+        >
+          <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${activeView === "history" ? "bg-white/15 text-white" : "bg-white text-emerald-700"}`}>
+            <History size={21} />
+          </span>
+          <span>
+            <span className="block text-sm font-black">Patient History</span>
+            <span className={`mt-1 block text-xs font-semibold ${activeView === "history" ? "text-emerald-50/85" : "text-slate-500"}`}>Visit records</span>
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={onWalkIn}
+          className="flex min-h-24 items-center gap-4 rounded-2xl bg-emerald-950 px-4 py-3 text-left text-white shadow-lg shadow-emerald-950/10 transition hover:bg-emerald-900 focus:outline-none focus:ring-4 focus:ring-emerald-100"
+        >
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white">
+            <Plus size={21} />
+          </span>
+          <span>
+            <span className="block text-sm font-black">Walk-In Patient</span>
+            <span className="mt-1 block text-xs font-semibold text-emerald-50/85">Create confirmed visit</span>
+          </span>
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function PatientHistoryTable({ bookings, onViewReceipt }) {
   const [dateSort, setDateSort] = useState("desc");
 
   const sortedBookings = useMemo(() => {
@@ -254,6 +323,7 @@ function PatientHistoryTable({ bookings }) {
                 <th className="p-3">Time</th>
                 <th className="p-3">Booking Status</th>
                 <th className="p-3">Payment</th>
+                <th className="p-3">Payment Receipt</th>
                 <th className="p-3 text-right">Amount</th>
               </tr>
             </thead>
@@ -268,6 +338,16 @@ function PatientHistoryTable({ bookings }) {
                   <td className="p-3">{booking.timeSlot || "-"}</td>
                   <td className="p-3"><StatusBadge value={booking.bookingStatus || booking.status || "Pending"} /></td>
                   <td className="p-3"><StatusBadge value={booking.paymentStatus || "Unpaid"} /></td>
+                  <td className="p-3">
+                    <button
+                      type="button"
+                      onClick={() => onViewReceipt(booking)}
+                      disabled={booking.paymentStatus !== "Paid"}
+                      className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-black text-emerald-800 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <Eye size={14} /> View
+                    </button>
+                  </td>
                   <td className="p-3 text-right font-black text-emerald-950">INR {Number(booking.amount || 0).toLocaleString("en-IN")}</td>
                 </tr>
               ))}
@@ -281,10 +361,10 @@ function PatientHistoryTable({ bookings }) {
   );
 }
 
-function PendingBookingsTable({ bookings, onStatus }) {
+function PendingBookingsTable({ bookings, description, onStatus, title }) {
   return (
     <section className="rounded-3xl border border-emerald-100 bg-white p-5 shadow-xl shadow-emerald-950/5 sm:p-6">
-      <h2 className="mb-5 text-xl font-black tracking-tight text-emerald-950">Pending Bookings</h2>
+      <SectionHeader count={bookings.length} description={description} title={title} />
       {bookings.length ? (
         <div className="overflow-x-auto rounded-2xl border border-emerald-100">
           <table className="w-full text-left text-sm">
@@ -334,10 +414,10 @@ function PendingBookingsTable({ bookings, onStatus }) {
   );
 }
 
-function BookingSection({ title, bookings, technicians, onAssignTechnician, onArrived, onPaid, onReceipt }) {
+function BookingSection({ title, description, bookings, onAssignTechnician, onArrived, onPaid, onReceipt }) {
   return (
     <section className="rounded-3xl border border-emerald-100 bg-white p-5 shadow-xl shadow-emerald-950/5 sm:p-6">
-      <h2 className="mb-5 text-xl font-black tracking-tight text-emerald-950">{title}</h2>
+      <SectionHeader count={bookings.length} description={description} title={title} />
       {bookings.length ? (
         <div className="grid gap-4 lg:grid-cols-2">
           {bookings.map((booking) => (
@@ -350,7 +430,6 @@ function BookingSection({ title, bookings, technicians, onAssignTechnician, onAr
                   <p className="mt-2 text-sm font-semibold text-slate-500">Patient: {booking.name}</p>
                   <p className="text-sm font-semibold text-slate-500">Phone: {booking.phone}</p>
                   <p className="text-sm font-semibold text-slate-500">{booking.bookingDate} | {booking.timeSlot}</p>
-                  <p className="text-sm font-semibold text-slate-500">Sample: {booking.sampleStatus || "Not Collected"}</p>
                   {booking.assignedTechnician && <p className="text-sm font-semibold text-slate-500">Technician assigned</p>}
                 </div>
                 <div className="text-right">
@@ -371,16 +450,14 @@ function BookingSection({ title, bookings, technicians, onAssignTechnician, onAr
                   </button>
                 )}
                 {(booking.patientArrived || booking.bookingStatus === "Arrived") && booking.paymentStatus === "Paid" && !["Processing", "Pending Report Approval", "Report Ready"].includes(booking.bookingStatus) && (
-                  <select
-                    value={booking.assignedTechnician || ""}
-                    onChange={(e) => onAssignTechnician(booking._id, e.target.value)}
-                    className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                  <button
+                    type="button"
+                    onClick={() => onAssignTechnician(booking._id)}
+                    disabled={Boolean(booking.assignedTechnician)}
+                    className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-3 py-2 text-xs font-black text-white shadow-sm transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    <option value="">Choose technician</option>
-                    {technicians.map((technician) => (
-                      <option key={technician._id} value={technician._id}>{technician.name}</option>
-                    ))}
-                  </select>
+                    <UserCheck size={14} /> Auto Assign Technician
+                  </button>
                 )}
                 {booking.paymentStatus === "Paid" && (
                   <button onClick={() => onReceipt(booking)} className="inline-flex items-center gap-2 rounded-xl bg-emerald-950 px-3 py-2 text-xs font-black text-white shadow-sm transition hover:bg-emerald-900">
@@ -398,29 +475,74 @@ function BookingSection({ title, bookings, technicians, onAssignTechnician, onAr
   );
 }
 
+function SectionHeader({ count, description, title }) {
+  return (
+    <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div>
+        <h2 className="text-xl font-black tracking-tight text-emerald-950">{title}</h2>
+        {description && <p className="mt-1 max-w-3xl text-sm font-semibold leading-6 text-slate-500">{description}</p>}
+      </div>
+      <span className="inline-flex w-fit items-center rounded-xl bg-emerald-50 px-3 py-1.5 text-xs font-black uppercase tracking-[0.1em] text-emerald-700">
+        {count} item{count === 1 ? "" : "s"}
+      </span>
+    </div>
+  );
+}
+
 function WalkInModal({ tests, onClose, onCreated }) {
+  const [collectionType, setCollectionType] = useState("Visit Lab");
   const [form, setForm] = useState({
     name: "",
     phone: "",
+    email: "",
     age: "",
     gender: "",
+    prescribedBy: "",
     testId: "",
     bookingDate: new Date().toISOString().slice(0, 10),
     timeSlot: "Walk-in",
-    sampleType: "",
-    notes: ""
+    notes: "",
+    houseNo: "",
+    building: "",
+    street: "",
+    landmark: "",
+    area: "",
+    city: "",
+    taluka: "",
+    district: "",
+    state: "",
+    pinCode: ""
   });
 
   const submit = async (e) => {
     e.preventDefault();
 
-    if (!form.name || !form.phone || !form.age || !form.gender || !form.testId || !form.bookingDate) {
-      alert("Patient name, phone, age, gender, test and date are required");
+    if (!form.name || !form.phone || !form.email || !form.age || !form.gender || !form.testId || !form.bookingDate || !form.timeSlot) {
+      alert("Patient name, phone, email, age, gender, test, date and time are required");
       return;
     }
 
+    if (collectionType === "Home Collection") {
+      const requiredAddressFields = ["houseNo", "street", "area", "city", "taluka", "district", "state", "pinCode"];
+      const missingAddress = requiredAddressFields.some((field) => !String(form[field] || "").trim());
+
+      if (missingAddress) {
+        alert("Please complete the home collection address.");
+        return;
+      }
+    }
+
+    const address = collectionType === "Home Collection"
+      ? `${form.houseNo}, ${form.building ? `${form.building}, ` : ""}${form.street}, ${form.landmark ? `${form.landmark}, ` : ""}${form.area}, ${form.city}, ${form.taluka}, ${form.district}, ${form.state} - ${form.pinCode}`
+      : "";
+
     try {
-      const data = await createWalkInBooking(form);
+      const data = await createWalkInBooking({
+        ...form,
+        collectionType,
+        homeSample: collectionType === "Home Collection",
+        address
+      });
       alert(data.message);
       onCreated();
     } catch (error) {
@@ -432,7 +554,10 @@ function WalkInModal({ tests, onClose, onCreated }) {
     <Modal title="Add Walk-In Patient" onClose={onClose}>
       <form onSubmit={submit} className="space-y-3">
         <Input placeholder="Patient name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-        <Input placeholder="Phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Input placeholder="Phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+          <Input type="email" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+        </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <Input type="number" min="0" max="130" placeholder="Age" value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })} />
           <select value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })} className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 font-semibold outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100">
@@ -443,13 +568,33 @@ function WalkInModal({ tests, onClose, onCreated }) {
             <option value="Prefer not to say">Prefer not to say</option>
           </select>
         </div>
+        <Input placeholder="Prescribed by / Doctor" value={form.prescribedBy} onChange={(e) => setForm({ ...form, prescribedBy: e.target.value })} />
         <select value={form.testId} onChange={(e) => setForm({ ...form, testId: e.target.value })} className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 font-semibold outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100">
           <option value="">Select test</option>
           {tests.map((test) => <option key={test._id} value={test._id}>{test.testName} - INR {test.price}</option>)}
         </select>
-        <Input type="date" value={form.bookingDate} onChange={(e) => setForm({ ...form, bookingDate: e.target.value })} />
-        <Input placeholder="Time slot" value={form.timeSlot} onChange={(e) => setForm({ ...form, timeSlot: e.target.value })} />
-        <Input placeholder="Sample type, if known" value={form.sampleType} onChange={(e) => setForm({ ...form, sampleType: e.target.value })} />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Input type="date" value={form.bookingDate} onChange={(e) => setForm({ ...form, bookingDate: e.target.value })} />
+          <Input placeholder="Time slot" value={form.timeSlot} onChange={(e) => setForm({ ...form, timeSlot: e.target.value })} />
+        </div>
+        <select value={collectionType} onChange={(e) => setCollectionType(e.target.value)} className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 font-semibold outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100">
+          <option value="Visit Lab">Lab Visit</option>
+          <option value="Home Collection">Home Visit</option>
+        </select>
+        {collectionType === "Home Collection" && (
+          <div className="grid gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-3 sm:grid-cols-2">
+            <Input placeholder="House / Flat No." value={form.houseNo} onChange={(e) => setForm({ ...form, houseNo: e.target.value })} />
+            <Input placeholder="Building" value={form.building} onChange={(e) => setForm({ ...form, building: e.target.value })} />
+            <Input placeholder="Street" value={form.street} onChange={(e) => setForm({ ...form, street: e.target.value })} />
+            <Input placeholder="Landmark" value={form.landmark} onChange={(e) => setForm({ ...form, landmark: e.target.value })} />
+            <Input placeholder="Area" value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} />
+            <Input placeholder="City" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+            <Input placeholder="Taluka" value={form.taluka} onChange={(e) => setForm({ ...form, taluka: e.target.value })} />
+            <Input placeholder="District" value={form.district} onChange={(e) => setForm({ ...form, district: e.target.value })} />
+            <Input placeholder="State" value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} />
+            <Input placeholder="PIN Code" value={form.pinCode} onChange={(e) => setForm({ ...form, pinCode: e.target.value })} />
+          </div>
+        )}
         <textarea placeholder="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="min-h-24 w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 font-semibold outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100" />
         <button className="w-full rounded-2xl bg-emerald-700 p-3.5 font-black text-white shadow-lg shadow-emerald-950/10 transition hover:bg-emerald-800">Create Confirmed Booking</button>
       </form>

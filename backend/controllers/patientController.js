@@ -10,8 +10,15 @@ const Package = require("../models/Package");
 const letterheadImagePath = path.join(__dirname, "..", "assets", "indipath-letterhead.png");
 const brandLogoPath = path.join(__dirname, "..", "..", "frontend", "src", "assets", "logo.png");
 const patientCodeStatuses = ["Confirmed", "Arrived", "Technician Assigned", "Sample Collected", "Processing", "Pending Report Approval", "Completed", "Report Ready"];
+const pdfLayout = {
+  left: 56,
+  right: 506,
+  contentTop: 124,
+  contentBottom: 650
+};
 
 const generatePatientCode = () => `PID${Date.now().toString().slice(-8)}${Math.floor(10 + Math.random() * 90)}`;
+const generateReceiptId = () => `RCT${Date.now().toString().slice(-8)}${Math.floor(10 + Math.random() * 90)}`;
 
 const ensurePatientCode = async (booking) => {
   if (!booking || booking.patientCode || !patientCodeStatuses.includes(booking.bookingStatus || booking.status)) {
@@ -25,14 +32,22 @@ const ensurePatientCode = async (booking) => {
 
 const safeFilePart = (value) => String(value || "patient").trim().replace(/[^a-z0-9-_]+/gi, "-").replace(/^-+|-+$/g, "") || "patient";
 
-const buildPatientPdfFilename = (name, patientCode) => {
-  return `${safeFilePart(name)}-${safeFilePart(patientCode || "pending-patient-id")}.pdf`;
+const buildPatientPdfFilename = (name, patientCode, documentType = "RPT") => {
+  return `${safeFilePart(name)}-${safeFilePart(patientCode || "pending-patient-id")}-${safeFilePart(documentType).toUpperCase()}.pdf`;
 };
+
+const formatDateTime = (value) => value ? new Date(value).toLocaleString("en-IN") : "N/A";
+
+const formatCurrency = (value) => `INR ${Number(value || 0).toLocaleString("en-IN")}`;
 
 const drawLetterhead = (doc) => {
   if (fs.existsSync(letterheadImagePath)) {
-    doc.image(letterheadImagePath, 0, 0, { width: doc.page.width, height: doc.page.height });
-    doc.y = 120;
+    doc.image(letterheadImagePath, 0, 0, {
+      cover: [doc.page.width, doc.page.height],
+      align: "center",
+      valign: "center"
+    });
+    doc.y = pdfLayout.contentTop;
     return true;
   }
 
@@ -74,6 +89,55 @@ const drawLetterhead = (doc) => {
   doc.fillColor("#111111");
   doc.y = 105;
   return true;
+};
+
+const drawTitleBlock = (doc, title, subtitle) => {
+  const top = doc.y;
+  doc.roundedRect(pdfLayout.left, top, pdfLayout.right - pdfLayout.left, 38, 4).fill("#173b8f");
+  doc.fillColor("#ffffff").fontSize(16).font("Helvetica-Bold").text(title, pdfLayout.left + 10, top + 10, { width: 430, align: "center" });
+  if (subtitle) {
+    doc.fillColor("#dff7ea").fontSize(7.5).font("Helvetica-Bold").text(subtitle, pdfLayout.left + 10, top + 28, { width: 430, align: "center" });
+  }
+  doc.y = top + 52;
+};
+
+const drawInfoGrid = (doc, title, rows, startY = doc.y) => {
+  const width = pdfLayout.right - pdfLayout.left;
+  const left = pdfLayout.left;
+  const rowHeight = 22;
+  const headerHeight = 22;
+  const bodyHeight = Math.ceil(rows.length / 2) * rowHeight;
+
+  doc.roundedRect(left, startY, width, headerHeight + bodyHeight + 10, 5).fill("#ffffff").strokeColor("#cfe4d8").stroke();
+  doc.rect(left, startY, width, headerHeight).fill("#187b4b");
+  doc.fillColor("#ffffff").fontSize(9).font("Helvetica-Bold").text(title, left + 12, startY + 7);
+
+  rows.forEach(([label, value], index) => {
+    const column = index % 2;
+    const row = Math.floor(index / 2);
+    const x = column ? 284 : left + 12;
+    const y = startY + headerHeight + 11 + (row * rowHeight);
+    doc.fillColor("#173b8f").fontSize(7.5).font("Helvetica-Bold").text(label.toUpperCase(), x, y, { width: 82 });
+    doc.fillColor("#1f2937").fontSize(8.8).font("Helvetica").text(String(value || "N/A"), x + 86, y, { width: 128, height: 18, ellipsis: true });
+  });
+
+  doc.y = startY + headerHeight + bodyHeight + 24;
+};
+
+const drawReceiptBox = (doc, rows) => {
+  const left = 80;
+  const top = doc.y;
+  const width = 395;
+  const rowHeight = 28;
+
+  doc.roundedRect(left, top, width, (rows.length * rowHeight) + 20, 6).fill("#ffffff").strokeColor("#cfe4d8").stroke();
+  rows.forEach(([label, value], index) => {
+    const y = top + 12 + (index * rowHeight);
+    if (index) doc.moveTo(left + 16, y - 7).lineTo(left + width - 16, y - 7).strokeColor("#edf7f1").stroke();
+    doc.fillColor("#64748b").fontSize(8).font("Helvetica-Bold").text(label.toUpperCase(), left + 20, y, { width: 140 });
+    doc.fillColor("#111827").fontSize(10).font("Helvetica-Bold").text(String(value || "N/A"), left + 180, y - 1, { width: 200, align: "right" });
+  });
+  doc.y = top + (rows.length * rowHeight) + 36;
 };
 
 const drawDefaultFooter = (doc) => {
@@ -219,7 +283,7 @@ const downloadReport = async (req, res) => {
     const booking = report.bookingId || {};
     const results = Array.isArray(report.results) ? report.results : [];
     const doc = new PDFDocument({ size: "A4", margin: 50, autoFirstPage: true });
-    const filename = buildPatientPdfFilename(booking.name || req.user.name, booking.patientCode || booking.bookingCode);
+    const filename = buildPatientPdfFilename(booking.name || req.user.name, booking.patientCode || booking.bookingCode, "RPT");
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
@@ -228,30 +292,22 @@ const downloadReport = async (req, res) => {
     const hasLetterheadImage = drawLetterhead(doc);
     doc.on("pageAdded", () => drawLetterhead(doc));
     doc.x = 50;
-    doc.fillColor("#173b8f").fontSize(16).font("Helvetica-Bold").text("DIAGNOSTIC REPORT", 50, doc.y, { width: 455, align: "center" });
-    const infoTop = doc.y + 12;
+    drawTitleBlock(doc, "DIAGNOSTIC TEST REPORT", "Approved pathology report");
+    const infoTop = doc.y;
     const patientDetails = [
       ["Patient Name", booking.name || req.user.name], ["Age / Gender", `${booking.age || req.user.age || "N/A"} / ${booking.gender || req.user.gender || "N/A"}`],
       ["Phone", booking.phone || req.user.phone], ["Patient ID", booking.patientCode || "Pending"],
       ["Booking ID", booking.bookingCode || "N/A"], ["Test", report.testName]
     ];
-    doc.rect(50, infoTop, 455, 18).fill("#187b4b");
-    doc.fillColor("#ffffff").fontSize(10).font("Helvetica-Bold").text("PATIENT & TEST INFORMATION", 60, infoTop + 5);
-    patientDetails.forEach(([label, value], index) => {
-      const column = index % 2;
-      const row = Math.floor(index / 2);
-      const x = column ? 290 : 60;
-      const y = infoTop + 28 + (row * 18);
-      doc.fillColor("#333333").fontSize(8).font("Helvetica-Bold").text(`${label}:`, x, y);
-      doc.font("Helvetica").text(String(value || "N/A"), x + 76, y, { width: 145 });
-    });
-    const approvalTop = infoTop + 84;
-    doc.fillColor("#333333").fontSize(8).font("Helvetica-Bold").text("Approved Date & Time:", 60, approvalTop);
-    doc.font("Helvetica").text(report.approvedAt ? report.approvedAt.toLocaleString("en-IN") : "N/A", 150, approvalTop, { width: 250 });
-    doc.y = approvalTop + 20;
+    drawInfoGrid(doc, "PATIENT & TEST INFORMATION", patientDetails, infoTop);
+    const approvalLineTop = doc.y;
+    doc.fillColor("#173b8f").fontSize(8).font("Helvetica-Bold").text("Approved Date & Time:", 60, approvalLineTop);
+    doc.fillColor("#1f2937").font("Helvetica").text(formatDateTime(report.approvedAt), 158, approvalLineTop, { width: 220 });
+    doc.y = approvalLineTop + 18;
     if (report.reportDescription) {
-      doc.fontSize(9).fillColor("#444444").text(report.reportDescription, 50, doc.y, { width: 470, align: "left" });
-      doc.moveDown(1);
+      doc.roundedRect(50, doc.y, 455, 34, 5).fill("#f8fffb").strokeColor("#d9efe2").stroke();
+      doc.fontSize(8.5).fillColor("#334155").font("Helvetica").text(report.reportDescription, 62, doc.y + 9, { width: 431, height: 18, ellipsis: true });
+      doc.y += 46;
     }
     const tableTop = doc.y + 5;
     const columns = [50, 215, 315, 390];
@@ -261,9 +317,9 @@ const downloadReport = async (req, res) => {
     let rowTop = tableTop + 19;
     results.forEach((result, index) => {
       const rowHeight = 22;
-      if (rowTop > doc.page.height - 235) {
+      if (rowTop > pdfLayout.contentBottom - 40) {
         doc.addPage();
-        rowTop = doc.y;
+        rowTop = pdfLayout.contentTop;
         doc.rect(50, rowTop, 455, 19).fill("#187b4b");
         ["PARAMETER", "RESULT", "UNIT", "REFERENCE RANGE"].forEach((heading, column) => doc.fillColor("#ffffff").fontSize(8).font("Helvetica-Bold").text(heading, columns[column] + 5, rowTop + 6, { width: widths[column] - 8 }));
         rowTop += 19;
@@ -275,7 +331,7 @@ const downloadReport = async (req, res) => {
     });
     doc.y = rowTop + 10;
 
-    if (doc.y > doc.page.height - 300) doc.addPage();
+    if (doc.y > pdfLayout.contentBottom - 110) doc.addPage();
     const remarksTop = doc.y + 6;
     doc.fillColor("#333333").fontSize(9).font("Helvetica-Bold").text("Technician Remarks:", 50, remarksTop, { width: 125 });
     doc.font("Helvetica").text(report.technicianRemarks || "N/A", 155, remarksTop, { width: 350, height: 18, ellipsis: true });
@@ -287,7 +343,7 @@ const downloadReport = async (req, res) => {
     const signatureFilename = isLegacyDataImage ? "" : path.basename(signatureUrl);
     const signaturePath = signatureFilename ? path.join(__dirname, "..", "uploads", "signatures", signatureFilename) : "";
 
-    const signatureTop = doc.page.height - 205;
+    const signatureTop = Math.min(pdfLayout.contentBottom - 62, doc.y + 76);
     if ((signatureFilename && fs.existsSync(signaturePath)) || isLegacyDataImage) {
       try {
         const signatureImage = isLegacyDataImage ? Buffer.from(signatureUrl.split(",")[1], "base64") : signaturePath;
@@ -328,8 +384,18 @@ const downloadReceipt = async (req, res) => {
       return res.status(400).json({ message: "Receipt is available only after payment is marked as paid" });
     }
 
-    const doc = new PDFDocument({ margin: 50 });
-    const filename = buildPatientPdfFilename(booking.name, booking.patientCode);
+    if (!booking.receiptId) {
+      booking.receiptId = generateReceiptId();
+      await booking.save();
+      await Payment.findOneAndUpdate(
+        { bookingId: booking._id },
+        { receiptId: booking.receiptId },
+        { new: true }
+      );
+    }
+
+    const doc = new PDFDocument({ size: "A4", margin: 50 });
+    const filename = buildPatientPdfFilename(booking.name, booking.patientCode, "RCT");
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
@@ -337,23 +403,26 @@ const downloadReceipt = async (req, res) => {
     doc.pipe(res);
     const hasLetterheadImage = drawLetterhead(doc);
     doc.x = 50;
-    doc.fontSize(20).text("INDIPATH Super Speciality Lab", 50, doc.y, { width: 495, align: "center" });
-    doc.moveDown(0.5);
-    doc.fontSize(16).text("Payment Receipt", { align: "center" });
-    doc.moveDown(1.5);
-    doc.fontSize(11);
-    doc.text(`Receipt Number: ${booking.receiptNumber}`);
-    doc.text(`Patient ID: ${booking.patientCode || "Pending"}`);
-    doc.text(`Booking ID: ${booking.bookingCode}`);
-    doc.text(`Patient Name: ${booking.name}`);
-    doc.text(`Test Name: ${booking.testName}`);
-    doc.text(`Booking Date: ${booking.bookingDate}`);
-    doc.text(`Time Slot: ${booking.timeSlot}`);
-    doc.text(`Total Amount: INR ${booking.amount}`);
-    doc.text(`Payment Method: ${booking.paymentMethod.toUpperCase()}`);
-    doc.text(`Payment Date: ${booking.paidAt ? booking.paidAt.toLocaleString("en-IN") : "N/A"}`);
-    doc.moveDown(1);
-    doc.text("Payment received successfully. Thank you for choosing INDIPATH.");
+    drawTitleBlock(doc, "PAYMENT RECEIPT", "Official receipt for paid diagnostic booking");
+    drawInfoGrid(doc, "PATIENT & BOOKING INFORMATION", [
+      ["Patient Name", booking.name],
+      ["Patient ID", booking.patientCode || "Pending"],
+      ["Booking ID", booking.bookingCode],
+      ["Receipt ID", booking.receiptId || booking.receiptNumber],
+      ["Receipt No.", booking.receiptNumber],
+      ["Test / Package", booking.testName],
+      ["Appointment", `${booking.bookingDate || "N/A"} | ${booking.timeSlot || "N/A"}`]
+    ]);
+    drawReceiptBox(doc, [
+      ["Total Amount", formatCurrency(booking.amount)],
+      ["Payment Method", String(booking.paymentMethod || "N/A").toUpperCase()],
+      ["Payment Status", booking.paymentStatus],
+      ["Payment Date", formatDateTime(booking.paidAt)]
+    ]);
+    const acknowledgementTop = doc.y;
+    doc.roundedRect(80, acknowledgementTop, 395, 46, 6).fill("#f0fdf4").strokeColor("#bbf7d0").stroke();
+    doc.fillColor("#166534").fontSize(11).font("Helvetica-Bold").text("Payment received successfully.", 100, acknowledgementTop + 11, { width: 355, align: "center" });
+    doc.fillColor("#334155").fontSize(8.5).font("Helvetica").text("Thank you for choosing INDIPATH Super Speciality Pathology Lab.", 100, acknowledgementTop + 28, { width: 355, align: "center" });
     if (!hasLetterheadImage) drawDefaultFooter(doc);
     doc.end();
   } catch (error) {

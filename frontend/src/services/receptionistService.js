@@ -25,8 +25,8 @@ export const updateBookingStatus = async (bookingId, status, rejectionReason = "
   return response.data;
 };
 
-export const assignTechnician = async (bookingId, technicianId) => {
-  const response = await api.patch(`/api/receptionist/bookings/${bookingId}/technician`, { technicianId });
+export const assignTechnician = async (bookingId) => {
+  const response = await api.patch(`/api/receptionist/bookings/${bookingId}/technician`);
   return response.data;
 };
 
