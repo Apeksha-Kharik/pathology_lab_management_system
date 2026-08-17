@@ -7,7 +7,7 @@ const packageSchema = new mongoose.Schema({
   description: { type: String, default: "" },
   reportDescription: { type: String, default: "" },
   reportLetterhead: { type: String, default: "" },
-  reportTemplate: [{ parameter: { type: String, required: true }, unit: { type: String, default: "" }, referenceRange: { type: String, default: "" } }],
+  reportTemplate: [{ parameter: { type: String, required: true }, value: { type: String, default: "" }, unit: { type: String, default: "" }, referenceRange: { type: String, default: "" } }],
   imageUrl: { type: String, default: "" },
   includedTests: [{ type: mongoose.Schema.Types.ObjectId, ref: "Test" }],
   parametersCount: { type: Number, default: 0, min: 0 },

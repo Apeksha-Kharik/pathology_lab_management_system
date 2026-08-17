@@ -3,6 +3,7 @@ const {
   getDashboardMetrics,
   getUsers,
   createUser,
+  downloadAdminReport,
   deleteUser,
   addTest,
   getTests,
@@ -19,6 +20,7 @@ const router = express.Router();
 
 router.get("/tests", getTests);
 router.get("/dashboard-metrics", protect, allowRoles("admin"), getDashboardMetrics);
+router.get("/reports/:reportId/download", protect, allowRoles("admin"), downloadAdminReport);
 router.get("/users", protect, allowRoles("admin"), getUsers);
 router.post("/users", protect, allowRoles("admin"), createUser);
 router.delete("/user/:id", protect, allowRoles("admin"), deleteUser);

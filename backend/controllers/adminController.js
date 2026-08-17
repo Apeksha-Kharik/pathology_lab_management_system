@@ -4,9 +4,28 @@ const Package = require("../models/Package");
 const Booking = require("../models/Booking");
 const Payment = require("../models/Payment");
 const Report = require("../models/Report");
+const PDFDocument = require("pdfkit");
+const fs = require("fs");
+const path = require("path");
 const bcrypt = require("bcryptjs");
 const { normalizeRole } = require("./authController");
 const { writeAuditLog } = require("../utils/auditLogger");
+
+const letterheadImagePath = path.join(__dirname, "..", "assets", "indipath-letterhead.png");
+const pdfLayout = { left: 56, right: 506, contentTop: 124, contentBottom: 650 };
+
+const drawLetterhead = (doc) => {
+  if (fs.existsSync(letterheadImagePath)) {
+    doc.image(letterheadImagePath, 0, 0, { cover: [doc.page.width, doc.page.height], align: "center", valign: "center" });
+    doc.y = pdfLayout.contentTop;
+    return true;
+  }
+  doc.y = 72;
+  return false;
+};
+
+const safeFilePart = (value) => String(value || "patient").trim().replace(/[^a-z0-9-_]+/gi, "-").replace(/^-+|-+$/g, "") || "patient";
+const formatDateTime = (value) => value ? new Date(value).toLocaleString("en-IN") : "N/A";
 
 const getDashboardMetrics = async (req, res) => {
   try {
@@ -33,6 +52,7 @@ const getDashboardMetrics = async (req, res) => {
       rejectedReports,
       paidRevenue,
       monthlyRevenue,
+      revenueByMethod,
       pendingAmount,
       recentBookings,
       roleBreakdown
@@ -60,12 +80,17 @@ const getDashboardMetrics = async (req, res) => {
         { $match: { status: "paid", paidAt: { $gte: monthStart } } },
         { $group: { _id: null, total: { $sum: "$amount" } } }
       ]),
+      Payment.aggregate([
+        { $match: { status: "paid" } },
+        { $group: { _id: "$method", total: { $sum: "$amount" }, count: { $sum: 1 } } },
+        { $sort: { total: -1 } }
+      ]),
       Booking.aggregate([
         { $match: { paymentStatus: "Unpaid", bookingStatus: { $nin: ["Rejected", "Cancelled"] } } },
         { $group: { _id: null, total: { $sum: "$amount" } } }
       ]),
       Booking.find()
-        .select("bookingCode name testName bookingDate bookingStatus paymentStatus amount")
+        .select("bookingCode name testName bookingDate bookingStatus paymentStatus amount receiptId receiptNumber")
         .sort({ updatedAt: -1 })
         .limit(6),
       User.aggregate([
@@ -73,6 +98,27 @@ const getDashboardMetrics = async (req, res) => {
         { $sort: { _id: 1 } }
       ])
     ]);
+
+    const recentReports = await Report.find({ bookingId: { $in: recentBookings.map((booking) => booking._id) } })
+      .select("bookingId reportId status")
+      .sort({ updatedAt: -1 });
+    const reportByBooking = recentReports.reduce((acc, report) => {
+      const key = String(report.bookingId);
+      if (!acc[key]) acc[key] = report;
+      return acc;
+    }, {});
+
+    const totalMethodRevenue = revenueByMethod.reduce((sum, item) => sum + (item.total || 0), 0);
+    const normalizedMethodRevenue = ["cash", "upi", "card"].map((method) => {
+      const found = revenueByMethod.find((item) => item._id === method);
+      const total = found?.total || 0;
+      return {
+        method,
+        total,
+        count: found?.count || 0,
+        percent: totalMethodRevenue ? Number(((total / totalMethodRevenue) * 100).toFixed(1)) : 0
+      };
+    });
 
     res.json({
       totals: {
@@ -99,13 +145,90 @@ const getDashboardMetrics = async (req, res) => {
       finance: {
         paidRevenue: paidRevenue[0]?.total || 0,
         monthlyRevenue: monthlyRevenue[0]?.total || 0,
-        pendingAmount: pendingAmount[0]?.total || 0
+        pendingAmount: pendingAmount[0]?.total || 0,
+        revenueByMethod: normalizedMethodRevenue
       },
       roleBreakdown,
-      recentBookings
+      recentBookings: recentBookings.map((booking) => {
+        const bookingData = booking.toObject();
+        const report = reportByBooking[String(booking._id)];
+        return {
+          ...bookingData,
+          report: report ? { _id: report._id, reportId: report.reportId, status: report.status } : null,
+          hasReceipt: booking.paymentStatus === "Paid" && Boolean(booking.receiptId || booking.receiptNumber)
+        };
+      })
     });
   } catch (error) {
     res.status(500).json({ message: "Error fetching dashboard metrics", error: error.message });
+  }
+};
+
+const downloadAdminReport = async (req, res) => {
+  try {
+    const report = await Report.findById(req.params.reportId)
+      .populate("bookingId")
+      .populate("approvedBy", "name qualification registrationNumber signatureUrl");
+
+    if (!report || report.status !== "Approved") {
+      return res.status(404).json({ message: "Approved report not found" });
+    }
+
+    const booking = report.bookingId || {};
+    const doc = new PDFDocument({ size: "A4", margin: 50 });
+    const filename = `${safeFilePart(booking.name)}-${safeFilePart(booking.patientCode || booking.bookingCode)}-RPT.pdf`;
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
+    doc.pipe(res);
+    drawLetterhead(doc);
+
+    doc.roundedRect(pdfLayout.left, doc.y, pdfLayout.right - pdfLayout.left, 38, 4).fill("#173b8f");
+    doc.fillColor("#ffffff").fontSize(16).font("Helvetica-Bold").text("DIAGNOSTIC TEST REPORT", pdfLayout.left + 10, doc.y + 10, { width: 430, align: "center" });
+    doc.y += 54;
+
+    const details = [
+      ["Patient Name", booking.name],
+      ["Age / Gender", `${booking.age || "N/A"} / ${booking.gender || "N/A"}`],
+      ["Patient ID", booking.patientCode || "Pending"],
+      ["Booking ID", booking.bookingCode || "N/A"],
+      ["Report ID", report.reportId || "N/A"],
+      ["Test", report.testName],
+      ["Approved", formatDateTime(report.approvedAt)]
+    ];
+    details.forEach(([label, value], index) => {
+      const column = index % 2;
+      const row = Math.floor(index / 2);
+      const x = column ? 292 : 62;
+      const y = doc.y + (row * 22);
+      doc.fillColor("#173b8f").fontSize(8).font("Helvetica-Bold").text(label.toUpperCase(), x, y, { width: 86 });
+      doc.fillColor("#1f2937").fontSize(9).font("Helvetica").text(String(value || "N/A"), x + 90, y, { width: 126, height: 18, ellipsis: true });
+    });
+    doc.y += 98;
+
+    const columns = [50, 215, 315, 390];
+    const widths = [165, 100, 75, 115];
+    doc.rect(50, doc.y, 455, 20).fill("#187b4b");
+    ["PARAMETER", "RESULT", "UNIT", "REFERENCE RANGE"].forEach((heading, index) => doc.fillColor("#ffffff").fontSize(8).font("Helvetica-Bold").text(heading, columns[index] + 5, doc.y + 6, { width: widths[index] - 8 }));
+    let rowTop = doc.y + 20;
+    (report.results || []).forEach((result, index) => {
+      if (rowTop > pdfLayout.contentBottom - 40) {
+        doc.addPage();
+        drawLetterhead(doc);
+        rowTop = doc.y;
+      }
+      doc.rect(50, rowTop, 455, 22).fill(index % 2 ? "#ffffff" : "#f8fffb");
+      [result.parameter, result.value, result.unit || "", result.normalRange || result.referenceRange || ""].forEach((value, column) => {
+        doc.fillColor("#1f2937").fontSize(8.5).font(column === 0 ? "Helvetica-Bold" : "Helvetica").text(String(value || "N/A"), columns[column] + 5, rowTop + 7, { width: widths[column] - 8, height: 12, ellipsis: true });
+      });
+      rowTop += 22;
+    });
+    doc.y = rowTop + 18;
+    doc.fillColor("#334155").fontSize(9).font("Helvetica-Bold").text("Pathologist Remarks:", 50, doc.y);
+    doc.font("Helvetica").text(report.pathologistRemarks || "N/A", 160, doc.y - 11, { width: 345, height: 40, ellipsis: true });
+    doc.end();
+  } catch (error) {
+    res.status(500).json({ message: "Admin report download failed", error: error.message });
   }
 };
 
@@ -380,4 +503,4 @@ const updatePackage = async (req, res) => {
   } catch (error) { res.status(500).json({ message: "Error updating package", error: error.message }); }
 };
 
-module.exports = { getDashboardMetrics, createUser, getUsers, deleteUser, addTest, getTests, updateTest, deleteTest, getPackages, addPackage, deletePackage, updatePackage };
+module.exports = { getDashboardMetrics, downloadAdminReport, createUser, getUsers, deleteUser, addTest, getTests, updateTest, deleteTest, getPackages, addPackage, deletePackage, updatePackage };

@@ -3,7 +3,7 @@ import api from '../services/api';
 import packageFallbackImage from '../assets/bg1.png';
 import { 
     LayoutDashboard, TestTube2, UserPlus, LogOut, Trash2,
-    Activity, FlaskConical, IndianRupee, Plus,
+    Activity, FlaskConical, IndianRupee, Plus, Eye, FileText, ReceiptText,
     CalendarDays, ClipboardList, FileCheck2, WalletCards, PackagePlus, Boxes,
     UserRound, Microscope, Headphones, Stethoscope, ArrowRight, CheckCircle2
 } from 'lucide-react';
@@ -39,8 +39,10 @@ const AdminDashboard = () => {
     const [adminNotice, setAdminNotice] = useState("");
     const [templateMode, setTemplateMode] = useState(false);
     const [templateTargetId, setTemplateTargetId] = useState("");
+    const [testFormStep, setTestFormStep] = useState("details");
+    const [documentAction, setDocumentAction] = useState("");
 
-    const [testForm, setTestForm] = useState({ testName: '', price: '', category: '', conditions: '', description: '', reportDescription: '', reportLetterhead: '' });
+    const [testForm, setTestForm] = useState({ testName: '', price: '', category: '', conditions: '', description: '', sampleType: '', turnaroundTime: '', reportDescription: '', reportLetterhead: '', isActive: true });
     const [templateRows, setTemplateRows] = useState([]);
     const [packageForm, setPackageForm] = useState({ packageName: '', price: '', category: 'Health Checkup', description: '', imageUrl: '', includedTests: [], parametersCount: '', homeCollection: true });
     const emptyUserForm = (role = '') => ({
@@ -126,7 +128,7 @@ const AdminDashboard = () => {
         e.preventDefault();
         try {
             const reportTemplate = templateRows
-                .map((row) => ({ parameter: row.parameter.trim(), unit: row.unit.trim(), referenceRange: row.referenceRange.trim() }))
+                .map((row) => ({ parameter: row.parameter.trim(), value: row.value.trim(), unit: row.unit.trim(), referenceRange: row.referenceRange.trim() }))
                 .filter((row) => row.parameter);
             if (templateMode && !reportTemplate.length) {
                 alert("Add at least one required report parameter.");
@@ -141,9 +143,10 @@ const AdminDashboard = () => {
                 await api.post('/api/admin/add-test', payload);
                 alert("Test added successfully.");
             }
-            setTestForm({ testName: '', price: '', category: '', conditions: '', description: '', reportDescription: '', reportLetterhead: '' });
+            setTestForm({ testName: '', price: '', category: '', conditions: '', description: '', sampleType: '', turnaroundTime: '', reportDescription: '', reportLetterhead: '', isActive: true });
             setTemplateRows([]);
             setTemplateTargetId("");
+            setTestFormStep("details");
             setView('availableTests');
             fetchData();
         } catch (err) {
@@ -198,9 +201,10 @@ const AdminDashboard = () => {
     const editTemplate = (type, item) => {
         setTemplateTargetId(`${type}:${item._id}`);
         setTestForm({ ...item, testName: item.testName || item.packageName });
-        setTemplateRows((item.reportTemplate || []).map((row) => ({ parameter: row.parameter || '', unit: row.unit || '', referenceRange: row.referenceRange || '' })));
+        setTemplateRows((item.reportTemplate || []).map((row) => ({ parameter: row.parameter || '', value: row.value || '', unit: row.unit || '', referenceRange: row.referenceRange || '' })));
         setView('addTest');
         setTemplateMode(true);
+        setTestFormStep("template");
     };
 
     const deleteTemplate = async (type, item) => {
@@ -229,6 +233,38 @@ const AdminDashboard = () => {
         }
     };
 
+    const openPdfBlob = (blob) => {
+        const url = URL.createObjectURL(blob);
+        window.open(url, "_blank", "noopener,noreferrer");
+        window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+    };
+
+    const viewAdminReport = async (booking) => {
+        if (!booking.report?._id) return;
+        try {
+            setDocumentAction(`report:${booking._id}`);
+            const response = await api.get(`/api/admin/reports/${booking.report._id}/download`, { responseType: "blob" });
+            openPdfBlob(response.data);
+        } catch (err) {
+            alert(err.response?.data?.message || "Report is not available yet.");
+        } finally {
+            setDocumentAction("");
+        }
+    };
+
+    const viewAdminReceipt = async (booking) => {
+        if (!booking.hasReceipt) return;
+        try {
+            setDocumentAction(`receipt:${booking._id}`);
+            const response = await api.get(`/api/receptionist/bookings/${booking._id}/receipt`, { responseType: "blob" });
+            openPdfBlob(response.data);
+        } catch (err) {
+            alert(err.response?.data?.message || "Receipt is not available yet.");
+        } finally {
+            setDocumentAction("");
+        }
+    };
+
     return (
         <div className="flex min-h-screen flex-col bg-slate-50 font-sans text-slate-900 lg:flex-row">
             {/* Sidebar */}
@@ -246,8 +282,8 @@ const AdminDashboard = () => {
                     <nav className="flex gap-2 overflow-x-auto pb-2 lg:flex-col lg:overflow-visible lg:pb-0">
                         <SidebarBtn active={view === 'dashboard'} onClick={() => setView('dashboard')} icon={<LayoutDashboard className="w-5 h-5" />} text="Dashboard" />
                         <SidebarBtn active={view === 'availableTests'} onClick={() => setView('availableTests')} icon={<FlaskConical className="w-5 h-5" />} text="Available Tests" />
-                        <SidebarBtn active={view === 'addTest' && !templateMode} onClick={() => { setTemplateMode(false); setView('addTest'); }} icon={<TestTube2 className="w-5 h-5" />} text="Add New Test" />
-                        <SidebarBtn active={view === 'addTest' && templateMode} onClick={() => { setTemplateMode(true); setTemplateTargetId(""); setTestForm({ testName: '', price: '', category: '', conditions: '', description: '', reportDescription: '', reportLetterhead: '' }); setTemplateRows([]); setView('addTest'); }} icon={<ClipboardList className="w-5 h-5" />} text="Report Templates" />
+                        <SidebarBtn active={view === 'addTest' && !templateMode} onClick={() => { setTemplateMode(false); setTemplateTargetId(""); setTestFormStep("details"); setView('addTest'); }} icon={<TestTube2 className="w-5 h-5" />} text="Add New Test" />
+                        <SidebarBtn active={view === 'addTest' && templateMode} onClick={() => { setTemplateMode(true); setTemplateTargetId(""); setTestForm({ testName: '', price: '', category: '', conditions: '', description: '', sampleType: '', turnaroundTime: '', reportDescription: '', reportLetterhead: '', isActive: true }); setTemplateRows([]); setTestFormStep("template"); setView('addTest'); }} icon={<ClipboardList className="w-5 h-5" />} text="Report Templates" />
                         <SidebarBtn active={view === 'availablePackages'} onClick={() => setView('availablePackages')} icon={<Boxes className="w-5 h-5" />} text="Health Packages" />
                         <SidebarBtn active={view === 'addPackage'} onClick={() => setView('addPackage')} icon={<PackagePlus className="w-5 h-5" />} text="Add New Package" />
                         <SidebarBtn active={view === 'addUser'} onClick={openAddUser} icon={<UserPlus className="w-5 h-5" />} text="Add User" />
@@ -321,6 +357,8 @@ const AdminDashboard = () => {
                             </div>
                         </div>
 
+                        <RevenueBreakdown finance={metrics?.finance} />
+
                         <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
                             <div className="border-b border-slate-100 p-5">
                                 <h3 className="font-bold text-emerald-950">Recent Booking Activity</h3>
@@ -337,6 +375,8 @@ const AdminDashboard = () => {
                                             <th className="p-4">Booking</th>
                                             <th className="p-4">Payment</th>
                                             <th className="p-4 text-right">Amount</th>
+                                            <th className="p-4 text-center">Report</th>
+                                            <th className="p-4 text-center">Receipt</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -349,11 +389,25 @@ const AdminDashboard = () => {
                                                 <td className="p-4"><StatusPill value={booking.bookingStatus} /></td>
                                                 <td className="p-4"><StatusPill value={booking.paymentStatus} /></td>
                                                 <td className="p-4 text-right font-bold">INR {booking.amount || 0}</td>
+                                                <td className="p-4 text-center">
+                                                    {booking.report?.status === "Approved" ? (
+                                                        <button type="button" onClick={() => viewAdminReport(booking)} disabled={documentAction === `report:${booking._id}`} className="inline-flex items-center gap-1 rounded-lg bg-emerald-700 px-3 py-2 text-xs font-black text-white hover:bg-emerald-800 disabled:opacity-60">
+                                                            <FileText size={14} /> {documentAction === `report:${booking._id}` ? "Opening" : "View"}
+                                                        </button>
+                                                    ) : <PendingLabel text={booking.report ? booking.report.status : "Pending"} />}
+                                                </td>
+                                                <td className="p-4 text-center">
+                                                    {booking.hasReceipt ? (
+                                                        <button type="button" onClick={() => viewAdminReceipt(booking)} disabled={documentAction === `receipt:${booking._id}`} className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-black text-emerald-800 hover:bg-emerald-50 disabled:opacity-60">
+                                                            <ReceiptText size={14} /> {documentAction === `receipt:${booking._id}` ? "Opening" : "View"}
+                                                        </button>
+                                                    ) : <PendingLabel text="Pending" />}
+                                                </td>
                                             </tr>
                                         ))}
                                         {!metrics?.recentBookings?.length && (
                                             <tr>
-                                                <td colSpan="7" className="p-8 text-center text-slate-500">No booking activity yet.</td>
+                                                <td colSpan="9" className="p-8 text-center text-slate-500">No booking activity yet.</td>
                                             </tr>
                                         )}
                                     </tbody>
@@ -468,26 +522,59 @@ const AdminDashboard = () => {
 
                 {/* Add Test View */}
                 {view === 'addTest' && (
-                    <div className="max-w-2xl mx-auto space-y-8">
-                        <h1 className="text-3xl font-bold text-emerald-950 text-center">{templateMode ? 'Create Test Report Template' : 'Create Lab Test'}</h1>
-                        {templateMode && <p className="text-center text-slate-500">Set up the test details and the parameter rows technicians will use when entering results.</p>}
-                        <form onSubmit={handleAddTest} className="bg-white p-5 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
-                            {templateMode && <div className="space-y-2"><label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Choose Test or Package</label><select required value={templateTargetId} onChange={(e) => { const [type, id] = e.target.value.split(':'); const selected = type === 'package' ? packages.find((item) => item._id === id) : tests.find((item) => item._id === id); setTemplateTargetId(e.target.value); if (selected) { setTestForm({ ...selected, testName: selected.testName || selected.packageName }); setTemplateRows((selected.reportTemplate || []).map((row) => ({ parameter: row.parameter || '', unit: row.unit || '', referenceRange: row.referenceRange || '' }))); } }} className="w-full rounded-xl border border-slate-200 bg-slate-50 p-4 outline-none focus:ring-2 focus:ring-emerald-500"><option value="">Select an existing test or package</option><optgroup label="Tests">{tests.map((test) => <option key={test._id} value={`test:${test._id}`}>{test.testName}</option>)}</optgroup><optgroup label="Packages">{packages.map((item) => <option key={item._id} value={`package:${item._id}`}>{item.packageName}</option>)}</optgroup></select></div>}
-                            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                                <FormInput label="Test Name" value={testForm.testName} onChange={(e) => setTestForm({...testForm, testName: e.target.value})} required />
-                                <FormInput label="Price (INR)" type="number" value={testForm.price} onChange={(e) => setTestForm({...testForm, price: e.target.value})} required />
-                            </div>
-                            <FormInput label="Category" value={testForm.category} onChange={(e) => setTestForm({...testForm, category: e.target.value})} required />
-                            {!templateMode && <FormInput label="Conditions" value={testForm.conditions} onChange={(e) => setTestForm({...testForm, conditions: e.target.value})} />}
-                            {!templateMode && <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Description</label>
-                                <textarea className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none h-32" 
-                                    value={testForm.description} onChange={(e) => setTestForm({...testForm, description: e.target.value})} required />
-                            </div>}
-                            <div className="space-y-2"><label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Report Letterhead</label><textarea className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none h-24" value={testForm.reportLetterhead || ''} onChange={(e) => setTestForm({...testForm, reportLetterhead: e.target.value})} placeholder={'INDIPATH DIAGNOSTIC LAB\n22 Mahapurush Complex, Kankavali\nPhone: 02367-231970'} /><p className="text-xs text-slate-400">This is shown at the top of the technician entry form and saved with the report.</p></div>
-                            <div className="space-y-2"><label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Report Description (optional)</label><textarea className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none h-24" value={testForm.reportDescription} onChange={(e) => setTestForm({...testForm, reportDescription: e.target.value})} placeholder="This description will appear above the results on the report." /></div>
-                            <div className="space-y-3"><div className="flex items-center justify-between"><label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Required Report Parameters</label><button type="button" onClick={() => setTemplateRows([...templateRows, { parameter: '', unit: '', referenceRange: '' }])} className="rounded-lg border border-emerald-200 px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-50">Add parameter</button></div>{templateRows.length === 0 && <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">Add each required parameter here. The technician can enter only the result value later.</p>}{templateRows.map((row, index) => <div key={index} className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 md:grid-cols-[1.4fr_1fr_1fr_auto]"><input required placeholder="Parameter name (e.g., Hemoglobin)" value={row.parameter} onChange={(e) => setTemplateRows(templateRows.map((item, i) => i === index ? { ...item, parameter: e.target.value } : item))} className="rounded-lg border border-slate-200 bg-white p-2 text-sm outline-none" /><input placeholder="Unit (e.g., g/dL)" value={row.unit} onChange={(e) => setTemplateRows(templateRows.map((item, i) => i === index ? { ...item, unit: e.target.value } : item))} className="rounded-lg border border-slate-200 bg-white p-2 text-sm outline-none" /><input placeholder="Reference range" value={row.referenceRange} onChange={(e) => setTemplateRows(templateRows.map((item, i) => i === index ? { ...item, referenceRange: e.target.value } : item))} className="rounded-lg border border-slate-200 bg-white p-2 text-sm outline-none" /><button type="button" onClick={() => setTemplateRows(templateRows.filter((_, i) => i !== index))} className="rounded-lg px-3 text-xs font-bold text-red-600 hover:bg-red-50">Remove</button></div>)}<p className="text-xs text-slate-400">Parameter name, unit, and reference range are saved by the admin and pre-filled in the technician report.</p></div>
-                            <button type="submit" className="w-full bg-emerald-800 text-white py-4 rounded-xl font-bold hover:bg-emerald-900 transition-all">{templateMode ? 'Save Test Template' : 'Publish Test'}</button>
+                    <div className="mx-auto max-w-5xl space-y-8">
+                        <header className="text-center">
+                            <h1 className="text-3xl font-bold text-emerald-950">{templateMode ? 'Create Test Report Template' : 'Create Lab Test'}</h1>
+                            <p className="mt-2 text-slate-500">Fill patient-visible test details first, then configure the technician report template.</p>
+                        </header>
+                        <div className="grid gap-3 rounded-2xl border border-emerald-100 bg-white p-3 shadow-sm sm:grid-cols-2">
+                            <button type="button" onClick={() => setTestFormStep("details")} className={`rounded-xl px-4 py-3 text-left font-bold transition ${testFormStep === "details" ? "bg-emerald-700 text-white" : "bg-emerald-50 text-emerald-900 hover:bg-emerald-100"}`}>Patient Visible Details</button>
+                            <button type="button" onClick={() => setTestFormStep("template")} className={`rounded-xl px-4 py-3 text-left font-bold transition ${testFormStep === "template" ? "bg-emerald-700 text-white" : "bg-emerald-50 text-emerald-900 hover:bg-emerald-100"}`}>Report Template</button>
+                        </div>
+                        <form onSubmit={handleAddTest} className="space-y-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
+                            {templateMode && <TemplateTargetSelector tests={tests} packages={packages} templateTargetId={templateTargetId} onChange={(value, selected) => { setTemplateTargetId(value); if (selected) { setTestForm({ ...selected, testName: selected.testName || selected.packageName }); setTemplateRows((selected.reportTemplate || []).map((row) => ({ parameter: row.parameter || '', value: row.value || '', unit: row.unit || '', referenceRange: row.referenceRange || '' }))); } }} />}
+
+                            {testFormStep === "details" && (
+                                <section className="space-y-6">
+                                    <div>
+                                        <h2 className="text-xl font-bold text-emerald-950">Patient Visible Details</h2>
+                                        <p className="text-sm text-slate-500">These details appear in patient booking cards and catalog screens.</p>
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                                        <FormInput label="Test Name" value={testForm.testName} onChange={(e) => setTestForm({...testForm, testName: e.target.value})} required />
+                                        <FormInput label="Price (INR)" type="number" value={testForm.price} onChange={(e) => setTestForm({...testForm, price: e.target.value})} required />
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                                        <FormInput label="Category" value={testForm.category} onChange={(e) => setTestForm({...testForm, category: e.target.value})} required />
+                                        <FormInput label="Turnaround Time" value={testForm.turnaroundTime} onChange={(e) => setTestForm({...testForm, turnaroundTime: e.target.value})} placeholder="12-24 hours" />
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                                        <FormInput label="Sample Type" value={testForm.sampleType} onChange={(e) => setTestForm({...testForm, sampleType: e.target.value})} placeholder="Blood / Serum / Urine" />
+                                        <FormInput label="Conditions" value={testForm.conditions} onChange={(e) => setTestForm({...testForm, conditions: e.target.value})} placeholder="Fasting required, if any" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold uppercase tracking-widest text-slate-400">Description</label>
+                                        <textarea className="h-32 w-full rounded-xl border border-slate-200 bg-slate-50 p-4 outline-none focus:ring-2 focus:ring-emerald-500" value={testForm.description} onChange={(e) => setTestForm({...testForm, description: e.target.value})} required />
+                                    </div>
+                                    <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
+                                        <input type="checkbox" checked={testForm.isActive !== false} onChange={(e) => setTestForm({...testForm, isActive: e.target.checked})} /> Publish test to patient catalog
+                                    </label>
+                                    <button type="button" onClick={() => setTestFormStep("template")} className="w-full rounded-xl border border-emerald-200 bg-emerald-50 py-4 font-bold text-emerald-800 transition-all hover:bg-emerald-100">Continue to Report Template</button>
+                                </section>
+                            )}
+
+                            {testFormStep === "template" && (
+                                <section className="space-y-6">
+                                    <div>
+                                        <h2 className="text-xl font-bold text-emerald-950">Report Template</h2>
+                                        <p className="text-sm text-slate-500">These rows appear for the technician while entering report values.</p>
+                                    </div>
+                                    <div className="space-y-2"><label className="text-xs font-bold uppercase tracking-widest text-slate-400">Report Letterhead</label><textarea className="h-24 w-full rounded-xl border border-slate-200 bg-slate-50 p-4 outline-none focus:ring-2 focus:ring-emerald-500" value={testForm.reportLetterhead || ''} onChange={(e) => setTestForm({...testForm, reportLetterhead: e.target.value})} placeholder={'INDIPATH DIAGNOSTIC LAB\n22 Mahapurush Complex, Kankavali\nPhone: 02367-231970'} /></div>
+                                    <div className="space-y-2"><label className="text-xs font-bold uppercase tracking-widest text-slate-400">Report Description</label><textarea className="h-24 w-full rounded-xl border border-slate-200 bg-slate-50 p-4 outline-none focus:ring-2 focus:ring-emerald-500" value={testForm.reportDescription} onChange={(e) => setTestForm({...testForm, reportDescription: e.target.value})} placeholder="This description appears above the result table." /></div>
+                                    <TemplateRows rows={templateRows} setRows={setTemplateRows} />
+                                    <button type="submit" className="w-full rounded-xl bg-emerald-800 py-4 font-bold text-white transition-all hover:bg-emerald-900">{templateMode ? 'Save Test Template' : 'Publish Test'}</button>
+                                </section>
+                            )}
                         </form>
                         {templateMode && <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><h2 className="text-lg font-bold text-emerald-950">Saved Report Templates</h2><div className="mt-4 space-y-3">{[...tests.map((item) => ({ type: 'test', item })), ...packages.map((item) => ({ type: 'package', item }))].filter(({ item }) => item.reportTemplate?.length || item.reportLetterhead || item.reportDescription).map(({ type, item }) => <div key={`${type}-${item._id}`} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-4"><div><p className="font-bold text-slate-800">{item.testName || item.packageName}</p><p className="text-xs text-slate-500">{item.reportTemplate?.length || 0} required parameter(s)</p></div><div className="flex gap-2"><button type="button" onClick={() => editTemplate(type, item)} className="rounded-lg border border-emerald-200 px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-50">Edit</button><button type="button" onClick={() => deleteTemplate(type, item)} className="rounded-lg border border-red-200 px-3 py-2 text-sm font-bold text-red-700 hover:bg-red-50">Delete</button></div></div>)}{![...tests, ...packages].some((item) => item.reportTemplate?.length || item.reportLetterhead || item.reportDescription) && <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">No report templates saved yet.</p>}</div></section>}
                     </div>
@@ -591,6 +678,106 @@ const SidebarBtn = ({ active, onClick, icon, text }) => (
     </button>
 );
 
+const RevenueBreakdown = ({ finance }) => {
+    const rows = finance?.revenueByMethod || [];
+    const total = rows.reduce((sum, row) => sum + Number(row.total || 0), 0);
+    const segments = buildPieSegments(rows);
+
+    return (
+        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-5 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+                <div>
+                    <h3 className="font-bold text-emerald-950">Revenue Breakdown</h3>
+                    <p className="text-sm text-slate-500">Paid revenue split by cash, UPI and card collections</p>
+                </div>
+                <span className="rounded-md bg-emerald-50 px-3 py-1 text-xs font-black uppercase tracking-wider text-emerald-700">{formatCurrency(total)} collected</span>
+            </div>
+            <div className="grid gap-6 lg:grid-cols-[280px_1fr] lg:items-center">
+                <div className="flex justify-center">
+                    <svg viewBox="0 0 120 120" className="h-56 w-56" aria-label="Revenue payment method pie chart">
+                        <circle cx="60" cy="60" r="48" fill="#ecfdf5" />
+                        {segments.map((segment) => (
+                            <circle
+                                key={segment.method}
+                                cx="60"
+                                cy="60"
+                                r="48"
+                                fill="transparent"
+                                stroke={segment.color}
+                                strokeWidth="24"
+                                strokeDasharray={`${segment.length} ${segment.gap}`}
+                                strokeDashoffset={segment.offset}
+                                transform="rotate(-90 60 60)"
+                            />
+                        ))}
+                        <circle cx="60" cy="60" r="31" fill="#ffffff" />
+                        <text x="60" y="57" textAnchor="middle" className="fill-emerald-950 text-[10px] font-black">Revenue</text>
+                        <text x="60" y="70" textAnchor="middle" className="fill-slate-500 text-[7px] font-bold">{total ? "Paid" : "No data"}</text>
+                    </svg>
+                </div>
+                <div className="grid gap-3 md:grid-cols-3">
+                    {rows.map((row) => (
+                        <div key={row.method} className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                            <div className="flex items-center gap-2">
+                                <span className={`h-3 w-3 rounded-full ${methodDotClass(row.method)}`} />
+                                <p className="text-xs font-black uppercase tracking-widest text-slate-500">{row.method || "other"}</p>
+                            </div>
+                            <p className="mt-3 text-xl font-black text-emerald-950">{formatCurrency(row.total)}</p>
+                            <p className="mt-1 text-sm font-bold text-slate-500">{row.percent || 0}% of paid revenue</p>
+                            <p className="text-xs text-slate-400">{row.count || 0} payment(s)</p>
+                        </div>
+                    ))}
+                    {!rows.length && <p className="rounded-xl bg-slate-50 p-4 text-sm font-semibold text-slate-500 md:col-span-3">No paid revenue available yet.</p>}
+                </div>
+            </div>
+        </section>
+    );
+};
+
+const PendingLabel = ({ text = "Pending" }) => (
+    <span className="inline-flex rounded-lg bg-amber-50 px-3 py-2 text-xs font-black uppercase tracking-wide text-amber-700">{text || "Pending"}</span>
+);
+
+const TemplateTargetSelector = ({ tests, packages, templateTargetId, onChange }) => (
+    <div className="space-y-2">
+        <label className="text-xs font-bold uppercase tracking-widest text-slate-400">Choose Test or Package</label>
+        <select
+            required
+            value={templateTargetId}
+            onChange={(e) => {
+                const [type, id] = e.target.value.split(':');
+                const selected = type === 'package' ? packages.find((item) => item._id === id) : tests.find((item) => item._id === id);
+                onChange(e.target.value, selected);
+            }}
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 p-4 outline-none focus:ring-2 focus:ring-emerald-500"
+        >
+            <option value="">Select an existing test or package</option>
+            <optgroup label="Tests">{tests.map((test) => <option key={test._id} value={`test:${test._id}`}>{test.testName}</option>)}</optgroup>
+            <optgroup label="Packages">{packages.map((item) => <option key={item._id} value={`package:${item._id}`}>{item.packageName}</option>)}</optgroup>
+        </select>
+    </div>
+);
+
+const TemplateRows = ({ rows, setRows }) => (
+    <div className="space-y-3">
+        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+            <label className="text-xs font-bold uppercase tracking-widest text-slate-400">Required Report Parameters</label>
+            <button type="button" onClick={() => setRows([...rows, { parameter: '', value: '', unit: '', referenceRange: '' }])} className="rounded-lg border border-emerald-200 px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-50">Add Parameter</button>
+        </div>
+        {rows.length === 0 && <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">Add parameter rows such as Hemoglobin, value placeholder, unit and reference range.</p>}
+        {rows.map((row, index) => (
+            <div key={index} className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 lg:grid-cols-[1.25fr_1fr_0.75fr_1fr_auto]">
+                <input required placeholder="Parameter name" value={row.parameter} onChange={(e) => setRows(rows.map((item, i) => i === index ? { ...item, parameter: e.target.value } : item))} className="rounded-lg border border-slate-200 bg-white p-2 text-sm outline-none focus:border-emerald-500" />
+                <input placeholder="Value / placeholder" value={row.value} onChange={(e) => setRows(rows.map((item, i) => i === index ? { ...item, value: e.target.value } : item))} className="rounded-lg border border-slate-200 bg-white p-2 text-sm outline-none focus:border-emerald-500" />
+                <input placeholder="Unit" value={row.unit} onChange={(e) => setRows(rows.map((item, i) => i === index ? { ...item, unit: e.target.value } : item))} className="rounded-lg border border-slate-200 bg-white p-2 text-sm outline-none focus:border-emerald-500" />
+                <input placeholder="Reference range" value={row.referenceRange} onChange={(e) => setRows(rows.map((item, i) => i === index ? { ...item, referenceRange: e.target.value } : item))} className="rounded-lg border border-slate-200 bg-white p-2 text-sm outline-none focus:border-emerald-500" />
+                <button type="button" onClick={() => setRows(rows.filter((_, i) => i !== index))} className="rounded-lg px-3 text-xs font-bold text-red-600 hover:bg-red-50">Remove</button>
+            </div>
+        ))}
+        <p className="text-xs text-slate-400">Admin-saved parameters are pre-filled for technicians; technicians complete or adjust result values during report entry.</p>
+    </div>
+);
+
 const StatsCard = ({ title, value, icon, color }) => (
     <div className="bg-white p-6 rounded-lg border border-slate-100 flex items-center gap-5 shadow-sm">
         <div className={`w-14 h-14 ${color} rounded-lg flex items-center justify-center text-white shadow-lg`}>{icon}</div>
@@ -637,6 +824,43 @@ const StatusPill = ({ value }) => {
 };
 
 const formatCurrency = (value = 0) => `INR ${Number(value || 0).toLocaleString("en-IN")}`;
+
+const methodColors = {
+    cash: "#16a34a",
+    upi: "#2563eb",
+    card: "#f97316"
+};
+
+const methodDotClass = (method) => ({
+    cash: "bg-green-600",
+    upi: "bg-blue-600",
+    card: "bg-orange-500"
+}[method] || "bg-slate-400");
+
+const buildPieSegments = (rows = []) => {
+    const circumference = 2 * Math.PI * 48;
+    const total = rows.reduce((sum, row) => sum + Number(row.total || 0), 0);
+    let used = 0;
+
+    if (!total) {
+        return [{ method: "empty", color: "#d1fae5", length: circumference, gap: 0, offset: 0 }];
+    }
+
+    return rows
+        .filter((row) => Number(row.total || 0) > 0)
+        .map((row) => {
+            const length = (Number(row.total || 0) / total) * circumference;
+            const segment = {
+                method: row.method,
+                color: methodColors[row.method] || "#94a3b8",
+                length,
+                gap: circumference - length,
+                offset: -used
+            };
+            used += length;
+            return segment;
+        });
+};
 
 const FormInput = ({ label, ...props }) => (
     <div className="space-y-2 flex-1">

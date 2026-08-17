@@ -12,6 +12,7 @@ const testSchema = new mongoose.Schema({
     reportLetterhead: { type: String, default: "" },
     reportTemplate: [{
         parameter: { type: String, required: true },
+        value: { type: String, default: "" },
         unit: { type: String, default: "" },
         referenceRange: { type: String, default: "" }
     }],
