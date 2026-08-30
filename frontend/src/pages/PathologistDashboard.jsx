@@ -23,6 +23,7 @@ function PathologistDashboard() {
   const [reportMonth, setReportMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [monthlyData, setMonthlyData] = useState(null);
   const [monthlyLoading, setMonthlyLoading] = useState(false);
+  const [monthlyRefresh, setMonthlyRefresh] = useState(0);
 
   const loadReports = async () => {
     setReports(await getPathologistReports());
@@ -55,7 +56,7 @@ function PathologistDashboard() {
       .catch(() => { if (isMounted) setMonthlyData(null); alert("Unable to load monthly report"); })
       .finally(() => { if (isMounted) setMonthlyLoading(false); });
     return () => { isMounted = false; };
-  }, [activeSection, reportMonth]);
+  }, [activeSection, reportMonth, monthlyRefresh]);
 
   const filteredReports = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
@@ -131,6 +132,7 @@ function PathologistDashboard() {
       alert(data.message);
       setSelectedReport(null);
       await loadReports();
+      setMonthlyRefresh((value) => value + 1);
     } catch (error) {
       alert(error.response?.data?.message || "Approval failed");
     }
@@ -147,6 +149,7 @@ function PathologistDashboard() {
       alert(data.message);
       setSelectedReport(null);
       await loadReports();
+      setMonthlyRefresh((value) => value + 1);
     } catch (error) {
       alert(error.response?.data?.message || "Rejection failed");
     }
@@ -415,6 +418,7 @@ function ReportsTable({ reports, section, onView }) {
             <th className="p-3">Report ID</th>
             <th className="p-3">Patient Name</th>
             <th className="p-3">Test Name</th>
+            <th className="p-3">Status</th>
             {section === "approved" ? <th className="p-3">Approved Date</th> : <th className="p-3">Technician Name</th>}
             {section === "rejected" ? <th className="p-3">Rejection Reason</th> : <th className="p-3">Submitted Date</th>}
             <th className="p-3 text-right">Action</th>
@@ -427,6 +431,7 @@ function ReportsTable({ reports, section, onView }) {
               <td className="p-3 font-black text-emerald-700">{report.reportId || "N/A"}</td>
               <td className="p-3 font-bold text-slate-800">{report.userId?.name || report.bookingId?.name || "N/A"}</td>
               <td className="p-3">{report.testName}</td>
+              <td className="p-3"><StatusBadge value={report.status} /></td>
               <td className="p-3">{section === "approved" ? formatDate(report.approvedAt) : report.technicianId?.name || "N/A"}</td>
               <td className="p-3">{section === "rejected" ? report.rejectionReason || "N/A" : formatDate(report.submittedAt || report.updatedAt)}</td>
               <td className="p-3 text-right">
