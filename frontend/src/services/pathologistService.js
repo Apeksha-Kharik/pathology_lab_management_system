@@ -10,6 +10,11 @@ export const getPathologistReports = async () => {
   return response.data;
 };
 
+export const getPathologistMonthlyReport = async (month) => {
+  const response = await api.get("/api/pathologist/reports/monthly", { params: { month } });
+  return response.data;
+};
+
 export const getPathologistProfile = async () => {
   const response = await api.get("/api/pathologist/profile");
   return response.data;
