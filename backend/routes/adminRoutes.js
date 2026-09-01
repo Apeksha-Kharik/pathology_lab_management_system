@@ -10,6 +10,7 @@ const {
   updateTest,
   deleteTest,
   getPackages,
+  getPackageById,
   addPackage,
   deletePackage
   ,updatePackage
@@ -28,6 +29,7 @@ router.post("/add-test", protect, allowRoles("admin"), addTest);
 router.put("/test/:id", protect, allowRoles("admin"), updateTest);
 router.delete("/test/:id", protect, allowRoles("admin"), deleteTest);
 router.get("/packages", protect, allowRoles("admin"), getPackages);
+router.get("/packages/:id", protect, allowRoles("admin"), getPackageById);
 router.post("/packages", protect, allowRoles("admin"), addPackage);
 router.delete("/packages/:id", protect, allowRoles("admin"), deletePackage);
 router.put("/packages/:id", protect, allowRoles("admin"), updatePackage);

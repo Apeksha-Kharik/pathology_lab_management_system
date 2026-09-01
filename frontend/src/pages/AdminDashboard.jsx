@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
-import packageFallbackImage from '../assets/bg1.png';
 import { 
     LayoutDashboard, TestTube2, UserPlus, LogOut, Trash2,
     Activity, FlaskConical, IndianRupee, Plus, Eye, FileText, ReceiptText,
@@ -44,7 +43,13 @@ const AdminDashboard = () => {
 
     const [testForm, setTestForm] = useState({ testName: '', price: '', category: '', conditions: '', description: '', sampleType: '', turnaroundTime: '', reportDescription: '', reportLetterhead: '', isActive: true });
     const [templateRows, setTemplateRows] = useState([]);
-    const [packageForm, setPackageForm] = useState({ packageName: '', price: '', category: 'Health Checkup', description: '', imageUrl: '', includedTests: [], parametersCount: '', homeCollection: true });
+    const emptyPackageForm = () => ({ packageName:'', packageCode:'', price:'', discountPrice:'', status:'active', category:'Health Checkup', description:'', imageUrl:'', includedTests:[], homeCollection:true });
+    const [packageForm,setPackageForm]=useState(()=>emptyPackageForm());
+    const [packageTestSearch,setPackageTestSearch]=useState('');
+    const [editingPackageId,setEditingPackageId]=useState('');
+    const [viewingPackage,setViewingPackage]=useState(null);
+    const [packageSaving,setPackageSaving]=useState(false);
+    const [packageError,setPackageError]=useState('');
     const emptyUserForm = (role = '') => ({
         name: '', email: '', password: '', phone: '', qualification: '', role,
         age: '', gender: '', dateOfBirth: '', address: '', city: '', state: '',
@@ -185,19 +190,9 @@ const AdminDashboard = () => {
     }
 };
 
-    const handleAddPackage = async (e) => {
-        e.preventDefault();
-        try {
-            await api.post('/api/admin/packages', packageForm);
-            alert('Package added successfully.');
-            setPackageForm({ packageName: '', price: '', category: 'Health Checkup', description: '', imageUrl: '', includedTests: [], parametersCount: '', homeCollection: true });
-            setView('availablePackages');
-            fetchData();
-        } catch (err) {
-            alert(err.response?.data?.message || 'Failed to add package.');
-        }
-    };
-
+    const openCreatePackage=()=>{setEditingPackageId('');setPackageForm(emptyPackageForm());setPackageError('');setView('addPackage');};
+    const openEditPackage=(item)=>{setEditingPackageId(item._id);setPackageForm({packageName:item.packageName||'',packageCode:item.packageCode||'',price:item.price??'',discountPrice:item.discountPrice??'',status:item.status||(item.isActive===false?'inactive':'active'),category:item.category||'Health Checkup',description:item.description||'',imageUrl:item.imageUrl||'',includedTests:[...new Set((item.includedTests||[]).map(test=>test._id||test))],homeCollection:item.homeCollection!==false});setPackageError('');setView('addPackage');};
+    const handleAddPackage=async(e)=>{e.preventDefault();setPackageError('');const includedTests=[...new Set(packageForm.includedTests)];if(!includedTests.length){setPackageError('Select at least one active test for this package.');return;}try{setPackageSaving(true);const payload={...packageForm,includedTests};if(editingPackageId)await api.put(`/api/admin/packages/${editingPackageId}`,payload);else await api.post('/api/admin/packages',payload);alert(`Package ${editingPackageId?'updated':'created'} successfully.`);setPackageForm(emptyPackageForm());setEditingPackageId('');setView('availablePackages');await fetchData();}catch(err){setPackageError(err.response?.data?.message||'Failed to save package.');}finally{setPackageSaving(false);}};
     const editTemplate = (type, item) => {
         setTemplateTargetId(`${type}:${item._id}`);
         setTestForm({ ...item, testName: item.testName || item.packageName });
@@ -285,7 +280,7 @@ const AdminDashboard = () => {
                         <SidebarBtn active={view === 'addTest' && !templateMode} onClick={() => { setTemplateMode(false); setTemplateTargetId(""); setTestFormStep("details"); setView('addTest'); }} icon={<TestTube2 className="w-5 h-5" />} text="Add New Test" />
                         <SidebarBtn active={view === 'addTest' && templateMode} onClick={() => { setTemplateMode(true); setTemplateTargetId(""); setTestForm({ testName: '', price: '', category: '', conditions: '', description: '', sampleType: '', turnaroundTime: '', reportDescription: '', reportLetterhead: '', isActive: true }); setTemplateRows([]); setTestFormStep("template"); setView('addTest'); }} icon={<ClipboardList className="w-5 h-5" />} text="Report Templates" />
                         <SidebarBtn active={view === 'availablePackages'} onClick={() => setView('availablePackages')} icon={<Boxes className="w-5 h-5" />} text="Health Packages" />
-                        <SidebarBtn active={view === 'addPackage'} onClick={() => setView('addPackage')} icon={<PackagePlus className="w-5 h-5" />} text="Add New Package" />
+                        <SidebarBtn active={view === 'addPackage'} onClick={openCreatePackage} icon={<PackagePlus className="w-5 h-5" />} text="Add New Package" />
                         <SidebarBtn active={view === 'addUser'} onClick={openAddUser} icon={<UserPlus className="w-5 h-5" />} text="Add User" />
                     </nav>
                 </div>
@@ -479,46 +474,8 @@ const AdminDashboard = () => {
                     </div>
                 )}
 
-                {view === 'availablePackages' && (
-                    <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
-                        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-                            <div>
-                                <h1 className="text-3xl font-bold text-emerald-950">Health Packages</h1>
-                                <p className="text-slate-500">Packages patients can view and book from their portal</p>
-                            </div>
-                            <button onClick={() => setView('addPackage')} className="flex items-center gap-2 bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-emerald-700/15 hover:bg-emerald-800 transition-all">
-                                <PackagePlus size={18} /> Add New Package
-                            </button>
-                        </div>
-                        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-                            {packages.length ? packages.map((item) => (
-                                <div key={item._id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                                    <img src={item.imageUrl || packageFallbackImage} onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = packageFallbackImage; }} alt={item.packageName} className="h-40 w-full object-cover" />
-                                    <div className="p-5">
-                                        <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-widest text-emerald-700">{item.category}</p><h3 className="mt-1 text-lg font-bold text-slate-800">{item.packageName}</h3></div><button onClick={() => deletePackage(item._id)} className="text-slate-300 hover:text-red-500"><Trash2 size={19} /></button></div>
-                                        <p className="mt-3 min-h-10 text-sm text-slate-500">{item.description || 'Comprehensive health checkup package.'}</p>
-                                        <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4"><span className="font-black text-emerald-900">INR {item.price}</span><span className="text-xs font-semibold text-slate-500">{item.includedTests?.length || item.parametersCount || 0} tests included</span></div>
-                                    </div>
-                                </div>
-                            )) : <p className="col-span-full py-10 text-center text-slate-500">No packages have been added yet.</p>}
-                        </div>
-                    </div>
-                )}
-
-                {view === 'addPackage' && (
-                    <div className="max-w-3xl mx-auto space-y-8">
-                        <div className="text-center"><h1 className="text-3xl font-bold text-emerald-950">Create Health Package</h1><p className="mt-2 text-slate-500">Add the package details, an image, and the tests it includes.</p></div>
-                        <form onSubmit={handleAddPackage} className="bg-white p-5 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
-                            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2"><FormInput label="Package Name" value={packageForm.packageName} onChange={(e) => setPackageForm({...packageForm, packageName: e.target.value})} required /><FormInput label="Price (INR)" type="number" min="0" value={packageForm.price} onChange={(e) => setPackageForm({...packageForm, price: e.target.value})} required /></div>
-                            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2"><FormInput label="Category" value={packageForm.category} onChange={(e) => setPackageForm({...packageForm, category: e.target.value})} /><div><FormInput label="Image URL" type="url" placeholder="https://example.com/package.jpg" value={packageForm.imageUrl} onChange={(e) => setPackageForm({...packageForm, imageUrl: e.target.value})} /><p className="mt-2 text-xs text-slate-400">Use a direct .jpg, .png, or .webp image address—not a Google Images or Drive preview page.</p></div></div>
-                            <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50"><img src={packageForm.imageUrl || packageFallbackImage} onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = packageFallbackImage; }} alt="Package image preview" className="h-40 w-full object-cover" /></div>
-                            <div className="space-y-2"><label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Included Tests</label><select multiple value={packageForm.includedTests} onChange={(e) => setPackageForm({...packageForm, includedTests: Array.from(e.target.selectedOptions, (option) => option.value)})} className="h-40 w-full rounded-xl border border-slate-200 bg-slate-50 p-3 outline-none focus:ring-2 focus:ring-emerald-500">{tests.map((test) => <option key={test._id} value={test._id}>{test.testName}</option>)}</select><p className="text-xs text-slate-400">Hold Ctrl (or Cmd) to select multiple tests.</p></div>
-                            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2"><FormInput label="Parameters Count (optional)" type="number" min="0" value={packageForm.parametersCount} onChange={(e) => setPackageForm({...packageForm, parametersCount: e.target.value})} /><label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700"><input type="checkbox" checked={packageForm.homeCollection} onChange={(e) => setPackageForm({...packageForm, homeCollection: e.target.checked})} /> Home sample collection available</label></div>
-                            <div className="space-y-2"><label className="text-xs font-bold text-slate-400 uppercase tracking-widest">Description</label><textarea required value={packageForm.description} onChange={(e) => setPackageForm({...packageForm, description: e.target.value})} className="h-28 w-full rounded-xl border border-slate-200 bg-slate-50 p-4 outline-none focus:ring-2 focus:ring-emerald-500" placeholder="Describe who this package is for and what it covers." /></div>
-                            <button type="submit" className="w-full bg-emerald-800 text-white py-4 rounded-xl font-bold hover:bg-emerald-900 transition-all">Publish Package</button>
-                        </form>
-                    </div>
-                )}
+                {view === 'availablePackages'&&(<div className="space-y-8"><div className="flex justify-between"><div><h1 className="text-3xl font-bold text-emerald-950">Package Management</h1><p className="text-slate-500">Manage test packages available to patients.</p></div><button onClick={openCreatePackage} className="rounded-xl bg-emerald-700 px-5 py-3 font-bold text-white">Create Package</button></div><div className="overflow-x-auto rounded-2xl border bg-white"><table className="w-full min-w-[850px] text-left text-sm"><thead className="bg-emerald-50"><tr>{['Package Name','Code','Price','Number of Tests','Status','Actions'].map(x=><th key={x} className="p-4">{x}</th>)}</tr></thead><tbody>{packages.map(item=><tr key={item._id} className="border-t"><td className="p-4 font-bold">{item.packageName}</td><td className="p-4 font-mono">{item.packageCode||'Legacy'}</td><td className="p-4 font-black">INR {item.discountPrice??item.price}</td><td className="p-4">{item.includedTests?.length||0}</td><td className="p-4 uppercase">{item.status||(item.isActive===false?'inactive':'active')}</td><td className="p-4"><div className="flex gap-2"><button onClick={()=>setViewingPackage(item)} className="rounded border px-3 py-2 text-emerald-700">View Tests</button><button onClick={()=>openEditPackage(item)} className="rounded border px-3 py-2 text-blue-700">Edit</button><button onClick={()=>deletePackage(item._id)} className="rounded border px-3 py-2 text-red-700">Delete</button></div></td></tr>)}</tbody></table></div>{viewingPackage&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={()=>setViewingPackage(null)}><div className="max-h-[80vh] w-full max-w-xl overflow-auto rounded-3xl bg-white p-6" onClick={e=>e.stopPropagation()}><div className="flex justify-between"><h2 className="text-2xl font-black">{viewingPackage.packageName}</h2><button onClick={()=>setViewingPackage(null)}>Close</button></div><div className="mt-4 space-y-2">{viewingPackage.includedTests?.map((test,i)=><p key={test._id||test} className="rounded-xl bg-slate-50 p-3">{i+1}. {test.testName||test}</p>)}</div></div></div>}</div>)}
+                {view === 'addPackage'&&(<div className="mx-auto max-w-4xl"><h1 className="mb-6 text-center text-3xl font-bold">{editingPackageId?'Edit Package':'Create Package'}</h1><form onSubmit={handleAddPackage} className="space-y-6 rounded-3xl border bg-white p-8">{packageError&&<p className="rounded-xl bg-red-50 p-4 font-bold text-red-700">{packageError}</p>}<div className="grid gap-6 sm:grid-cols-2"><FormInput label="Package Name" required value={packageForm.packageName} onChange={e=>setPackageForm({...packageForm,packageName:e.target.value})}/><FormInput label="Package Code" required value={packageForm.packageCode} onChange={e=>setPackageForm({...packageForm,packageCode:e.target.value.toUpperCase()})}/><FormInput label="Package Price" required type="number" min="0.01" value={packageForm.price} onChange={e=>setPackageForm({...packageForm,price:e.target.value})}/><FormInput label="Discount Price (optional)" type="number" min="0" value={packageForm.discountPrice} onChange={e=>setPackageForm({...packageForm,discountPrice:e.target.value})}/><SelectInput label="Status" options={['active','inactive']} value={packageForm.status} onChange={e=>setPackageForm({...packageForm,status:e.target.value})}/></div><textarea required placeholder="Description" value={packageForm.description} onChange={e=>setPackageForm({...packageForm,description:e.target.value})} className="h-28 w-full rounded-xl border p-4"/><div><div className="flex flex-wrap gap-2"><input placeholder="Search active tests" value={packageTestSearch} onChange={e=>setPackageTestSearch(e.target.value)} className="flex-1 rounded-xl border p-3"/><button type="button" onClick={()=>setPackageForm({...packageForm,includedTests:tests.filter(t=>t.isActive!==false).map(t=>t._id)})} className="rounded bg-emerald-700 px-3 text-white">Select All Tests</button><button type="button" onClick={()=>setPackageForm({...packageForm,includedTests:[]})} className="rounded border px-3">Clear All</button></div><div className="mt-3 max-h-72 overflow-auto rounded-xl border p-2">{tests.filter(t=>t.isActive!==false&&(t.testName||'').toLowerCase().includes(packageTestSearch.toLowerCase())).map(test=><label key={test._id} className="flex gap-3 rounded p-3 hover:bg-emerald-50"><input type="checkbox" checked={packageForm.includedTests.includes(test._id)} onChange={e=>setPackageForm({...packageForm,includedTests:e.target.checked?[...new Set([...packageForm.includedTests,test._id])]:packageForm.includedTests.filter(id=>id!==test._id)})}/>{test.testName}</label>)}</div><p className="mt-2 font-bold text-emerald-700">{packageForm.includedTests.length} Tests Selected</p></div><button disabled={packageSaving} className="w-full rounded-xl bg-emerald-800 py-4 font-bold text-white">{packageSaving?'Saving...':editingPackageId?'Update Package':'Create Package'}</button></form></div>)}
 
                 {/* Add Test View */}
                 {view === 'addTest' && (

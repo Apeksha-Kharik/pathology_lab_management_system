@@ -14,20 +14,25 @@ const receptionistRoutes = require("./routes/receptionistRoutes");
 const technicianRoutes = require("./routes/technicianRoutes");
 const pathologistRoutes = require("./routes/pathologistRoutes");
 const profileRoutes = require("./routes/profileRoutes");
+const { validateRequest } = require("./middleware/validateRequest");
 
 dotenv.config();
 verifyTransporter();
 
 const app = express();
 
-const allowedOrigins = [
+const localOrigins = [
   /^http:\/\/localhost:51\d{2}$/,
   /^http:\/\/127\.0\.0\.1:51\d{2}$/
 ];
+const configuredOrigins = String(process.env.FRONTEND_URL || "")
+  .split(",")
+  .map((origin) => origin.trim().replace(/\/$/, ""))
+  .filter(Boolean);
 
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || allowedOrigins.some((allowedOrigin) => allowedOrigin.test(origin))) {
+    if (!origin || configuredOrigins.includes(origin) || localOrigins.some((allowedOrigin) => allowedOrigin.test(origin))) {
       return callback(null, true);
     }
 
@@ -38,6 +43,7 @@ app.use(cors({
 }));
 
 app.use(express.json());
+app.use(validateRequest);
 app.use("/uploads/signatures", express.static(path.join(__dirname, "uploads", "signatures"), {
   dotfiles: "deny",
   fallthrough: false,

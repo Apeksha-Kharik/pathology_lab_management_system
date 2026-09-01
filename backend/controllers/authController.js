@@ -45,6 +45,9 @@ const generateOtp = () => String(Math.floor(100000 + Math.random() * 900000));
 
 const getOtpExpiry = () => new Date(Date.now() + 10 * 60 * 1000);
 
+const canExposeDevOtp = () =>
+  process.env.NODE_ENV !== "production" && process.env.ALLOW_DEV_OTP !== "false";
+
 const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const getPasswordValidationErrors = (password) => {
@@ -140,11 +143,29 @@ const register = async (req, res) => {
       otpExpiry: getOtpExpiry()
     });
 
-    await sendOtpEmail({
-      to: user.email,
-      subject: "Verify your INDIPATH account",
-      otp
-    });
+    try {
+      await sendOtpEmail({
+        to: user.email,
+        subject: "Verify your INDIPATH account",
+        otp
+      });
+    } catch (emailError) {
+      if (canExposeDevOtp()) {
+        console.warn(`Registration email unavailable; using development OTP for ${user.email}`);
+        return res.status(201).json({
+          message: "Email delivery is unavailable. Use the development OTP shown below.",
+          devOtp: otp,
+          user: buildUserResponse(user)
+        });
+      }
+
+      // Do not leave an unusable, unverified account when OTP delivery fails.
+      await User.deleteOne({ _id: user._id, isVerified: false });
+      console.error(`Registration OTP delivery failed for ${user.email}: ${emailError.message}`);
+      return res.status(503).json({
+        message: "Unable to send verification email. Please try again later."
+      });
+    }
 
     res.status(201).json({
       message: "Registration successful. OTP sent to your email.",
@@ -220,12 +241,13 @@ const cancelRegistration = async (req, res) => {
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
+    const normalizedEmail = String(email || "").toLowerCase().trim();
 
-    if (!email || !password) {
+    if (!normalizedEmail || !password) {
       return res.status(400).json({ message: "Email and password are required" });
     }
 
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
@@ -376,11 +398,27 @@ const forgotPassword = async (req, res) => {
     user.resetPasswordExpiry = undefined;
     await user.save();
 
-    await sendOtpEmail({
-      to: user.email,
-      subject: "Reset your INDIPATH password",
-      otp
-    });
+    try {
+      await sendOtpEmail({
+        to: user.email,
+        subject: "Reset your INDIPATH password",
+        otp
+      });
+    } catch (emailError) {
+      if (canExposeDevOtp()) {
+        console.warn(`Password reset email unavailable; using development OTP for ${user.email}`);
+        return res.json({
+          message: "Email delivery is unavailable. Use the development OTP shown below.",
+          devOtp: otp
+        });
+      }
+
+      user.otp = undefined;
+      user.otpExpiry = undefined;
+      user.resetPasswordVerified = false;
+      await user.save();
+      return res.status(503).json({ message: "Unable to send password reset email. Please try again later." });
+    }
 
     res.json({
       message: "Password reset OTP sent to your email"

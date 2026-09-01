@@ -8,6 +8,7 @@ const PDFDocument = require("pdfkit");
 const fs = require("fs");
 const path = require("path");
 const bcrypt = require("bcryptjs");
+const mongoose = require("mongoose");
 const { normalizeRole } = require("./authController");
 const { writeAuditLog } = require("../utils/auditLogger");
 
@@ -446,41 +447,76 @@ const deleteTest = async (req, res) => {
   }
 };
 
-const buildPackagePayload = (body) => ({
-  packageName: body.packageName,
-  category: body.category || "Health Checkup",
-  price: Number(body.price),
-  description: body.description || "",
-  reportDescription: body.reportDescription || "",
-  reportLetterhead: body.reportLetterhead || "",
-  reportTemplate: Array.isArray(body.reportTemplate) ? body.reportTemplate.filter((row) => row.parameter) : [],
-  imageUrl: body.imageUrl || "",
-  includedTests: Array.isArray(body.includedTests) ? body.includedTests : [],
-  parametersCount: Number(body.parametersCount || 0),
-  homeCollection: body.homeCollection !== false,
-  isActive: body.isActive !== undefined ? Boolean(body.isActive) : true
-});
+const normalizeTestIds = (values = []) => [...new Set((Array.isArray(values) ? values : []).map((value) => String(value?._id || value)))];
+
+const validatePackageTests = async (values) => {
+  const ids = normalizeTestIds(values);
+  if (!ids.length) return { error: "Select at least one active test for the package" };
+  if (ids.some((id) => !mongoose.isValidObjectId(id))) return { error: "One or more selected test IDs are invalid" };
+  const activeTests = await Test.find({ _id: { $in: ids }, isActive: true }).select("_id");
+  if (activeTests.length !== ids.length) return { error: "Every selected test must exist and be active" };
+  return { ids };
+};
+
+const buildPackagePayload = (body, includedTests) => {
+  const status = String(body.status || (body.isActive === false ? "inactive" : "active")).toLowerCase();
+  return {
+    packageName: String(body.packageName || "").trim(),
+    packageCode: String(body.packageCode || "").trim().toUpperCase(),
+    category: body.category || "Health Checkup",
+    price: Number(body.price),
+    discountPrice: body.discountPrice === "" || body.discountPrice === undefined || body.discountPrice === null ? null : Number(body.discountPrice),
+    description: body.description || "",
+    reportDescription: body.reportDescription || "",
+    reportLetterhead: body.reportLetterhead || "",
+    reportTemplate: Array.isArray(body.reportTemplate) ? body.reportTemplate.filter((row) => row.parameter) : [],
+    imageUrl: body.imageUrl || "",
+    includedTests,
+    parametersCount: includedTests.length,
+    homeCollection: body.homeCollection !== false,
+    status,
+    isActive: status === "active"
+  };
+};
+
+const validatePackagePayload = async (body) => {
+  if (!body.packageName || !body.packageCode || body.price === undefined || body.price === "") return { error: "Package name, code and price are required" };
+  if (!Number.isFinite(Number(body.price)) || Number(body.price) <= 0) return { error: "Package price must be a positive number" };
+  if (body.discountPrice !== undefined && body.discountPrice !== "" && body.discountPrice !== null && (!Number.isFinite(Number(body.discountPrice)) || Number(body.discountPrice) < 0 || Number(body.discountPrice) >= Number(body.price))) return { error: "Discount price must be non-negative and lower than the package price" };
+  if (body.status && !["active", "inactive"].includes(String(body.status).toLowerCase())) return { error: "Package status must be active or inactive" };
+  return validatePackageTests(body.includedTests);
+};
 
 const getPackages = async (req, res) => {
   try {
-    const packages = await Package.find().populate("includedTests", "testName").sort({ createdAt: -1 });
+    const packages = await Package.find().populate("includedTests", "testName category price description isActive").sort({ createdAt: -1 });
     res.json(packages);
   } catch (error) {
     res.status(500).json({ message: "Error fetching packages" });
   }
 };
 
+const getPackageById = async (req, res) => {
+  try {
+    const packageItem = await Package.findById(req.params.id).populate("includedTests", "testName category price description isActive");
+    if (!packageItem) return res.status(404).json({ message: "Package not found" });
+    res.json(packageItem);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching package", error: error.message });
+  }
+};
+
 const addPackage = async (req, res) => {
   try {
-    const { packageName, price } = req.body;
-    if (!packageName || price === undefined || price === "") {
-      return res.status(400).json({ message: "Package name and price are required" });
-    }
-    const packageItem = await Package.create(buildPackagePayload(req.body));
-    await writeAuditLog({ actor: req.user, action: "PACKAGE_CREATED", entityType: "Package", entityId: packageItem._id, details: { packageName: packageItem.packageName, price: packageItem.price } });
+    const selection = await validatePackagePayload(req.body);
+    if (selection.error) return res.status(400).json({ message: selection.error });
+    const packageItem = await Package.create(buildPackagePayload(req.body, selection.ids));
+    await packageItem.populate("includedTests", "testName category price description isActive");
+    await writeAuditLog({ actor: req.user, action: "PACKAGE_CREATED", entityType: "Package", entityId: packageItem._id, details: { packageName: packageItem.packageName, packageCode: packageItem.packageCode, price: packageItem.price } });
     res.status(201).json({ message: "Package added successfully", package: packageItem });
   } catch (error) {
-    res.status(500).json({ message: "Error adding package", error: error.message });
+    const duplicate = error?.code === 11000;
+    res.status(duplicate ? 409 : 500).json({ message: duplicate ? "Package code already exists" : "Error adding package", error: error.message });
   }
 };
 
@@ -497,10 +533,15 @@ const deletePackage = async (req, res) => {
 
 const updatePackage = async (req, res) => {
   try {
-    const packageItem = await Package.findByIdAndUpdate(req.params.id, buildPackagePayload(req.body), { new: true, runValidators: true });
+    const selection = await validatePackagePayload(req.body);
+    if (selection.error) return res.status(400).json({ message: selection.error });
+    const packageItem = await Package.findByIdAndUpdate(req.params.id, buildPackagePayload(req.body, selection.ids), { new: true, runValidators: true }).populate("includedTests", "testName category price description isActive");
     if (!packageItem) return res.status(404).json({ message: "Package not found" });
     res.json({ message: "Package updated successfully", package: packageItem });
-  } catch (error) { res.status(500).json({ message: "Error updating package", error: error.message }); }
+  } catch (error) {
+    const duplicate = error?.code === 11000;
+    res.status(duplicate ? 409 : 500).json({ message: duplicate ? "Package code already exists" : "Error updating package", error: error.message });
+  }
 };
 
-module.exports = { getDashboardMetrics, downloadAdminReport, createUser, getUsers, deleteUser, addTest, getTests, updateTest, deleteTest, getPackages, addPackage, deletePackage, updatePackage };
+module.exports = { getDashboardMetrics, downloadAdminReport, createUser, getUsers, deleteUser, addTest, getTests, updateTest, deleteTest, getPackages, getPackageById, addPackage, deletePackage, updatePackage };

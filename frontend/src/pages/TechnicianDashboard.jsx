@@ -15,6 +15,12 @@ const blankResult = { parameter: "", value: "", unit: "", normalRange: "" };
 const technicianFont = "Aptos, 'Avenir Next', Inter, 'Segoe UI', system-ui, sans-serif";
 
 const getReportTemplate = (booking) => {
+  if (booking.bookingType === "Package" && Array.isArray(booking.packageTests) && booking.packageTests.length) {
+    return booking.packageTests.flatMap((test) => {
+      const rows = Array.isArray(test.reportTemplate) && test.reportTemplate.length ? test.reportTemplate : [{ parameter: "Result", value: "", unit: "", referenceRange: "" }];
+      return rows.map((row) => ({ ...row, parameter: test.testName + " - " + row.parameter }));
+    });
+  }
   const templates = [booking.testId?.reportTemplate, booking.packageId?.reportTemplate];
   return templates.find((template) => Array.isArray(template) && template.length > 0) || [];
 };

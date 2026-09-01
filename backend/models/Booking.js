@@ -5,6 +5,7 @@ const bookingSchema = new mongoose.Schema({
   patientId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   testId: { type: mongoose.Schema.Types.ObjectId, ref: "Test" },
   packageId: { type: mongoose.Schema.Types.ObjectId, ref: "Package" },
+  packageTests: [{ type: mongoose.Schema.Types.ObjectId, ref: "Test" }],
   bookingType: { type: String, enum: ["Test", "Package"], default: "Test" },
   name: { type: String, required: true },
   testName: { type: String, required: true },

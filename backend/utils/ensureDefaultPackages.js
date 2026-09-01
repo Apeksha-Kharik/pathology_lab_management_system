@@ -11,8 +11,8 @@ const ensureDefaultPackages = async () => {
     return;
   }
 
-  await Package.insertMany(missingPackages);
-  console.log(`Added ${missingPackages.length} default health package(s)`);
+  // Packages now require explicit active-test references and are created by admins.
+  console.log(`Skipped ${missingPackages.length} legacy package seed(s) without test references`);
 };
 
 module.exports = ensureDefaultPackages;

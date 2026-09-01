@@ -166,8 +166,8 @@ const getTests = async (req, res) => {
 
 const getPackages = async (req, res) => {
   try {
-    const packages = await Package.find({ isActive: true })
-      .populate("includedTests", "testName")
+    const packages = await Package.find({ isActive: true, status: { $ne: "inactive" }, includedTests: { $exists: true, $ne: [] } })
+      .populate("includedTests", "testName category price description isActive")
       .sort({ createdAt: -1 });
     res.json(packages);
   } catch (error) {
@@ -189,12 +189,18 @@ const createBooking = async (req, res) => {
 
     const bookingType = packageId ? "Package" : "Test";
     const selectedItem = packageId
-      ? await Package.findOne({ _id: packageId, isActive: true })
+      ? await Package.findOne({ _id: packageId, isActive: true, status: { $ne: "inactive" }, includedTests: { $exists: true, $ne: [] } })
       : await Test.findById(testId);
+    if (selectedItem && bookingType === "Package") {
+      const activeTestCount = await Test.countDocuments({ _id: { $in: selectedItem.includedTests }, isActive: true });
+      if (activeTestCount !== selectedItem.includedTests.length) return res.status(400).json({ message: "This package contains an unavailable test and cannot be booked" });
+    }
+
     if (!selectedItem) {
       return res.status(404).json({ message: `Selected ${bookingType.toLowerCase()} not found` });
     }
 
+    const bookingAmount = bookingType === "Package" && selectedItem.discountPrice !== null && selectedItem.discountPrice !== undefined ? selectedItem.discountPrice : selectedItem.price;
     const patientName = String(name || requestedPatientName || req.user.name || "").trim();
     const patientPhone = String(phone || req.user.phone || "").trim();
     const patientEmail = String(email || req.user.email || "").trim();
@@ -209,6 +215,7 @@ const createBooking = async (req, res) => {
       patientId: req.user._id,
       testId: bookingType === "Test" ? selectedItem._id : undefined,
       packageId: bookingType === "Package" ? selectedItem._id : undefined,
+      packageTests: bookingType === "Package" ? selectedItem.includedTests.map((test) => test._id || test) : [],
       bookingType,
       name: patientName,
       phone: patientPhone,
@@ -226,7 +233,7 @@ const createBooking = async (req, res) => {
       sampleType: sampleType || "",
       homeSample: Boolean(homeSample),
       testName: bookingType === "Package" ? selectedItem.packageName : selectedItem.testName,
-      amount: selectedItem.price,
+      amount: bookingAmount,
       status: "Pending Approval",
       bookingStatus: "Pending Approval",
       paymentStatus: "Unpaid",
@@ -236,7 +243,7 @@ const createBooking = async (req, res) => {
     await Payment.create({
       bookingId: booking._id,
       userId: req.user._id,
-      amount: selectedItem.price,
+      amount: bookingAmount,
       method: "cash",
       status: "pending"
     });

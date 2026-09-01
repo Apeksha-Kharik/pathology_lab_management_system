@@ -83,7 +83,7 @@ const getTechnicianBookings = async (req, res) => {
     const bookings = await Booking.find({
       assignedTechnician: req.user._id,
       bookingStatus: { $in: ["Technician Assigned", "Sample Collected", "Processing", "Pending Report Approval", "Completed", "Report Ready"] }
-    }).populate("testId", "reportTemplate reportDescription reportLetterhead").populate("packageId", "reportTemplate reportDescription reportLetterhead").sort({ updatedAt: -1 });
+    }).populate("testId", "reportTemplate reportDescription reportLetterhead").populate("packageId", "reportTemplate reportDescription reportLetterhead includedTests").populate("packageTests", "testName reportTemplate reportDescription reportLetterhead").sort({ updatedAt: -1 });
 
     const reports = await Report.find({
       bookingId: { $in: bookings.map((booking) => booking._id) }

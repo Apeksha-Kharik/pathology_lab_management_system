@@ -41,7 +41,7 @@ import bg3 from "../assets/bg3.png";
 const dashboardFont = "Aptos, 'Avenir Next', Inter, 'Segoe UI', system-ui, sans-serif";
 const showLegacyDashboardSections = false;
 
-const healthPackageCards = [
+const _healthPackageCards = [
   {
     id: "pkg-01",
     type: "package",
@@ -221,14 +221,17 @@ const mapPackageToCard = (item, index) => ({
   type: "package",
   bookingType: "Package",
   title: item.packageName,
+  code: item.packageCode,
+  description: item.description || "Comprehensive health checkup package.",
+  includedTests: item.includedTests || [],
   imageUrl: item.imageUrl || packageImages[index % packageImages.length],
   fallbackImageUrl: packageImages[index % packageImages.length],
   chips: [
-    `${item.includedTests?.length || item.parametersCount || 0} parameters`,
+    `${item.includedTests?.length || 0} tests included`,
     item.homeCollection ? "Home collection" : "Visit lab",
     "Pending approval"
   ],
-  price: Number(item.price || 0),
+  price: Number(item.discountPrice ?? item.price ?? 0),
   oldPrice: item.oldPrice || Math.round(Number(item.price || 0) * 1.8),
   discount: item.discount || "Best value"
 });
@@ -398,7 +401,7 @@ function PatientDashboard() {
   }, [tests, searchTerm]);
 
   const healthPackageRows = useMemo(
-    () => packages.length ? packages.map(mapPackageToCard) : healthPackageCards,
+    () => packages.map(mapPackageToCard),
     [packages]
   );
 
@@ -648,7 +651,7 @@ function PatientNavbar({ cartItems, onBookNow, onLogout, onRemoveItem, onSearchC
                         <p className="text-xs font-semibold text-slate-500">INR {item.price}</p>
                         <div className="mt-3 flex gap-2">
                           <button onClick={() => { onBookNow(item); setCartOpen(false); }} className="flex-1 rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-800">
-                            Book Now
+                            {item.type === "package" ? "Book Package" : "Book Now"}
                           </button>
                           <button onClick={() => onRemoveItem(item.id)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 transition hover:bg-emerald-50 hover:text-emerald-800">
                             Remove
@@ -789,6 +792,7 @@ function ShowcaseRow({ cartItems, eyebrow, items, onAddToCart, onBookNow, subtit
 }
 
 function ShowcaseCard({ item, isInCart, onAddToCart, onBookNow }) {
+  const [showTests, setShowTests] = useState(false);
   const Icon = item.icon || CalendarDays;
   const imageSrc = item.imageUrl || item.fallbackImageUrl;
 
@@ -838,12 +842,13 @@ function ShowcaseCard({ item, isInCart, onAddToCart, onBookNow }) {
           </div>
         </div>
 
+        {item.type === "package" && <div className="mb-4"><p className="text-sm text-slate-600">{item.description}</p><button type="button" onClick={() => setShowTests(!showTests)} className="mt-3 text-sm font-black text-emerald-700">{showTests ? "Hide Tests" : "View Tests"}</button>{showTests && <div className="mt-2 max-h-40 overflow-auto rounded-xl bg-emerald-50 p-3">{item.includedTests.length ? item.includedTests.map((test, index) => <p key={test._id || test} className="py-1 text-sm font-semibold">{index + 1}. {test.testName || test}</p>) : <p className="text-sm text-slate-500">No test details available.</p>}</div>}</div>}
         <div className="mt-auto space-y-2">
           <button
             onClick={() => onAddToCart(item)}
             className={`w-full rounded-2xl px-4 py-3.5 text-sm font-black text-white shadow-lg shadow-emerald-950/10 transition-colors duration-200 ${isInCart ? "bg-emerald-900" : "bg-emerald-700 hover:bg-emerald-800"}`}
           >
-            {isInCart ? "Added to Cart" : "Add to Cart"}
+            {isInCart ? "Added to Cart" : item.type === "package" ? "Add Package to Cart" : "Add to Cart"}
           </button>
           {isInCart && (
             <button
