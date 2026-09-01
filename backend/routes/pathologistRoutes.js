@@ -1,5 +1,5 @@
 const express = require("express");
-const { getPendingReports, getAllReports, getPathologistProfile, uploadDigitalSignature, approveReport, rejectReport } = require("../controllers/pathologistController");
+const { getPendingReports, getAllReports, getMonthlyReport, getPathologistProfile, uploadDigitalSignature, approveReport, rejectReport } = require("../controllers/pathologistController");
 const { protect, allowRoles } = require("../middleware/authMiddleware");
 const { uploadSignature } = require("../middleware/signatureUpload");
 
@@ -9,6 +9,7 @@ router.get("/profile", protect, allowRoles("pathologist"), getPathologistProfile
 router.post("/profile/signature", protect, allowRoles("pathologist"), uploadSignature, uploadDigitalSignature);
 router.get("/reports", protect, allowRoles("pathologist"), getPendingReports);
 router.get("/reports/all", protect, allowRoles("pathologist"), getAllReports);
+router.get("/reports/monthly", protect, allowRoles("pathologist"), getMonthlyReport);
 router.patch("/reports/:reportId/approve", protect, allowRoles("pathologist"), approveReport);
 router.patch("/reports/:reportId/reject", protect, allowRoles("pathologist"), rejectReport);
 

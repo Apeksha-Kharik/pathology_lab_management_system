@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { AlertCircle, CheckCircle2, Eye, FileImage, FileText, LogOut, Search, ShieldCheck, Upload, XCircle } from "lucide-react";
+import { AlertCircle, BarChart3, CheckCircle2, Eye, FileImage, FileText, LogOut, Search, ShieldCheck, Upload, XCircle } from "lucide-react";
 import { useAuth } from "../context/useAuth";
-import { approveReport, getPathologistProfile, getPathologistReports, rejectReport, uploadPathologistSignature } from "../services/pathologistService";
+import { approveReport, getPathologistMonthlyReport, getPathologistProfile, getPathologistReports, rejectReport, uploadPathologistSignature } from "../services/pathologistService";
 import logo from "../assets/logo.png";
 
 const pathologistFont = "Aptos, 'Avenir Next', Inter, 'Segoe UI', system-ui, sans-serif";
@@ -20,6 +20,10 @@ function PathologistDashboard() {
   const [dateFilter, setDateFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [testFilter, setTestFilter] = useState("");
+  const [reportMonth, setReportMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [monthlyData, setMonthlyData] = useState(null);
+  const [monthlyLoading, setMonthlyLoading] = useState(false);
+  const [monthlyRefresh, setMonthlyRefresh] = useState(0);
 
   const loadReports = async () => {
     setReports(await getPathologistReports());
@@ -42,6 +46,17 @@ function PathologistDashboard() {
       isMounted = false;
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (activeSection !== "monthly") return;
+    let isMounted = true;
+    setMonthlyLoading(true);
+    getPathologistMonthlyReport(reportMonth)
+      .then((data) => { if (isMounted) setMonthlyData(data); })
+      .catch(() => { if (isMounted) setMonthlyData(null); alert("Unable to load monthly report"); })
+      .finally(() => { if (isMounted) setMonthlyLoading(false); });
+    return () => { isMounted = false; };
+  }, [activeSection, reportMonth, monthlyRefresh]);
 
   const filteredReports = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
@@ -96,6 +111,12 @@ function PathologistDashboard() {
       label: "Digital Signature",
       description: "Manage qualification, registration and signature.",
       icon: ShieldCheck
+    },
+    {
+      id: "monthly",
+      label: "Monthly Report",
+      description: "Monthly workload, status and test summary.",
+      icon: BarChart3
     }
   ];
   const activeViewDetails = pathologistViews.find((view) => view.id === activeSection) || pathologistViews[0];
@@ -111,6 +132,7 @@ function PathologistDashboard() {
       alert(data.message);
       setSelectedReport(null);
       await loadReports();
+      setMonthlyRefresh((value) => value + 1);
     } catch (error) {
       alert(error.response?.data?.message || "Approval failed");
     }
@@ -127,6 +149,7 @@ function PathologistDashboard() {
       alert(data.message);
       setSelectedReport(null);
       await loadReports();
+      setMonthlyRefresh((value) => value + 1);
     } catch (error) {
       alert(error.response?.data?.message || "Rejection failed");
     }
@@ -229,11 +252,15 @@ function PathologistDashboard() {
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
         <PathologistDeskNav activeView={activeSection} onChange={setActiveSection} views={pathologistViews} />
 
-        {activeSection !== "signature" && (
+        {!["signature", "monthly"].includes(activeSection) && (
           <section className="mb-6 rounded-3xl border border-emerald-100 bg-white p-5 shadow-xl shadow-emerald-950/5 sm:p-6">
             <SectionHeader description={activeViewDetails.description} title={activeViewDetails.label} />
             <ReportsTable reports={activeReports} section={activeSection} onView={setSelectedReport} />
           </section>
+        )}
+
+        {activeSection === "monthly" && (
+          <MonthlyReport data={monthlyData} loading={monthlyLoading} month={reportMonth} onMonthChange={setReportMonth} onView={setSelectedReport} />
         )}
 
         {activeSection === "signature" && (
@@ -311,6 +338,62 @@ function PathologistDeskNav({ activeView, onChange, views }) {
   );
 }
 
+function MonthlyReport({ data, loading, month, onMonthChange, onView }) {
+  const summary = data?.summary || { total: 0, approved: 0, pending: 0, rejected: 0 };
+  const cards = [
+    ["Total Reports", summary.total, "bg-slate-900 text-white"],
+    ["Approved", summary.approved, "bg-emerald-700 text-white"],
+    ["Pending", summary.pending, "bg-amber-100 text-amber-900"],
+    ["Corrections", summary.rejected, "bg-red-100 text-red-800"]
+  ];
+
+  return (
+    <section className="mb-6 rounded-3xl border border-emerald-100 bg-white p-5 shadow-xl shadow-emerald-950/5 sm:p-6">
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <SectionHeader title="Monthly Report" description="Reports submitted to you during the selected month, grouped by current status and test." />
+        <label className="text-sm font-black text-slate-600">
+          Report month
+          <input type="month" value={month} onChange={(event) => onMonthChange(event.target.value)} className="mt-2 block rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 font-semibold outline-none focus:border-emerald-500 focus:bg-white" />
+        </label>
+      </div>
+
+      {loading ? (
+        <p className="rounded-2xl bg-emerald-50 p-8 text-center font-bold text-slate-500">Generating monthly report...</p>
+      ) : (
+        <>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {cards.map(([label, value, classes]) => (
+              <div key={label} className={`rounded-2xl p-5 ${classes}`}>
+                <p className="text-xs font-black uppercase tracking-[0.14em] opacity-75">{label}</p>
+                <p className="mt-2 text-3xl font-black">{value}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-6 grid gap-6 lg:grid-cols-[320px_1fr]">
+            <div className="rounded-2xl border border-emerald-100 p-4">
+              <h3 className="font-black text-emerald-950">Tests performed</h3>
+              <div className="mt-4 space-y-3">
+                {data?.tests?.length ? data.tests.map((test) => (
+                  <div key={test.testName} className="flex items-center justify-between gap-3 rounded-xl bg-emerald-50 px-3 py-2">
+                    <span className="text-sm font-bold text-slate-700">{test.testName}</span>
+                    <span className="rounded-full bg-white px-2.5 py-1 text-xs font-black text-emerald-800">{test.count}</span>
+                  </div>
+                )) : <p className="text-sm font-semibold text-slate-500">No test data for this month.</p>}
+              </div>
+            </div>
+
+            <div>
+              <h3 className="mb-4 font-black text-emerald-950">Monthly report details</h3>
+              <ReportsTable reports={data?.reports || []} section="monthly" onView={onView} />
+            </div>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
 function SectionHeader({ description, title }) {
   return (
     <div className="mb-5">
@@ -335,6 +418,7 @@ function ReportsTable({ reports, section, onView }) {
             <th className="p-3">Report ID</th>
             <th className="p-3">Patient Name</th>
             <th className="p-3">Test Name</th>
+            <th className="p-3">Status</th>
             {section === "approved" ? <th className="p-3">Approved Date</th> : <th className="p-3">Technician Name</th>}
             {section === "rejected" ? <th className="p-3">Rejection Reason</th> : <th className="p-3">Submitted Date</th>}
             <th className="p-3 text-right">Action</th>
@@ -347,6 +431,7 @@ function ReportsTable({ reports, section, onView }) {
               <td className="p-3 font-black text-emerald-700">{report.reportId || "N/A"}</td>
               <td className="p-3 font-bold text-slate-800">{report.userId?.name || report.bookingId?.name || "N/A"}</td>
               <td className="p-3">{report.testName}</td>
+              <td className="p-3"><StatusBadge value={report.status} /></td>
               <td className="p-3">{section === "approved" ? formatDate(report.approvedAt) : report.technicianId?.name || "N/A"}</td>
               <td className="p-3">{section === "rejected" ? report.rejectionReason || "N/A" : formatDate(report.submittedAt || report.updatedAt)}</td>
               <td className="p-3 text-right">

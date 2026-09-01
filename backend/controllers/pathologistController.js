@@ -109,6 +109,47 @@ const getAllReports = async (req, res) => {
   }
 };
 
+const getMonthlyReport = async (req, res) => {
+  try {
+    const month = String(req.query.month || new Date().toISOString().slice(0, 7));
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
+      return res.status(400).json({ message: "Month must use YYYY-MM format" });
+    }
+
+    const [year, monthNumber] = month.split("-").map(Number);
+    const startDate = new Date(Date.UTC(year, monthNumber - 1, 1));
+    const endDate = new Date(Date.UTC(year, monthNumber, 1));
+    const reports = await Report.find({
+      $or: [{ pathologistId: req.user._id }, { approvedBy: req.user._id }],
+      submittedAt: { $gte: startDate, $lt: endDate }
+    })
+      .populate("bookingId", "bookingCode name age gender patientCode")
+      .populate("userId", "name email phone")
+      .populate("technicianId", "name")
+      .sort({ submittedAt: -1 });
+
+    const byStatus = { pending: 0, approved: 0, rejected: 0 };
+    const testCounts = new Map();
+    reports.forEach((report) => {
+      if (report.status === "Approved") byStatus.approved += 1;
+      else if (report.status === "Rejected") byStatus.rejected += 1;
+      else byStatus.pending += 1;
+      testCounts.set(report.testName, (testCounts.get(report.testName) || 0) + 1);
+    });
+
+    res.json({
+      month,
+      summary: { total: reports.length, ...byStatus },
+      tests: [...testCounts.entries()]
+        .map(([testName, count]) => ({ testName, count }))
+        .sort((a, b) => b.count - a.count || a.testName.localeCompare(b.testName)),
+      reports
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Error generating monthly report", error: error.message });
+  }
+};
+
 const rejectReport = async (req, res) => {
   try {
     const { rejectionReason, pathologistRemarks } = req.body;
@@ -237,4 +278,4 @@ const approveReport = async (req, res) => {
   }
 };
 
-module.exports = { getPendingReports, getAllReports, getPathologistProfile, uploadDigitalSignature, approveReport, rejectReport };
+module.exports = { getPendingReports, getAllReports, getMonthlyReport, getPathologistProfile, uploadDigitalSignature, approveReport, rejectReport };
