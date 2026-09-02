@@ -2,6 +2,8 @@ const Booking = require("../models/Booking");
 const Report = require("../models/Report");
 const Test = require("../models/Test");
 const Package = require("../models/Package");
+const TechnicianAssignment = require("../models/TechnicianAssignment");
+const mongoose = require("mongoose");
 const User = require("../models/User");
 
 const generateSampleId = () => `SMP${Date.now().toString().slice(-8)}${Math.floor(10 + Math.random() * 90)}`;
@@ -114,6 +116,105 @@ const getTechnicianBookings = async (req, res) => {
     }));
   } catch (error) {
     res.status(500).json({ message: "Error fetching technician bookings" });
+  }
+};
+
+const getAssignmentRequests = async (req, res) => {
+  try {
+    const assignments = await TechnicianAssignment.find({ technician: req.user._id })
+      .populate("booking", "bookingCode patientCode name testName sampleType collectionType bookingDate timeSlot bookingStatus paymentStatus")
+      .populate("requestedBy", "name role")
+      .sort({ requestedAt: -1 });
+    res.json(assignments);
+  } catch (error) {
+    res.status(500).json({ message: "Unable to load assignment requests" });
+  }
+};
+
+const acceptAssignmentRequest = async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.assignmentId)) {
+    return res.status(400).json({ message: "Invalid assignment request ID" });
+  }
+  const session = await mongoose.startSession();
+  try {
+    let acceptedAssignment;
+    let assignedBooking;
+    await session.withTransaction(async () => {
+      acceptedAssignment = await TechnicianAssignment.findOneAndUpdate(
+        { _id: req.params.assignmentId, technician: req.user._id, status: "PENDING" },
+        { $set: { status: "ACCEPTED", respondedAt: new Date(), rejectionReason: "" } },
+        { new: true, runValidators: true, session }
+      );
+      if (!acceptedAssignment) {
+        const existing = await TechnicianAssignment.findById(req.params.assignmentId).session(session);
+        const error = new Error(!existing || String(existing.technician) !== String(req.user._id)
+          ? "Assignment request not found"
+          : "This assignment request has already been handled.");
+        error.status = !existing || String(existing.technician) !== String(req.user._id) ? 404 : 409;
+        throw error;
+      }
+
+      assignedBooking = await Booking.findOneAndUpdate(
+        { _id: acceptedAssignment.booking, assignedTechnician: null },
+        {
+          $set: {
+            assignedTechnician: req.user._id,
+            bookingStatus: "Technician Assigned",
+            status: "Technician Assigned"
+          }
+        },
+        { new: true, session }
+      );
+      if (!assignedBooking) {
+        const error = new Error("The assignment has already been accepted by another technician.");
+        error.status = 409;
+        throw error;
+      }
+    });
+
+    await acceptedAssignment.populate([
+      { path: "booking", select: "bookingCode patientCode name testName sampleType collectionType bookingDate timeSlot bookingStatus paymentStatus" },
+      { path: "requestedBy", select: "name role" }
+    ]);
+    res.json({ message: "Assignment request accepted.", assignment: acceptedAssignment, booking: assignedBooking });
+  } catch (error) {
+    const duplicate = error?.code === 11000;
+    res.status(duplicate ? 409 : (error.status || 500)).json({
+      message: duplicate ? "The assignment has already been accepted by another technician." : (error.status ? error.message : "Unable to accept the assignment request")
+    });
+  } finally {
+    await session.endSession();
+  }
+};
+
+const rejectAssignmentRequest = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.assignmentId)) {
+      return res.status(400).json({ message: "Invalid assignment request ID" });
+    }
+    const rejectionReason = String(req.body.rejectionReason || "").trim();
+    if (rejectionReason.length > 500) {
+      return res.status(400).json({ message: "Rejection reason cannot exceed 500 characters." });
+    }
+    const assignment = await TechnicianAssignment.findOneAndUpdate(
+      { _id: req.params.assignmentId, technician: req.user._id, status: "PENDING" },
+      { $set: { status: "REJECTED", respondedAt: new Date(), rejectionReason } },
+      { new: true, runValidators: true }
+    );
+    if (!assignment) {
+      const existing = await TechnicianAssignment.findById(req.params.assignmentId);
+      if (!existing || String(existing.technician) !== String(req.user._id)) {
+        return res.status(404).json({ message: "Assignment request not found" });
+      }
+      return res.status(409).json({ message: "This assignment request has already been handled." });
+    }
+    await assignment.populate([
+      { path: "booking", select: "bookingCode patientCode name testName sampleType collectionType bookingDate timeSlot bookingStatus paymentStatus" },
+      { path: "requestedBy", select: "name role" }
+    ]);
+    res.json({ message: "Assignment request rejected.", assignment });
+  } catch (error) {
+    res.status(500).json({ message: "Unable to reject the assignment request" });
   }
 };
 
@@ -325,4 +426,4 @@ const submitReport = async (req, res) => {
   }
 };
 
-module.exports = { getTechnicianBookings, updateSampleStatus, startTest, startReportEntry, saveReportDraft, submitReport };
+module.exports = { getTechnicianBookings, getAssignmentRequests, acceptAssignmentRequest, rejectAssignmentRequest, updateSampleStatus, startTest, startReportEntry, saveReportDraft, submitReport };

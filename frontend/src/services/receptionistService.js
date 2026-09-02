@@ -15,6 +15,11 @@ export const getTechnicians = async () => {
   return response.data;
 };
 
+export const getTechnicianAssignments = async (bookingId = "") => {
+  const response = await api.get("/api/receptionist/technician-assignments", { params: bookingId ? { bookingId } : {} });
+  return response.data;
+};
+
 export const createWalkInBooking = async (payload) => {
   const response = await api.post("/api/receptionist/walk-in-bookings", payload);
   return response.data;
@@ -25,8 +30,8 @@ export const updateBookingStatus = async (bookingId, status, rejectionReason = "
   return response.data;
 };
 
-export const assignTechnician = async (bookingId) => {
-  const response = await api.patch(`/api/receptionist/bookings/${bookingId}/technician`);
+export const assignTechnician = async (bookingId, technicianId) => {
+  const response = await api.patch(`/api/receptionist/bookings/${bookingId}/technician`, { technicianId });
   return response.data;
 };
 

@@ -1,7 +1,9 @@
 const Booking = require("../models/Booking");
+const TechnicianAssignment = require("../models/TechnicianAssignment");
 const Payment = require("../models/Payment");
 const Test = require("../models/Test");
 const User = require("../models/User");
+const mongoose = require("mongoose");
 const PDFDocument = require("pdfkit");
 const fs = require("fs");
 const path = require("path");
@@ -342,8 +344,30 @@ const updateBookingStatus = async (req, res) => {
   }
 };
 
+const getTechnicianAssignments = async (req, res) => {
+  try {
+    if (req.query.bookingId && !mongoose.isValidObjectId(req.query.bookingId)) {
+      return res.status(400).json({ message: "Invalid booking ID" });
+    }
+    const query = req.query.bookingId ? { booking: req.query.bookingId } : {};
+    const assignments = await TechnicianAssignment.find(query)
+      .populate("booking", "bookingCode patientCode name testName sampleType bookingStatus paymentStatus assignedTechnician")
+      .populate("technician", "name email phone")
+      .populate("requestedBy", "name role")
+      .sort({ requestedAt: -1 });
+    res.json(assignments);
+  } catch (error) {
+    res.status(500).json({ message: "Unable to load technician assignment history" });
+  }
+};
+
 const assignTechnician = async (req, res) => {
   try {
+    const technicianId = String(req.body.technicianId || "").trim();
+    if (!mongoose.isValidObjectId(technicianId)) {
+      return res.status(400).json({ message: "Please select a technician." });
+    }
+
     const booking = await Booking.findById(req.params.id);
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
@@ -353,25 +377,42 @@ const assignTechnician = async (req, res) => {
       return res.status(400).json({ message: "Patient must be arrived and payment must be paid before assigning technician" });
     }
 
-    if (booking.assignedTechnician) {
-      return res.status(400).json({ message: "Technician is already assigned for this booking" });
+    if (booking.assignedTechnician || await TechnicianAssignment.exists({ booking: booking._id, status: "ACCEPTED" })) {
+      return res.status(409).json({ message: "The assignment has already been accepted by a technician." });
     }
 
-    const technician = await selectFairTechnician();
+    const technician = await User.findOne({ _id: technicianId, role: "technician" }).select("name email phone role");
     if (!technician) {
-      return res.status(404).json({ message: "No technician users are available for assignment" });
+      return res.status(404).json({ message: "Selected technician is not available." });
     }
 
-    booking.assignedTechnician = technician._id;
-    if (!booking.patientCode) {
-      booking.patientCode = generatePatientCode();
+    const pending = await TechnicianAssignment.findOne({ booking: booking._id, status: "PENDING" });
+    if (pending) {
+      return res.status(409).json({
+        message: String(pending.technician) === technicianId
+          ? "This technician has already received a pending request."
+          : "Another technician assignment request is still pending."
+      });
     }
-    booking.bookingStatus = "Technician Assigned";
-    booking.status = "Technician Assigned";
-    await booking.save();
 
-    res.json({ message: `Technician assigned fairly to ${technician.name}`, booking });
+    const assignment = await TechnicianAssignment.create({
+      booking: booking._id,
+      technician: technician._id,
+      requestedBy: req.user._id,
+      status: "PENDING",
+      requestedAt: new Date()
+    });
+    await assignment.populate([
+      { path: "booking", select: "bookingCode patientCode name testName sampleType bookingStatus paymentStatus assignedTechnician" },
+      { path: "technician", select: "name email phone" },
+      { path: "requestedBy", select: "name role" }
+    ]);
+
+    res.status(201).json({ message: `Assignment request sent to ${technician.name}.`, assignment });
   } catch (error) {
+    if (error?.code === 11000) {
+      return res.status(409).json({ message: "A technician assignment request is already pending for this booking." });
+    }
     res.status(500).json({ message: "Technician assignment failed", error: error.message });
   }
 };
@@ -505,6 +546,7 @@ module.exports = {
   createWalkInBooking,
   updateBookingStatus,
   assignTechnician,
+  getTechnicianAssignments,
   markPaymentPaid,
   downloadReceptionistReceipt
 };

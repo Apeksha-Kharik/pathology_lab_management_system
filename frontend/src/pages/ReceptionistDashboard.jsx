@@ -8,6 +8,8 @@ import {
   downloadReceptionistReceipt,
   getReceptionistBookings,
   getReceptionistTests,
+  getTechnicianAssignments,
+  getTechnicians,
   markPaymentPaid,
   updateBookingStatus
 } from "../services/receptionistService";
@@ -27,6 +29,10 @@ function ReceptionistDashboard() {
   const { user, logout } = useAuth();
   const [bookings, setBookings] = useState([]);
   const [tests, setTests] = useState([]);
+  const [technicians, setTechnicians] = useState([]);
+  const [assignments, setAssignments] = useState([]);
+  const [selectedTechnicians, setSelectedTechnicians] = useState({});
+  const [sendingAssignment, setSendingAssignment] = useState("");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [showWalkIn, setShowWalkIn] = useState(false);
@@ -38,12 +44,16 @@ function ReceptionistDashboard() {
   const loadData = useCallback(async (searchValue = "") => {
     try {
       setLoading(true);
-      const [bookingData, testData] = await Promise.all([
+      const [bookingData, testData, technicianData, assignmentData] = await Promise.all([
         getReceptionistBookings(searchValue),
-        getReceptionistTests()
+        getReceptionistTests(),
+        getTechnicians(),
+        getTechnicianAssignments()
       ]);
       setBookings(bookingData || []);
       setTests(testData || []);
+      setTechnicians(technicianData || []);
+      setAssignments(assignmentData || []);
     } catch (error) {
       alert(error.response?.data?.message || "Unable to load receptionist dashboard");
     } finally {
@@ -55,11 +65,34 @@ function ReceptionistDashboard() {
     loadData("");
   }, [loadData]);
 
+  useEffect(() => {
+    const refreshAssignments = () => getTechnicianAssignments().then((data) => setAssignments(data || [])).catch(() => {});
+    const interval = window.setInterval(refreshAssignments, 10000);
+    window.addEventListener("focus", refreshAssignments);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshAssignments);
+    };
+  }, []);
+
   const pendingBookings = useMemo(() => bookings.filter((booking) => booking.bookingStatus === "Pending Approval"), [bookings]);
   const todaysBookings = useMemo(() => bookings.filter((booking) => booking.bookingDate === today && booking.bookingStatus !== "Rejected"), [bookings, today]);
   const pendingPayments = useMemo(() => bookings.filter((booking) => ["Confirmed", "Arrived"].includes(booking.bookingStatus) && booking.paymentStatus === "Unpaid"), [bookings]);
   const paidAwaitingArrival = useMemo(() => bookings.filter((booking) => booking.bookingStatus === "Confirmed" && booking.paymentStatus === "Paid" && !booking.patientArrived), [bookings]);
-  const readyForAssignment = useMemo(() => bookings.filter((booking) => (booking.patientArrived || booking.bookingStatus === "Arrived") && booking.paymentStatus === "Paid" && !booking.assignedTechnician && !["Processing", "Pending Report Approval", "Report Ready"].includes(booking.bookingStatus)), [bookings]);
+  const assignmentsByBooking = useMemo(() => {
+    const grouped = new Map();
+    assignments.forEach((assignment) => {
+      const bookingId = assignment.booking?._id || assignment.booking;
+      if (!grouped.has(bookingId)) grouped.set(bookingId, []);
+      grouped.get(bookingId).push(assignment);
+    });
+    return grouped;
+  }, [assignments]);
+  const readyForAssignment = useMemo(() => bookings.filter((booking) => {
+    const history = assignmentsByBooking.get(booking._id) || [];
+    const hasActiveRequest = history.some((assignment) => ["PENDING", "ACCEPTED"].includes(assignment.status));
+    return (booking.patientArrived || booking.bookingStatus === "Arrived") && booking.paymentStatus === "Paid" && !booking.assignedTechnician && !hasActiveRequest && !["Processing", "Pending Report Approval", "Report Ready"].includes(booking.bookingStatus);
+  }), [bookings, assignmentsByBooking]);
   const workflowSections = [
     {
       title: "New Booking Requests",
@@ -143,12 +176,22 @@ function ReceptionistDashboard() {
   };
 
   const handleAssignTechnician = async (bookingId) => {
+    const technicianId = selectedTechnicians[bookingId];
+    if (!technicianId) {
+      alert("Please select a technician.");
+      return;
+    }
+    if (sendingAssignment) return;
     try {
-      const data = await assignTechnician(bookingId);
+      setSendingAssignment(bookingId);
+      const data = await assignTechnician(bookingId, technicianId);
       alert(data.message);
-      replaceBooking(data.booking);
+      setAssignments((current) => [data.assignment, ...current]);
+      setSelectedTechnicians((current) => ({ ...current, [bookingId]: "" }));
     } catch (error) {
       alert(error.response?.data?.message || "Technician assignment failed");
+    } finally {
+      setSendingAssignment("");
     }
   };
 
@@ -216,7 +259,7 @@ function ReceptionistDashboard() {
             {workflowSections.map((section) => section.variant === "pending" ? (
               <PendingBookingsTable key={section.title} bookings={section.bookings} description={section.description} title={section.title} onStatus={handleStatus} />
             ) : (
-              <BookingSection key={section.title} title={section.title} description={section.description} bookings={section.bookings} onAssignTechnician={handleAssignTechnician} onArrived={(id) => handleStatus(id, "Arrived")} onPaid={setPaymentBooking} onReceipt={handleReceipt} />
+              <BookingSection key={section.title} title={section.title} description={section.description} bookings={section.bookings} assignmentsByBooking={assignmentsByBooking} technicians={technicians} selectedTechnicians={selectedTechnicians} onSelectTechnician={(bookingId, technicianId) => setSelectedTechnicians((current) => ({ ...current, [bookingId]: technicianId }))} sendingAssignment={sendingAssignment} onAssignTechnician={handleAssignTechnician} onArrived={(id) => handleStatus(id, "Arrived")} onPaid={setPaymentBooking} onReceipt={handleReceipt} />
             ))}
           </div>
         )}
@@ -414,14 +457,18 @@ function PendingBookingsTable({ bookings, description, onStatus, title }) {
   );
 }
 
-function BookingSection({ title, description, bookings, onAssignTechnician, onArrived, onPaid, onReceipt }) {
+function BookingSection({ title, description, bookings, assignmentsByBooking, technicians, selectedTechnicians, sendingAssignment, onSelectTechnician, onAssignTechnician, onArrived, onPaid, onReceipt }) {
   return (
     <section className="rounded-3xl border border-emerald-100 bg-white p-5 shadow-xl shadow-emerald-950/5 sm:p-6">
       <SectionHeader count={bookings.length} description={description} title={title} />
       {bookings.length ? (
         <div className="grid gap-4 lg:grid-cols-2">
-          {bookings.map((booking) => (
-            <div key={booking._id} className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-lg hover:shadow-emerald-950/5">
+          {bookings.map((booking) => {
+            const assignmentHistory = assignmentsByBooking?.get(booking._id) || [];
+            const currentAssignment = assignmentHistory.find((assignment) => ["PENDING", "ACCEPTED"].includes(assignment.status)) || assignmentHistory[0];
+            const rejectedTechnicianIds = new Set(assignmentHistory.filter((assignment) => assignment.status === "REJECTED").map((assignment) => assignment.technician?._id || assignment.technician));
+            const canRequest = (booking.patientArrived || booking.bookingStatus === "Arrived") && booking.paymentStatus === "Paid" && !booking.assignedTechnician && !assignmentHistory.some((assignment) => ["PENDING", "ACCEPTED"].includes(assignment.status));
+            return <div key={booking._id} className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-lg hover:shadow-emerald-950/5">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">{booking.bookingCode}</p>
@@ -430,7 +477,7 @@ function BookingSection({ title, description, bookings, onAssignTechnician, onAr
                   <p className="mt-2 text-sm font-semibold text-slate-500">Patient: {booking.name}</p>
                   <p className="text-sm font-semibold text-slate-500">Phone: {booking.phone}</p>
                   <p className="text-sm font-semibold text-slate-500">{booking.bookingDate} | {booking.timeSlot}</p>
-                  {booking.assignedTechnician && <p className="text-sm font-semibold text-slate-500">Technician assigned</p>}
+                  {currentAssignment && <p className="mt-2 text-sm font-semibold text-slate-600">Technician: {currentAssignment.technician?.name || "Assigned technician"} <AssignmentStatus status={currentAssignment.status} /></p>}
                 </div>
                 <div className="text-right">
                   <StatusBadge value={booking.bookingStatus} />
@@ -449,30 +496,29 @@ function BookingSection({ title, description, bookings, onAssignTechnician, onAr
                     <CreditCard size={14} /> Mark as Paid
                   </button>
                 )}
-                {(booking.patientArrived || booking.bookingStatus === "Arrived") && booking.paymentStatus === "Paid" && !["Processing", "Pending Report Approval", "Report Ready"].includes(booking.bookingStatus) && (
-                  <button
-                    type="button"
-                    onClick={() => onAssignTechnician(booking._id)}
-                    disabled={Boolean(booking.assignedTechnician)}
-                    className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-3 py-2 text-xs font-black text-white shadow-sm transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <UserCheck size={14} /> Auto Assign Technician
-                  </button>
-                )}
+                {canRequest && <div className="flex min-w-full flex-col gap-2 sm:flex-row"><select value={selectedTechnicians[booking._id] || ""} onChange={(event) => onSelectTechnician(booking._id, event.target.value)} className="min-w-0 flex-1 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-bold"><option value="">Select technician</option>{technicians.map((technician) => <option key={technician._id} value={technician._id} disabled={rejectedTechnicianIds.has(technician._id)}>{technician.name}{rejectedTechnicianIds.has(technician._id) ? " (previously rejected)" : ""}</option>)}</select><button type="button" onClick={() => onAssignTechnician(booking._id)} disabled={sendingAssignment === booking._id} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-3 py-2 text-xs font-black text-white disabled:opacity-60"><UserCheck size={14} /> {sendingAssignment === booking._id ? "Sending..." : assignmentHistory.length ? "Assign Another Technician" : "Send Request"}</button></div>}
                 {booking.paymentStatus === "Paid" && (
                   <button onClick={() => onReceipt(booking)} className="inline-flex items-center gap-2 rounded-xl bg-emerald-950 px-3 py-2 text-xs font-black text-white shadow-sm transition hover:bg-emerald-900">
                     <Download size={14} /> Generate Receipt
                   </button>
                 )}
               </div>
-            </div>
-          ))}
+              {assignmentHistory.length > 0 && <div className="mt-4 border-t border-emerald-100 pt-3"><p className="text-xs font-black uppercase tracking-wider text-slate-400">Assignment History</p><div className="mt-2 space-y-2">{assignmentHistory.map((assignment) => <div key={assignment._id} className="rounded-xl bg-slate-50 p-3 text-xs text-slate-600"><div className="flex items-center justify-between gap-2"><strong>{assignment.technician?.name || "Technician"}</strong><AssignmentStatus status={assignment.status} /></div><p className="mt-1">Requested: {formatAssignmentDate(assignment.requestedAt)}</p>{assignment.respondedAt && <p>Responded: {formatAssignmentDate(assignment.respondedAt)}</p>}{assignment.rejectionReason && <p>Reason: {assignment.rejectionReason}</p>}{assignment.status === "PENDING" && <p className="text-amber-700">Waiting for technician response...</p>}</div>)}</div></div>}
+            </div>;
+          })}
         </div>
       ) : (
         <Empty text={`No ${title.toLowerCase()}.`} />
       )}
     </section>
   );
+}
+
+const formatAssignmentDate = (value) => value ? new Date(value).toLocaleString("en-IN") : "N/A";
+
+function AssignmentStatus({ status }) {
+  const classes = status === "ACCEPTED" ? "bg-emerald-100 text-emerald-800" : status === "REJECTED" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-800";
+  return <span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-black ${classes}`}>{status}</span>;
 }
 
 function SectionHeader({ count, description, title }) {

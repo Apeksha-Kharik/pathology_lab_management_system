@@ -7,6 +7,7 @@ const {
   createWalkInBooking,
   updateBookingStatus,
   assignTechnician,
+  getTechnicianAssignments,
   markPaymentPaid,
   downloadReceptionistReceipt
 } = require("../controllers/receptionistController");
@@ -18,6 +19,7 @@ router.get("/pending-bookings", protect, allowRoles("receptionist", "admin"), ge
 router.get("/bookings", protect, allowRoles("receptionist", "admin"), getAllBookings);
 router.get("/tests", protect, allowRoles("receptionist", "admin"), getReceptionistTests);
 router.get("/technicians", protect, allowRoles("receptionist", "admin"), getTechnicians);
+router.get("/technician-assignments", protect, allowRoles("receptionist", "admin"), getTechnicianAssignments);
 router.post("/walk-in-bookings", protect, allowRoles("receptionist", "admin"), createWalkInBooking);
 router.patch("/bookings/:id/status", protect, allowRoles("receptionist", "admin"), updateBookingStatus);
 router.patch("/bookings/:id/technician", protect, allowRoles("receptionist", "admin"), assignTechnician);

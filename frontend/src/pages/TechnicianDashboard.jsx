@@ -1,8 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { AlertCircle, ClipboardList, Edit3, Eye, FileText, FlaskConical, LogOut, PlayCircle, Save, Search, Send } from "lucide-react";
+import { AlertCircle, CheckCircle2, ClipboardList, Edit3, Eye, FileText, FlaskConical, LogOut, PlayCircle, Save, Search, Send, XCircle } from "lucide-react";
 import { useAuth } from "../context/useAuth";
 import {
   getTechnicianBookings,
+  getAssignmentRequests,
+  acceptAssignmentRequest,
+  rejectAssignmentRequest,
   saveTechnicianReportDraft,
   startTechnicianReportEntry,
   startTechnicianTest,
@@ -66,28 +69,45 @@ const buildReportRows = (booking) => {
 function TechnicianDashboard() {
   const { user, logout } = useAuth();
   const [bookings, setBookings] = useState([]);
+  const [assignmentRequests, setAssignmentRequests] = useState([]);
+  const [respondingRequest, setRespondingRequest] = useState("");
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [reportBooking, setReportBooking] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState("");
   const [testFilter, setTestFilter] = useState("");
-  const [activeView, setActiveView] = useState("assigned");
+  const [activeView, setActiveView] = useState("requests");
 
   const loadBookings = async () => {
-    setBookings(await getTechnicianBookings());
+    const [bookingData, requestData] = await Promise.all([getTechnicianBookings(), getAssignmentRequests()]);
+    setBookings(bookingData || []);
+    setAssignmentRequests(requestData || []);
   };
 
   useEffect(() => {
     let isMounted = true;
 
-    getTechnicianBookings()
-      .then((data) => {
-        if (isMounted) setBookings(data);
+    Promise.all([getTechnicianBookings(), getAssignmentRequests()])
+      .then(([bookingData, requestData]) => {
+        if (isMounted) {
+          setBookings(bookingData || []);
+          setAssignmentRequests(requestData || []);
+        }
       })
       .catch(() => alert("Unable to load technician bookings"));
 
     return () => {
       isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const refreshRequests = () => getAssignmentRequests().then((data) => setAssignmentRequests(data || [])).catch(() => {});
+    const interval = window.setInterval(refreshRequests, 10000);
+    window.addEventListener("focus", refreshRequests);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshRequests);
     };
   }, []);
 
@@ -134,6 +154,12 @@ function TechnicianDashboard() {
 
   const technicianViews = [
     {
+      id: "requests",
+      label: "Assignment Requests",
+      description: "Incoming technician assignment requests awaiting your response.",
+      icon: ClipboardList
+    },
+    {
       id: "assigned",
       label: "Sample Queue",
       description: "Assigned patients waiting for sample collection or test start.",
@@ -168,6 +194,43 @@ function TechnicianDashboard() {
       replaceBooking(data.booking);
     } catch (error) {
       alert(error.response?.data?.message || "Unable to start test");
+    }
+  };
+
+  const replaceAssignment = (updatedAssignment) => {
+    setAssignmentRequests((current) => current.map((assignment) => assignment._id === updatedAssignment._id ? updatedAssignment : assignment));
+  };
+
+  const handleAcceptAssignment = async (assignmentId) => {
+    if (respondingRequest) return;
+    try {
+      setRespondingRequest(assignmentId);
+      const data = await acceptAssignmentRequest(assignmentId);
+      replaceAssignment(data.assignment);
+      if (data.booking) setBookings((current) => [data.booking, ...current.filter((booking) => booking._id !== data.booking._id)]);
+      alert(data.message);
+    } catch (error) {
+      alert(error.response?.data?.message || "Unable to accept the assignment request");
+      await loadBookings();
+    } finally {
+      setRespondingRequest("");
+    }
+  };
+
+  const handleRejectAssignment = async (assignmentId) => {
+    if (respondingRequest) return;
+    const rejectionReason = window.prompt("Reason for rejection (optional)", "") ?? null;
+    if (rejectionReason === null) return;
+    try {
+      setRespondingRequest(assignmentId);
+      const data = await rejectAssignmentRequest(assignmentId, rejectionReason);
+      replaceAssignment(data.assignment);
+      alert(data.message);
+    } catch (error) {
+      alert(error.response?.data?.message || "Unable to reject the assignment request");
+      await loadBookings();
+    } finally {
+      setRespondingRequest("");
     }
   };
 
@@ -253,6 +316,9 @@ function TechnicianDashboard() {
 
         <section className="rounded-3xl border border-emerald-100 bg-white p-5 shadow-xl shadow-emerald-950/5 sm:p-6">
           <SectionHeader description={activeViewDetails.description} title={activeViewDetails.label} />
+          {activeView === "requests" && (
+            <AssignmentRequests requests={assignmentRequests} respondingRequest={respondingRequest} onAccept={handleAcceptAssignment} onReject={handleRejectAssignment} />
+          )}
           {activeView === "assigned" && (
             <AssignedTable bookings={assignedTests} onView={setSelectedBooking} onSampleCollected={handleSampleCollected} onStart={handleStartTest} />
           )}
@@ -277,7 +343,7 @@ function TechnicianDashboard() {
 function TechnicianDeskNav({ activeView, onChange, views }) {
   return (
     <section className="mb-6 overflow-hidden rounded-3xl border border-emerald-100 bg-white shadow-xl shadow-emerald-950/5">
-      <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-5">
         {views.map((view) => {
           const Icon = view.icon;
           const active = activeView === view.id;
@@ -303,6 +369,23 @@ function TechnicianDeskNav({ activeView, onChange, views }) {
     </section>
   );
 }
+
+function AssignmentRequests({ requests, respondingRequest, onAccept, onReject }) {
+  if (!requests.length) return <Empty text="No incoming assignment requests." />;
+
+  return <div className="grid gap-4 lg:grid-cols-2">{requests.map((request) => {
+    const booking = request.booking || {};
+    const statusClass = request.status === "ACCEPTED" ? "bg-emerald-100 text-emerald-800" : request.status === "REJECTED" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-800";
+    const busy = respondingRequest === request._id;
+    return <article key={request._id} className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
+      <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-wider text-slate-400">{booking.bookingCode || booking._id}</p><h3 className="mt-2 text-lg font-black text-emerald-950">{booking.testName || "Lab assignment"}</h3></div><span className={`rounded-full px-3 py-1 text-xs font-black ${statusClass}`}>{request.status}</span></div>
+      <div className="mt-4 grid gap-1 text-sm font-semibold text-slate-600"><p>Patient: {booking.name || "N/A"}</p><p>Patient ID: {booking.patientCode || "Pending"}</p><p>Sample: {booking.sampleType || booking.collectionType || "N/A"}</p><p>Requested by: {request.requestedBy?.name || "Receptionist"}</p><p>Requested: {formatAssignmentDate(request.requestedAt)}</p>{request.respondedAt && <p>Responded: {formatAssignmentDate(request.respondedAt)}</p>}{request.rejectionReason && <p className="text-red-700">Reason: {request.rejectionReason}</p>}</div>
+      {request.status === "PENDING" && <div className="mt-5 flex gap-3"><button type="button" disabled={busy} onClick={() => onReject(request._id)} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-red-200 px-4 py-3 text-sm font-black text-red-700 disabled:opacity-50"><XCircle size={17} /> Reject</button><button type="button" disabled={busy} onClick={() => onAccept(request._id)} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-3 text-sm font-black text-white disabled:opacity-50"><CheckCircle2 size={17} /> {busy ? "Saving..." : "Accept"}</button></div>}
+    </article>;
+  })}</div>;
+}
+
+const formatAssignmentDate = (value) => value ? new Date(value).toLocaleString("en-IN") : "N/A";
 
 function SectionHeader({ description, title }) {
   return (

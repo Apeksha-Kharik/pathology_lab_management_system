@@ -5,6 +5,21 @@ export const getTechnicianBookings = async () => {
   return response.data;
 };
 
+export const getAssignmentRequests = async () => {
+  const response = await api.get("/api/technician/assignment-requests");
+  return response.data;
+};
+
+export const acceptAssignmentRequest = async (assignmentId) => {
+  const response = await api.patch(`/api/technician/assignment-requests/${assignmentId}/accept`);
+  return response.data;
+};
+
+export const rejectAssignmentRequest = async (assignmentId, rejectionReason = "") => {
+  const response = await api.patch(`/api/technician/assignment-requests/${assignmentId}/reject`, { rejectionReason });
+  return response.data;
+};
+
 export const updateTechnicianStatus = async (bookingId, status) => {
   const response = await api.patch(`/api/technician/bookings/${bookingId}/status`, { status });
   return response.data;
