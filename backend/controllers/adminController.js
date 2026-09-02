@@ -447,13 +447,19 @@ const deleteTest = async (req, res) => {
   }
 };
 
-const normalizeTestIds = (values = []) => [...new Set((Array.isArray(values) ? values : []).map((value) => String(value?._id || value)))];
+const normalizeTestIds = (values = []) => [...new Set(
+  (Array.isArray(values) ? values : [])
+    .map((value) => String(value?._id || value || "").trim())
+    .filter(Boolean)
+)];
 
 const validatePackageTests = async (values) => {
   const ids = normalizeTestIds(values);
   if (!ids.length) return { error: "Select at least one active test for the package" };
   if (ids.some((id) => !mongoose.isValidObjectId(id))) return { error: "One or more selected test IDs are invalid" };
-  const activeTests = await Test.find({ _id: { $in: ids }, isActive: true }).select("_id");
+  // Older test records predate `isActive` and are active by default. Keep this
+  // in sync with the admin UI, which only excludes explicitly inactive tests.
+  const activeTests = await Test.find({ _id: { $in: ids }, isActive: { $ne: false } }).select("_id");
   if (activeTests.length !== ids.length) return { error: "Every selected test must exist and be active" };
   return { ids };
 };
@@ -480,7 +486,7 @@ const buildPackagePayload = (body, includedTests) => {
 };
 
 const validatePackagePayload = async (body) => {
-  if (!body.packageName || !body.packageCode || body.price === undefined || body.price === "") return { error: "Package name, code and price are required" };
+  if (!String(body.packageName || "").trim() || !String(body.packageCode || "").trim() || body.price === undefined || body.price === "") return { error: "Package name, code and price are required" };
   if (!Number.isFinite(Number(body.price)) || Number(body.price) <= 0) return { error: "Package price must be a positive number" };
   if (body.discountPrice !== undefined && body.discountPrice !== "" && body.discountPrice !== null && (!Number.isFinite(Number(body.discountPrice)) || Number(body.discountPrice) < 0 || Number(body.discountPrice) >= Number(body.price))) return { error: "Discount price must be non-negative and lower than the package price" };
   if (body.status && !["active", "inactive"].includes(String(body.status).toLowerCase())) return { error: "Package status must be active or inactive" };

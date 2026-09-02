@@ -5,7 +5,9 @@ const defaultApiUrl = `${window.location.protocol}//${window.location.hostname}:
 
 const api = axios.create({
   baseURL: (configuredApiUrl || defaultApiUrl).replace(/\/$/, ""),
-  timeout: 10000
+  // Atlas discovery can take longer on the first request. Keep this aligned
+  // with the backend's database connection timeout.
+  timeout: 30000
 });
 
 api.interceptors.request.use((config) => {

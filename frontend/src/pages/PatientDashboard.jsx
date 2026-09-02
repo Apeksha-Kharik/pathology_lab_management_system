@@ -369,16 +369,27 @@ function PatientDashboard() {
   const loadDashboard = async () => {
     try {
       setLoading(true);
-      const [testsData, packagesData, bookingsData, reportsData] = await Promise.all([
+      const results = await Promise.allSettled([
         getTests(),
         getPackages(),
         getBookings(),
         getReports()
       ]);
-      setTests(testsData || []);
-      setPackages(packagesData || []);
-      setBookings(bookingsData || []);
-      setReports(reportsData || []);
+      const valueOrEmpty = (result) => result.status === "fulfilled" ? result.value || [] : [];
+      setTests(valueOrEmpty(results[0]));
+      setPackages(valueOrEmpty(results[1]));
+      setBookings(valueOrEmpty(results[2]));
+      setReports(valueOrEmpty(results[3]));
+
+      const catalogErrors = results.slice(0, 2).filter((result) => result.status === "rejected");
+      if (catalogErrors.length) {
+        const error = catalogErrors[0].reason;
+        const message = error.response?.data?.message
+          || (error.code === "ECONNABORTED"
+            ? "The server could not reach the database in time. Check the MongoDB Atlas connection and IP access list."
+            : "Unable to connect to the pathology server. Confirm that the backend is running on port 5000.");
+        alert(message);
+      }
     } catch (error) {
       alert(error.response?.data?.message || "Unable to load patient dashboard");
     } finally {

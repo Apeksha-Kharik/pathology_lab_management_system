@@ -15,7 +15,7 @@ const loadAdminPayload = async () => {
         api.get('/api/admin/dashboard-metrics')
     ]);
 
-    const errors = [userRes, testRes, metricsRes]
+    const errors = [userRes, testRes, packageRes, metricsRes]
         .filter((result) => result.status === 'rejected')
         .map((result) => result.reason?.response?.data?.message || result.reason?.message || 'Unable to load one admin section');
 
@@ -192,7 +192,69 @@ const AdminDashboard = () => {
 
     const openCreatePackage=()=>{setEditingPackageId('');setPackageForm(emptyPackageForm());setPackageError('');setView('addPackage');};
     const openEditPackage=(item)=>{setEditingPackageId(item._id);setPackageForm({packageName:item.packageName||'',packageCode:item.packageCode||'',price:item.price??'',discountPrice:item.discountPrice??'',status:item.status||(item.isActive===false?'inactive':'active'),category:item.category||'Health Checkup',description:item.description||'',imageUrl:item.imageUrl||'',includedTests:[...new Set((item.includedTests||[]).map(test=>test._id||test))],homeCollection:item.homeCollection!==false});setPackageError('');setView('addPackage');};
-    const handleAddPackage=async(e)=>{e.preventDefault();setPackageError('');const includedTests=[...new Set(packageForm.includedTests)];if(!includedTests.length){setPackageError('Select at least one active test for this package.');return;}try{setPackageSaving(true);const payload={...packageForm,includedTests};if(editingPackageId)await api.put(`/api/admin/packages/${editingPackageId}`,payload);else await api.post('/api/admin/packages',payload);alert(`Package ${editingPackageId?'updated':'created'} successfully.`);setPackageForm(emptyPackageForm());setEditingPackageId('');setView('availablePackages');await fetchData();}catch(err){setPackageError(err.response?.data?.message||'Failed to save package.');}finally{setPackageSaving(false);}};
+    const handleAddPackage = async (event) => {
+        event.preventDefault();
+        if (packageSaving) return;
+
+        setPackageError('');
+        const packageName = packageForm.packageName.trim();
+        const packageCode = packageForm.packageCode.trim().toUpperCase();
+        const price = Number(packageForm.price);
+        const discountPrice = packageForm.discountPrice === '' ? null : Number(packageForm.discountPrice);
+        const includedTests = [...new Set(packageForm.includedTests.filter(Boolean))];
+
+        if (!packageName || !packageCode) {
+            setPackageError('Package name and package code are required.');
+            return;
+        }
+        if (!Number.isFinite(price) || price <= 0) {
+            setPackageError('Package price must be greater than zero.');
+            return;
+        }
+        if (discountPrice !== null && (!Number.isFinite(discountPrice) || discountPrice < 0 || discountPrice >= price)) {
+            setPackageError('Discount price must be lower than the package price.');
+            return;
+        }
+        if (!includedTests.length) {
+            setPackageError('Select at least one active test for this package.');
+            return;
+        }
+
+        try {
+            setPackageSaving(true);
+            const payload = {
+                ...packageForm,
+                packageName,
+                packageCode,
+                price,
+                discountPrice,
+                description: packageForm.description.trim(),
+                includedTests
+            };
+            const response = editingPackageId
+                ? await api.put(`/api/admin/packages/${editingPackageId}`, payload)
+                : await api.post('/api/admin/packages', payload);
+            const savedPackage = response.data?.package;
+
+            if (savedPackage) {
+                setPackages((current) => editingPackageId
+                    ? current.map((item) => item._id === editingPackageId ? savedPackage : item)
+                    : [savedPackage, ...current]
+                );
+            }
+
+            alert(response.data?.message || `Package ${editingPackageId ? 'updated' : 'created'} successfully.`);
+            setPackageForm(emptyPackageForm());
+            setPackageTestSearch('');
+            setEditingPackageId('');
+            setView('availablePackages');
+        } catch (err) {
+            const response = err.response?.data;
+            setPackageError([response?.message, response?.error].filter(Boolean).join(': ') || err.message || 'Failed to save package.');
+        } finally {
+            setPackageSaving(false);
+        }
+    };
     const editTemplate = (type, item) => {
         setTemplateTargetId(`${type}:${item._id}`);
         setTestForm({ ...item, testName: item.testName || item.packageName });
@@ -475,7 +537,7 @@ const AdminDashboard = () => {
                 )}
 
                 {view === 'availablePackages'&&(<div className="space-y-8"><div className="flex justify-between"><div><h1 className="text-3xl font-bold text-emerald-950">Package Management</h1><p className="text-slate-500">Manage test packages available to patients.</p></div><button onClick={openCreatePackage} className="rounded-xl bg-emerald-700 px-5 py-3 font-bold text-white">Create Package</button></div><div className="overflow-x-auto rounded-2xl border bg-white"><table className="w-full min-w-[850px] text-left text-sm"><thead className="bg-emerald-50"><tr>{['Package Name','Code','Price','Number of Tests','Status','Actions'].map(x=><th key={x} className="p-4">{x}</th>)}</tr></thead><tbody>{packages.map(item=><tr key={item._id} className="border-t"><td className="p-4 font-bold">{item.packageName}</td><td className="p-4 font-mono">{item.packageCode||'Legacy'}</td><td className="p-4 font-black">INR {item.discountPrice??item.price}</td><td className="p-4">{item.includedTests?.length||0}</td><td className="p-4 uppercase">{item.status||(item.isActive===false?'inactive':'active')}</td><td className="p-4"><div className="flex gap-2"><button onClick={()=>setViewingPackage(item)} className="rounded border px-3 py-2 text-emerald-700">View Tests</button><button onClick={()=>openEditPackage(item)} className="rounded border px-3 py-2 text-blue-700">Edit</button><button onClick={()=>deletePackage(item._id)} className="rounded border px-3 py-2 text-red-700">Delete</button></div></td></tr>)}</tbody></table></div>{viewingPackage&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={()=>setViewingPackage(null)}><div className="max-h-[80vh] w-full max-w-xl overflow-auto rounded-3xl bg-white p-6" onClick={e=>e.stopPropagation()}><div className="flex justify-between"><h2 className="text-2xl font-black">{viewingPackage.packageName}</h2><button onClick={()=>setViewingPackage(null)}>Close</button></div><div className="mt-4 space-y-2">{viewingPackage.includedTests?.map((test,i)=><p key={test._id||test} className="rounded-xl bg-slate-50 p-3">{i+1}. {test.testName||test}</p>)}</div></div></div>}</div>)}
-                {view === 'addPackage'&&(<div className="mx-auto max-w-4xl"><h1 className="mb-6 text-center text-3xl font-bold">{editingPackageId?'Edit Package':'Create Package'}</h1><form onSubmit={handleAddPackage} className="space-y-6 rounded-3xl border bg-white p-8">{packageError&&<p className="rounded-xl bg-red-50 p-4 font-bold text-red-700">{packageError}</p>}<div className="grid gap-6 sm:grid-cols-2"><FormInput label="Package Name" required value={packageForm.packageName} onChange={e=>setPackageForm({...packageForm,packageName:e.target.value})}/><FormInput label="Package Code" required value={packageForm.packageCode} onChange={e=>setPackageForm({...packageForm,packageCode:e.target.value.toUpperCase()})}/><FormInput label="Package Price" required type="number" min="0.01" value={packageForm.price} onChange={e=>setPackageForm({...packageForm,price:e.target.value})}/><FormInput label="Discount Price (optional)" type="number" min="0" value={packageForm.discountPrice} onChange={e=>setPackageForm({...packageForm,discountPrice:e.target.value})}/><SelectInput label="Status" options={['active','inactive']} value={packageForm.status} onChange={e=>setPackageForm({...packageForm,status:e.target.value})}/></div><textarea required placeholder="Description" value={packageForm.description} onChange={e=>setPackageForm({...packageForm,description:e.target.value})} className="h-28 w-full rounded-xl border p-4"/><div><div className="flex flex-wrap gap-2"><input placeholder="Search active tests" value={packageTestSearch} onChange={e=>setPackageTestSearch(e.target.value)} className="flex-1 rounded-xl border p-3"/><button type="button" onClick={()=>setPackageForm({...packageForm,includedTests:tests.filter(t=>t.isActive!==false).map(t=>t._id)})} className="rounded bg-emerald-700 px-3 text-white">Select All Tests</button><button type="button" onClick={()=>setPackageForm({...packageForm,includedTests:[]})} className="rounded border px-3">Clear All</button></div><div className="mt-3 max-h-72 overflow-auto rounded-xl border p-2">{tests.filter(t=>t.isActive!==false&&(t.testName||'').toLowerCase().includes(packageTestSearch.toLowerCase())).map(test=><label key={test._id} className="flex gap-3 rounded p-3 hover:bg-emerald-50"><input type="checkbox" checked={packageForm.includedTests.includes(test._id)} onChange={e=>setPackageForm({...packageForm,includedTests:e.target.checked?[...new Set([...packageForm.includedTests,test._id])]:packageForm.includedTests.filter(id=>id!==test._id)})}/>{test.testName}</label>)}</div><p className="mt-2 font-bold text-emerald-700">{packageForm.includedTests.length} Tests Selected</p></div><button disabled={packageSaving} className="w-full rounded-xl bg-emerald-800 py-4 font-bold text-white">{packageSaving?'Saving...':editingPackageId?'Update Package':'Create Package'}</button></form></div>)}
+                {view === 'addPackage'&&(<div className="mx-auto max-w-4xl"><h1 className="mb-6 text-center text-3xl font-bold">{editingPackageId?'Edit Package':'Create Package'}</h1><form noValidate onSubmit={handleAddPackage} className="space-y-6 rounded-3xl border bg-white p-8">{packageError&&<p role="alert" className="rounded-xl bg-red-50 p-4 font-bold text-red-700">{packageError}</p>}<div className="grid gap-6 sm:grid-cols-2"><FormInput label="Package Name" required value={packageForm.packageName} onChange={e=>setPackageForm({...packageForm,packageName:e.target.value})}/><FormInput label="Package Code" required value={packageForm.packageCode} onChange={e=>setPackageForm({...packageForm,packageCode:e.target.value.toUpperCase()})}/><FormInput label="Package Price" required type="number" min="0.01" value={packageForm.price} onChange={e=>setPackageForm({...packageForm,price:e.target.value})}/><FormInput label="Discount Price (optional)" type="number" min="0" value={packageForm.discountPrice} onChange={e=>setPackageForm({...packageForm,discountPrice:e.target.value})}/><SelectInput label="Status" options={['active','inactive']} value={packageForm.status} onChange={e=>setPackageForm({...packageForm,status:e.target.value})}/></div><textarea placeholder="Description (optional)" value={packageForm.description} onChange={e=>setPackageForm({...packageForm,description:e.target.value})} className="h-28 w-full rounded-xl border p-4"/><div><div className="flex flex-wrap gap-2"><input placeholder="Search active tests" value={packageTestSearch} onChange={e=>setPackageTestSearch(e.target.value)} className="flex-1 rounded-xl border p-3"/><button type="button" onClick={()=>setPackageForm({...packageForm,includedTests:tests.filter(t=>t.isActive!==false).map(t=>t._id)})} className="rounded bg-emerald-700 px-3 text-white">Select All Tests</button><button type="button" onClick={()=>setPackageForm({...packageForm,includedTests:[]})} className="rounded border px-3">Clear All</button></div><div className="mt-3 max-h-72 overflow-auto rounded-xl border p-2">{tests.filter(t=>t.isActive!==false&&(t.testName||'').toLowerCase().includes(packageTestSearch.toLowerCase())).map(test=><label key={test._id} className="flex gap-3 rounded p-3 hover:bg-emerald-50"><input type="checkbox" checked={packageForm.includedTests.includes(test._id)} onChange={e=>setPackageForm({...packageForm,includedTests:e.target.checked?[...new Set([...packageForm.includedTests,test._id])]:packageForm.includedTests.filter(id=>id!==test._id)})}/>{test.testName}</label>)}</div><p className="mt-2 font-bold text-emerald-700">{packageForm.includedTests.length} Tests Selected</p></div><button type="submit" disabled={packageSaving} className="w-full rounded-xl bg-emerald-800 py-4 font-bold text-white disabled:cursor-not-allowed disabled:opacity-60">{packageSaving?'Saving...':editingPackageId?'Update Package':'Create Package'}</button></form></div>)}
 
                 {/* Add Test View */}
                 {view === 'addTest' && (

@@ -166,7 +166,7 @@ const getTests = async (req, res) => {
 
 const getPackages = async (req, res) => {
   try {
-    const packages = await Package.find({ isActive: true, status: { $ne: "inactive" }, includedTests: { $exists: true, $ne: [] } })
+    const packages = await Package.find({ isActive: { $ne: false }, status: { $ne: "inactive" }, includedTests: { $exists: true, $ne: [] } })
       .populate("includedTests", "testName category price description isActive")
       .sort({ createdAt: -1 });
     res.json(packages);
@@ -189,10 +189,10 @@ const createBooking = async (req, res) => {
 
     const bookingType = packageId ? "Package" : "Test";
     const selectedItem = packageId
-      ? await Package.findOne({ _id: packageId, isActive: true, status: { $ne: "inactive" }, includedTests: { $exists: true, $ne: [] } })
+      ? await Package.findOne({ _id: packageId, isActive: { $ne: false }, status: { $ne: "inactive" }, includedTests: { $exists: true, $ne: [] } })
       : await Test.findById(testId);
     if (selectedItem && bookingType === "Package") {
-      const activeTestCount = await Test.countDocuments({ _id: { $in: selectedItem.includedTests }, isActive: true });
+      const activeTestCount = await Test.countDocuments({ _id: { $in: selectedItem.includedTests }, isActive: { $ne: false } });
       if (activeTestCount !== selectedItem.includedTests.length) return res.status(400).json({ message: "This package contains an unavailable test and cannot be booked" });
     }
 
