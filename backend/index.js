@@ -6,6 +6,7 @@ const path = require("path");
 const connectDB = require("./config/db");
 const { verifyTransporter } = require("./config/email");
 const ensureDefaultPackages = require("./utils/ensureDefaultPackages");
+const ensureDefaultTests = require("./utils/ensureDefaultTests");
 
 const authRoutes = require("./routes/authRoutes");
 const adminRoutes = require("./routes/adminRoutes");
@@ -72,6 +73,7 @@ const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
   await connectDB();
+  await ensureDefaultTests();
   await ensureDefaultPackages();
 
   app.listen(PORT, () => {
