@@ -1566,24 +1566,8 @@ function ReportsAndReceipts({ bookings, reports }) {
 
 function ReportButton({ report, user }) {
   const [reportAction, setReportAction] = useState("");
+  const [showPreview, setShowPreview] = useState(false);
 
-  const handleView = async () => {
-    try {
-      setReportAction("view");
-      const blob = await downloadReport(report._id);
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
-      link.click();
-      window.setTimeout(() => window.URL.revokeObjectURL(url), 60000);
-    } catch (error) {
-      alert(error.reportMessage || error.response?.data?.message || "Report preview failed");
-    } finally {
-      setReportAction("");
-    }
-  };
   const handleDownload = async () => {
     try {
       setReportAction("download");
@@ -1608,15 +1592,77 @@ function ReportButton({ report, user }) {
         <p className="mt-1 text-xs text-slate-500">Approved report</p>
       </div>
       <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={handleView} disabled={Boolean(reportAction)} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">
-          <Eye size={16} /> {reportAction === "view" ? "Opening..." : "View Report"}
+        <button type="button" onClick={() => setShowPreview(true)} disabled={Boolean(reportAction)} className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">
+          <Eye size={16} /> View Report
         </button>
         <button type="button" onClick={handleDownload} disabled={Boolean(reportAction)} className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60">
           <Download size={16} /> {reportAction === "download" ? "Downloading..." : "Download"}
         </button>
       </div>
+      {showPreview && <ReportPreview report={report} user={user} onClose={() => setShowPreview(false)} onDownload={handleDownload} downloading={reportAction === "download"} />}
     </div>
   );
+}
+
+function ReportPreview({ report, user, onClose, onDownload, downloading }) {
+  const booking = report.bookingId || {};
+  const resultStatusClass = (status) => status === "Critical" || status === "Abnormal"
+    ? "text-red-700"
+    : status === "High" || status === "Low"
+      ? "text-amber-700"
+      : "text-emerald-700";
+  const signatureUrl = report.pathologistSignatureImage || report.approvedBy?.signatureUrl || "";
+  const authorizedSignature = report.authorizedSignatureImage || report.authorizedBy?.signatureUrl || signatureUrl;
+  const assetUrl = (value) => !value || value.startsWith("http") || value.startsWith("data:") ? value : `${window.location.protocol}//${window.location.hostname}:5000${value}`;
+  const dateTime = (value) => value ? new Date(value).toLocaleString("en-IN") : "N/A";
+
+  return (
+    <div className="fixed inset-0 z-[100] overflow-y-auto bg-slate-950/70 p-3 sm:p-6">
+      <style>{`@media print { body * { visibility: hidden !important; } #lab-report-print, #lab-report-print * { visibility: visible !important; } #lab-report-print { position: absolute !important; inset: 0 !important; width: 210mm !important; min-height: 297mm !important; margin: 0 !important; box-shadow: none !important; } .report-no-print { display: none !important; } @page { size: A4; margin: 10mm; } }`}</style>
+      <div className="report-no-print sticky top-0 z-10 mx-auto mb-3 flex max-w-[210mm] flex-wrap justify-end gap-2 rounded-xl bg-white p-3 shadow-lg">
+        <button type="button" onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-bold text-white"><Printer size={16} /> Print Report</button>
+        <button type="button" onClick={onDownload} disabled={downloading} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"><Download size={16} /> {downloading ? "Downloading..." : "Download PDF"}</button>
+        <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 p-2 text-slate-600"><X size={18} /></button>
+      </div>
+
+      <article id="lab-report-print" className="mx-auto min-h-[297mm] w-full max-w-[210mm] bg-white p-6 text-slate-900 shadow-2xl sm:p-10">
+        <header className="flex items-center justify-between gap-5 border-b-4 border-emerald-700 pb-5">
+          <div className="flex items-center gap-4"><img src={logo} alt="INDIPATH logo" className="h-16 w-16 object-contain" /><div><h1 className="text-3xl font-black tracking-tight text-emerald-950">INDIPATH</h1><p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">Super Speciality Pathology Lab</p></div></div>
+          <div className="text-right text-xs leading-5 text-slate-600"><p className="font-bold text-slate-900">Diagnostic Test Report</p><p>22 Mahapurush Complex, Kankavali</p><p>02367-231970 · 7448231970</p></div>
+        </header>
+
+        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          <ReportSection title="Patient Details" rows={[["Patient Name", booking.name || user?.name], ["Patient ID", booking.patientCode], ["Age / Gender", `${booking.age || user?.age || "N/A"} / ${booking.gender || user?.gender || "N/A"}`], ["Phone", booking.phone || user?.phone]]} />
+          <ReportSection title="Test Details" rows={[["Report ID", report.reportId], ["Booking ID", booking.bookingCode], ["Sample ID", booking.sampleId], ["Test Name", report.testName], ["Sample Type", booking.sampleType || "N/A"], ["Report Status", report.reportStatus || report.status]]} />
+        </div>
+
+        <section className="mt-5 overflow-hidden rounded-xl border border-slate-200">
+          <h2 className="bg-emerald-800 px-4 py-2 text-sm font-black uppercase tracking-wider text-white">Test Results</h2>
+          <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-emerald-50 text-xs uppercase text-emerald-950"><tr><th className="p-3">Test / Parameter</th><th className="p-3">Result</th><th className="p-3">Unit</th><th className="p-3">Reference Range</th><th className="p-3">Status</th></tr></thead><tbody>{(report.results || []).map((row, index) => <tr key={`${row.parameter}-${index}`} className="border-t"><td className="p-3 font-bold">{row.parameter}</td><td className="p-3">{row.value}</td><td className="p-3">{row.unit || "—"}</td><td className="p-3">{row.referenceRange || row.normalRange || "—"}</td><td className={`p-3 font-black ${resultStatusClass(row.status)}`}>{row.status || "Not Set"}</td></tr>)}</tbody></table></div>
+        </section>
+
+        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          <ReportSection title="Billing / Receipt" rows={[["Receipt ID", booking.receiptId || booking.receiptNumber], ["Amount", `INR ${Number(booking.amount || 0).toLocaleString("en-IN")}`], ["Payment Status", booking.paymentStatus], ["Payment Method", String(booking.paymentMethod || "N/A").toUpperCase()]]} />
+          <ReportSection title="Report Information" rows={[["Sample Status", booking.sampleStatus], ["Approved", dateTime(report.approvedAt)], ["Pathologist", report.approvedPathologistName || report.approvedBy?.name], ["Authorization", report.authorizationStatus || "Authorized"]]} />
+        </div>
+
+        {(report.technicianRemarks || report.pathologistRemarks) && <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm"><p><strong>Technician Remarks:</strong> {report.technicianRemarks || "N/A"}</p><p className="mt-2"><strong>Pathologist Remarks:</strong> {report.pathologistRemarks || "N/A"}</p></div>}
+
+        <footer className="mt-16 grid grid-cols-2 gap-12 text-center text-xs">
+          <SignatureArea image={assetUrl(signatureUrl)} name={report.approvedPathologistName || report.approvedBy?.name || "Pathologist"} subtitle={[report.approvedPathologistQualification, report.approvedPathologistRegistrationNumber && `Reg. No. ${report.approvedPathologistRegistrationNumber}`].filter(Boolean).join(" · ")} label="Pathologist Signature" />
+          <SignatureArea image={assetUrl(authorizedSignature)} name={report.authorizedPersonName || report.approvedPathologistName || "Authorized Laboratory Person"} subtitle={report.authorizationStatus === "Authorized" ? `Authorized ${dateTime(report.authorizedAt || report.approvedAt)}` : "Authorization pending"} label="Authorized Signature" />
+        </footer>
+      </article>
+    </div>
+  );
+}
+
+function ReportSection({ title, rows }) {
+  return <section className="overflow-hidden rounded-xl border border-slate-200"><h2 className="bg-emerald-800 px-4 py-2 text-xs font-black uppercase tracking-wider text-white">{title}</h2><dl className="grid grid-cols-2 gap-x-4 gap-y-2 p-4 text-xs">{rows.map(([label, value]) => <React.Fragment key={label}><dt className="font-bold text-slate-500">{label}</dt><dd className="font-semibold text-slate-900">{value || "N/A"}</dd></React.Fragment>)}</dl></section>;
+}
+
+function SignatureArea({ image, name, subtitle, label }) {
+  return <div className="flex min-h-28 flex-col justify-end"><div className="mb-1 flex h-14 items-end justify-center">{image && <img src={image} alt={label} className="max-h-14 max-w-40 object-contain" />}</div><div className="border-t border-slate-500 pt-2"><p className="font-black text-slate-900">{name}</p><p className="mt-1 text-[10px] text-slate-500">{subtitle || label}</p><p className="mt-1 font-bold uppercase tracking-wider text-emerald-800">{label}</p></div></div>;
 }
 
 function ReceiptButton({ booking, user }) {

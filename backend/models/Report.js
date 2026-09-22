@@ -5,7 +5,12 @@ const resultSchema = new mongoose.Schema({
   value: { type: String, required: true },
   unit: { type: String },
   referenceRange: { type: String },
-  normalRange: { type: String }
+  normalRange: { type: String },
+  status: {
+    type: String,
+    enum: ["Normal", "Low", "High", "Abnormal", "Critical", "Not Set"],
+    default: "Not Set"
+  }
 }, { _id: false });
 
 const reportSchema = new mongoose.Schema({
@@ -26,6 +31,15 @@ const reportSchema = new mongoose.Schema({
   approvedPathologistName: { type: String },
   approvedPathologistQualification: { type: String },
   approvedPathologistRegistrationNumber: { type: String },
+  authorizedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  authorizedPersonName: { type: String, trim: true },
+  authorizedSignatureImage: { type: String, trim: true },
+  authorizedAt: { type: Date },
+  authorizationStatus: {
+    type: String,
+    enum: ["Pending", "Authorized"],
+    default: "Pending"
+  },
   rejectionReason: { type: String },
   reportStatus: {
     type: String,

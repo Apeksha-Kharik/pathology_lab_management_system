@@ -14,7 +14,7 @@ import {
 } from "../services/technicianService";
 import logo from "../assets/logo.png";
 
-const blankResult = { parameter: "", value: "", unit: "", normalRange: "" };
+const blankResult = { parameter: "", value: "", unit: "", normalRange: "", status: "Not Set" };
 const technicianFont = "Aptos, 'Avenir Next', Inter, 'Segoe UI', system-ui, sans-serif";
 
 const getReportTemplate = (booking) => {
@@ -41,7 +41,8 @@ const toResultRow = (row = {}) => ({
   parameter: row.parameter || "",
   value: row.value || "",
   unit: row.unit || "",
-  normalRange: row.normalRange || row.referenceRange || ""
+  normalRange: row.normalRange || row.referenceRange || "",
+  status: row.status || "Not Set"
 });
 
 const buildReportRows = (booking) => {
@@ -634,7 +635,7 @@ function ReportModal({ booking, onClose, onDone }) {
             <tr>
               <th className="p-3">Parameter</th>
               <th className="p-3">Result</th>
-              <th className="p-3">Unit</th><th className="p-3">Normal Range</th>
+              <th className="p-3">Unit</th><th className="p-3">Reference Range</th><th className="p-3">Status</th>
             </tr>
           </thead>
           <tbody>
@@ -643,6 +644,7 @@ function ReportModal({ booking, onClose, onDone }) {
                 <td className="p-2"><Input disabled={isLocked} placeholder="Parameter" value={row.parameter} onChange={(e) => updateResult(index, "parameter", e.target.value)} /></td>
                 <td className="p-2"><Input disabled={isLocked} placeholder="Result" value={row.value} onChange={(e) => updateResult(index, "value", e.target.value)} /></td>
                 <td className="p-2"><Input disabled={isLocked} placeholder="Unit" value={row.unit} onChange={(e) => updateResult(index, "unit", e.target.value)} /></td><td className="p-2"><Input disabled={isLocked} placeholder="Reference range" value={row.normalRange} onChange={(e) => updateResult(index, "normalRange", e.target.value)} /></td>
+                <td className="p-2"><select disabled={isLocked} value={row.status || "Not Set"} onChange={(e) => updateResult(index, "status", e.target.value)} className="w-full rounded-md border border-slate-200 bg-white p-2.5 outline-none focus:border-emerald-500 disabled:bg-slate-50">{["Not Set", "Normal", "Low", "High", "Abnormal", "Critical"].map((value) => <option key={value}>{value}</option>)}</select></td>
               </tr>
             ))}
           </tbody>

@@ -15,6 +15,7 @@ const receptionistRoutes = require("./routes/receptionistRoutes");
 const technicianRoutes = require("./routes/technicianRoutes");
 const pathologistRoutes = require("./routes/pathologistRoutes");
 const profileRoutes = require("./routes/profileRoutes");
+const documentRoutes = require("./routes/documentRoutes");
 const { validateRequest } = require("./middleware/validateRequest");
 
 dotenv.config();
@@ -68,6 +69,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/receptionist", receptionistRoutes);
 app.use("/api/technician", technicianRoutes);
 app.use("/api/pathologist", pathologistRoutes);
+app.use("/api/documents", documentRoutes);
 
 const PORT = process.env.PORT || 5000;
 

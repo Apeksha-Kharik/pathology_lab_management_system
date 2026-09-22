@@ -17,7 +17,8 @@ const normalizeResults = (results = []) => {
       value: row.value,
       unit: row.unit || "",
       referenceRange: row.normalRange || row.referenceRange || "",
-      normalRange: row.normalRange || row.referenceRange || ""
+      normalRange: row.normalRange || row.referenceRange || "",
+      status: ["Normal", "Low", "High", "Abnormal", "Critical"].includes(row.status) ? row.status : "Not Set"
     }));
 };
 

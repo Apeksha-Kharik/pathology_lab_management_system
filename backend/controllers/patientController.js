@@ -141,9 +141,9 @@ const drawReceiptBox = (doc, rows) => {
 };
 
 const drawReceiptResults = (doc, results) => {
-  const columns = [56, 220, 320, 396];
-  const widths = [164, 100, 76, 110];
-  const headings = ["PARAMETER", "RESULT", "UNIT", "REFERENCE RANGE"];
+  const columns = [56, 190, 270, 330, 430];
+  const widths = [134, 80, 60, 100, 76];
+  const headings = ["PARAMETER", "RESULT", "UNIT", "REFERENCE RANGE", "STATUS"];
   const startPage = (subtitle = "") => {
     drawLetterhead(doc);
     drawTitleBlock(doc, "TEST RESULTS", subtitle);
@@ -168,7 +168,7 @@ const drawReceiptResults = (doc, results) => {
     }
     doc.rect(pdfLayout.left, rowTop, pdfLayout.right - pdfLayout.left, 24).fill(index % 2 ? "#f2faf5" : "#ffffff");
     doc.strokeColor("#cfe4d8").rect(pdfLayout.left, rowTop, pdfLayout.right - pdfLayout.left, 24).stroke();
-    [result.parameter, result.value, result.unit || "", result.normalRange || result.referenceRange || "N/A"].forEach((value, column) => doc.fillColor("#1f2937").fontSize(8.5).font(column === 0 ? "Helvetica-Bold" : "Helvetica").text(String(value ?? "N/A"), columns[column] + 5, rowTop + 7, { width: widths[column] - 8, height: 14, ellipsis: true }));
+    [result.parameter, result.value, result.unit || "", result.normalRange || result.referenceRange || "N/A", result.status || "Not Set"].forEach((value, column) => doc.fillColor("#1f2937").fontSize(8.2).font(column === 0 || column === 4 ? "Helvetica-Bold" : "Helvetica").text(String(value ?? "N/A"), columns[column] + 5, rowTop + 7, { width: widths[column] - 8, height: 14, ellipsis: true }));
     rowTop += 24;
   });
   doc.y = rowTop + 18;
@@ -301,7 +301,9 @@ const getBookings = async (req, res) => {
 const getReports = async (req, res) => {
   try {
     const reports = await Report.find({ userId: req.user._id, status: "Approved" })
-      .populate("bookingId", "name patientCode bookingCode testName")
+      .populate("bookingId")
+      .populate("approvedBy", "name qualification registrationNumber signatureUrl")
+      .populate("authorizedBy", "name qualification registrationNumber signatureUrl")
       .sort({ approvedAt: -1 });
     res.json(reports);
   } catch (error) {
@@ -315,7 +317,7 @@ const downloadReport = async (req, res) => {
       _id: req.params.reportId,
       userId: req.user._id,
       status: "Approved"
-    }).populate("bookingId").populate("approvedBy", "name qualification registrationNumber signatureUrl");
+    }).populate("bookingId").populate("approvedBy", "name qualification registrationNumber signatureUrl").populate("authorizedBy", "name qualification registrationNumber signatureUrl");
 
     if (!report) {
       return res.status(404).json({ message: "Report not found or not ready" });
@@ -359,10 +361,10 @@ const downloadReport = async (req, res) => {
       doc.y += 46;
     }
     const tableTop = doc.y + 5;
-    const columns = [50, 215, 315, 390];
-    const widths = [165, 100, 75, 115];
+    const columns = [50, 185, 265, 325, 425];
+    const widths = [135, 80, 60, 100, 80];
     doc.rect(50, tableTop, 455, 19).fill("#187b4b");
-    ["PARAMETER", "RESULT", "UNIT", "REFERENCE RANGE"].forEach((heading, index) => doc.fillColor("#ffffff").fontSize(8).font("Helvetica-Bold").text(heading, columns[index] + 5, tableTop + 6, { width: widths[index] - 8 }));
+    ["PARAMETER", "RESULT", "UNIT", "REFERENCE RANGE", "STATUS"].forEach((heading, index) => doc.fillColor("#ffffff").fontSize(7.3).font("Helvetica-Bold").text(heading, columns[index] + 5, tableTop + 6, { width: widths[index] - 8 }));
     let rowTop = tableTop + 19;
     results.forEach((result, index) => {
       const rowHeight = 22;
@@ -370,12 +372,12 @@ const downloadReport = async (req, res) => {
         doc.addPage();
         rowTop = pdfLayout.contentTop;
         doc.rect(50, rowTop, 455, 19).fill("#187b4b");
-        ["PARAMETER", "RESULT", "UNIT", "REFERENCE RANGE"].forEach((heading, column) => doc.fillColor("#ffffff").fontSize(8).font("Helvetica-Bold").text(heading, columns[column] + 5, rowTop + 6, { width: widths[column] - 8 }));
+        ["PARAMETER", "RESULT", "UNIT", "REFERENCE RANGE", "STATUS"].forEach((heading, column) => doc.fillColor("#ffffff").fontSize(7.3).font("Helvetica-Bold").text(heading, columns[column] + 5, rowTop + 6, { width: widths[column] - 8 }));
         rowTop += 19;
       }
       doc.rect(50, rowTop, 455, rowHeight).fill(index % 2 ? "#f2faf5" : "#ffffff");
       doc.strokeColor("#cfe4d8").rect(50, rowTop, 455, rowHeight).stroke();
-      [result?.parameter || "N/A", result?.value ?? "N/A", result?.unit || "", result?.normalRange || result?.referenceRange || "N/A"].forEach((value, column) => doc.fillColor("#222222").fontSize(9).font(column === 0 ? "Helvetica-Bold" : "Helvetica").text(String(value), columns[column] + 5, rowTop + 7, { width: widths[column] - 8 }));
+      [result?.parameter || "N/A", result?.value ?? "N/A", result?.unit || "", result?.normalRange || result?.referenceRange || "N/A", result?.status || "Not Set"].forEach((value, column) => doc.fillColor("#222222").fontSize(8.3).font(column === 0 || column === 4 ? "Helvetica-Bold" : "Helvetica").text(String(value), columns[column] + 5, rowTop + 7, { width: widths[column] - 8 }));
       rowTop += rowHeight;
     });
     doc.y = rowTop + 10;
@@ -402,6 +404,23 @@ const downloadReport = async (req, res) => {
     }
     const qualification = report.approvedPathologistQualification || report.approvedBy?.qualification || "";
     const registrationNumber = report.approvedPathologistRegistrationNumber || report.approvedBy?.registrationNumber || "";
+    const authorizedName = report.authorizedPersonName || report.authorizedBy?.name || pathologistName;
+    const authorizedSignatureUrl = report.authorizedSignatureImage || report.authorizedBy?.signatureUrl || signatureUrl;
+    const authorizedDataImage = authorizedSignatureUrl.startsWith("data:image");
+    const authorizedFilename = authorizedDataImage ? "" : path.basename(authorizedSignatureUrl);
+    const authorizedPath = authorizedFilename ? path.join(__dirname, "..", "uploads", "signatures", authorizedFilename) : "";
+    doc.fillColor("#173b8f").fontSize(7).font("Helvetica-Bold").text("AUTHORIZED LABORATORY PERSON", 55, signatureTop - 10, { width: 180, align: "center" });
+    if ((authorizedFilename && fs.existsSync(authorizedPath)) || authorizedDataImage) {
+      try {
+        const authorizedImage = authorizedDataImage ? Buffer.from(authorizedSignatureUrl.split(",")[1], "base64") : authorizedPath;
+        doc.image(authorizedImage, 85, signatureTop, { fit: [120, 48], align: "center", valign: "center" });
+      } catch (error) {
+        doc.fillColor("#666666").fontSize(8).text("Signature unavailable", 85, signatureTop + 18, { width: 120, align: "center" });
+      }
+    }
+    doc.fillColor("#173b8f").fontSize(9).font("Helvetica-Bold").text(authorizedName, 65, signatureTop + 50, { width: 160, align: "center" });
+    doc.fontSize(7).font("Helvetica").text(report.authorizationStatus || "Authorized", 65, signatureTop + 62, { width: 160, align: "center" });
+    doc.fontSize(7).font("Helvetica-Bold").text("PATHOLOGIST SIGNATURE", 350, signatureTop - 10, { width: 160, align: "center" });
     doc.fillColor("#173b8f").fontSize(9).font("Helvetica-Bold").text(pathologistName, 350, signatureTop + 50, { width: 160, align: "center" });
     doc.fontSize(7).font("Helvetica").text([qualification, registrationNumber && `Reg. No. ${registrationNumber}`].filter(Boolean).join(" | "), 350, signatureTop + 62, { width: 160, align: "center" });
     doc.y = signatureTop + 76;

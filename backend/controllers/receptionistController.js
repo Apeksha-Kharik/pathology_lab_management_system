@@ -103,9 +103,9 @@ const drawReceiptBox = (doc, rows) => {
 };
 
 const drawResultsTable = (doc, results, onNewPage) => {
-  const columns = [56, 220, 320, 396];
-  const widths = [164, 100, 76, 110];
-  const headings = ["PARAMETER", "RESULT", "UNIT", "REFERENCE RANGE"];
+  const columns = [56, 190, 270, 330, 430];
+  const widths = [134, 80, 60, 100, 76];
+  const headings = ["PARAMETER", "RESULT", "UNIT", "REFERENCE RANGE", "STATUS"];
   const drawHeader = (top) => {
     doc.rect(pdfLayout.left, top, pdfLayout.right - pdfLayout.left, 21).fill("#187b4b");
     headings.forEach((heading, index) => doc.fillColor("#ffffff").fontSize(7.5).font("Helvetica-Bold").text(heading, columns[index] + 5, top + 7, { width: widths[index] - 8 }));
@@ -128,8 +128,8 @@ const drawResultsTable = (doc, results, onNewPage) => {
     }
     doc.rect(pdfLayout.left, rowTop, pdfLayout.right - pdfLayout.left, 24).fill(index % 2 ? "#f2faf5" : "#ffffff");
     doc.strokeColor("#cfe4d8").rect(pdfLayout.left, rowTop, pdfLayout.right - pdfLayout.left, 24).stroke();
-    [result.parameter, result.value, result.unit || "", result.normalRange || result.referenceRange || "N/A"].forEach((value, column) => {
-      doc.fillColor("#1f2937").fontSize(8.5).font(column === 0 ? "Helvetica-Bold" : "Helvetica").text(String(value ?? "N/A"), columns[column] + 5, rowTop + 7, { width: widths[column] - 8, height: 14, ellipsis: true });
+    [result.parameter, result.value, result.unit || "", result.normalRange || result.referenceRange || "N/A", result.status || "Not Set"].forEach((value, column) => {
+      doc.fillColor("#1f2937").fontSize(8.2).font(column === 0 || column === 4 ? "Helvetica-Bold" : "Helvetica").text(String(value ?? "N/A"), columns[column] + 5, rowTop + 7, { width: widths[column] - 8, height: 14, ellipsis: true });
     });
     rowTop += 24;
   });
