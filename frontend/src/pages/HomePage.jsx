@@ -308,23 +308,18 @@ function HomePage() {
         </section>
 
         <section id="terms" className="scroll-mt-24 bg-white py-20">
-          <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-            <SectionHeader
-              eyebrow="Patient Information"
-              title="Terms & Conditions"
-              text="Please read these conditions before registering, booking a test, or using our laboratory services."
-            />
-            <div className="mt-10 overflow-hidden rounded-2xl border border-emerald-100 bg-[#f7fcf9] shadow-sm">
-              <ol className="divide-y divide-emerald-100">
-                {termsAndConditions.map((term, index) => (
-                  <li key={term} className="flex gap-4 px-5 py-4 sm:px-7">
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-700 text-xs font-extrabold text-white">
-                      {index + 1}
-                    </span>
-                    <p className="pt-0.5 text-sm font-medium leading-7 text-slate-700 sm:text-base">{term}</p>
-                  </li>
+          <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+            <div className="rounded-3xl border border-emerald-100 bg-[#f7fcf9] p-7 shadow-md sm:p-10 lg:p-12">
+              <p className="text-sm font-bold uppercase tracking-[0.2em] text-emerald-700">Patient Information</p>
+              <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-emerald-950 sm:text-4xl">Terms & Conditions</h2>
+              <p className="mt-4 max-w-3xl text-base leading-7 text-slate-600">
+                Please read these conditions before registering, booking a test, or using our laboratory services.
+              </p>
+              <ul className="mt-8 grid list-disc gap-x-14 gap-y-4 pl-6 text-base leading-7 text-slate-700 marker:text-emerald-600 sm:grid-cols-2">
+                {termsAndConditions.map((term) => (
+                  <li key={term} className="pl-1">{term}</li>
                 ))}
-              </ol>
+              </ul>
             </div>
           </div>
         </section>
