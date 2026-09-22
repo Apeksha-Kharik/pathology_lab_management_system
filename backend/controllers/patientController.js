@@ -289,6 +289,7 @@ const downloadReport = async (req, res) => {
 
     const booking = report.bookingId || {};
     const results = Array.isArray(report.results) ? report.results : [];
+    const pathologistName = report.approvedPathologistName || report.approvedBy?.name || report.pathologistSignature || "Pending assignment";
     const doc = new PDFDocument({ size: "A4", margin: 50, autoFirstPage: true });
     const filename = buildPatientPdfFilename(booking.name || req.user.name, booking.patientCode || booking.bookingCode, "RPT");
 
@@ -300,13 +301,20 @@ const downloadReport = async (req, res) => {
     doc.on("pageAdded", () => drawLetterhead(doc));
     doc.x = 50;
     drawTitleBlock(doc, "DIAGNOSTIC TEST REPORT", "Approved pathology report");
-    const infoTop = doc.y;
-    const patientDetails = [
-      ["Patient Name", booking.name || req.user.name], ["Age / Gender", `${booking.age || req.user.age || "N/A"} / ${booking.gender || req.user.gender || "N/A"}`],
-      ["Phone", booking.phone || req.user.phone], ["Patient ID", booking.patientCode || "Pending"],
-      ["Booking ID", booking.bookingCode || "N/A"], ["Test", report.testName]
-    ];
-    drawInfoGrid(doc, "PATIENT & TEST INFORMATION", patientDetails, infoTop);
+    drawInfoGrid(doc, "PATIENT DETAILS", [
+      ["Patient Name", booking.name || req.user.name],
+      ["Patient ID", booking.patientCode || "Pending"],
+      ["Age / Gender", `${booking.age || req.user.age || "N/A"} / ${booking.gender || req.user.gender || "N/A"}`],
+      ["Phone", booking.phone || req.user.phone]
+    ]);
+    drawInfoGrid(doc, "TEST, BILLING & REPORT DETAILS", [
+      ["Test Details", report.testName],
+      ["Booking ID", booking.bookingCode || "N/A"],
+      ["Billing", `${formatCurrency(booking.amount)} (${booking.paymentStatus || "Unpaid"})`],
+      ["Sample Status", booking.sampleStatus || "Not Collected"],
+      ["Report Status", report.reportStatus || report.status || "Pending"],
+      ["Pathologist Name", pathologistName]
+    ]);
     const approvalLineTop = doc.y;
     doc.fillColor("#173b8f").fontSize(8).font("Helvetica-Bold").text("Approved Date & Time:", 60, approvalLineTop);
     doc.fillColor("#1f2937").font("Helvetica").text(formatDateTime(report.approvedAt), 158, approvalLineTop, { width: 220 });
@@ -344,7 +352,6 @@ const downloadReport = async (req, res) => {
     doc.font("Helvetica").text(report.technicianRemarks || "N/A", 155, remarksTop, { width: 350, height: 18, ellipsis: true });
     doc.font("Helvetica-Bold").text("Pathologist Remarks:", 50, remarksTop + 24, { width: 125 });
     doc.font("Helvetica").text(report.pathologistRemarks || "N/A", 155, remarksTop + 24, { width: 350, height: 60, ellipsis: true });
-    const pathologistName = report.approvedPathologistName || report.approvedBy?.name || report.pathologistSignature || "Pathologist";
     const signatureUrl = report.pathologistSignatureImage || report.approvedBy?.signatureUrl || "";
     const isLegacyDataImage = signatureUrl.startsWith("data:image");
     const signatureFilename = isLegacyDataImage ? "" : path.basename(signatureUrl);
@@ -401,6 +408,11 @@ const downloadReceipt = async (req, res) => {
       );
     }
 
+    const report = await Report.findOne({ bookingId: booking._id })
+      .sort({ createdAt: -1 })
+      .populate("approvedBy", "name");
+    const pathologistName = report?.approvedPathologistName || report?.approvedBy?.name || report?.pathologistSignature || "Pending";
+
     const doc = new PDFDocument({ size: "A4", margin: 50 });
     const filename = buildPatientPdfFilename(booking.name, booking.patientCode, "RCT");
 
@@ -411,16 +423,23 @@ const downloadReceipt = async (req, res) => {
     const hasLetterheadImage = drawLetterhead(doc);
     doc.x = 50;
     drawTitleBlock(doc, "PAYMENT RECEIPT", "Official receipt for paid diagnostic booking");
-    drawInfoGrid(doc, "PATIENT & BOOKING INFORMATION", [
+    drawInfoGrid(doc, "PATIENT DETAILS", [
       ["Patient Name", booking.name],
       ["Patient ID", booking.patientCode || "Pending"],
+      ["Age / Gender", `${booking.age || "N/A"} / ${booking.gender || "N/A"}`],
+      ["Phone", booking.phone || "N/A"]
+    ]);
+    drawInfoGrid(doc, "TEST & STATUS DETAILS", [
+      ["Test Details", booking.testName],
+      ["Booking Type", booking.bookingType || "Test"],
       ["Booking ID", booking.bookingCode],
-      ["Receipt ID", booking.receiptId || booking.receiptNumber],
-      ["Receipt No.", booking.receiptNumber],
-      ["Test / Package", booking.testName],
-      ["Appointment", `${booking.bookingDate || "N/A"} | ${booking.timeSlot || "N/A"}`]
+      ["Sample Status", booking.sampleStatus || "Not Collected"],
+      ["Report Status", report?.reportStatus || report?.status || "Pending"],
+      ["Pathologist Name", pathologistName]
     ]);
     drawReceiptBox(doc, [
+      ["Receipt ID", booking.receiptId || booking.receiptNumber],
+      ["Receipt No.", booking.receiptNumber],
       ["Total Amount", formatCurrency(booking.amount)],
       ["Payment Method", String(booking.paymentMethod || "N/A").toUpperCase()],
       ["Payment Status", booking.paymentStatus],
