@@ -140,6 +140,40 @@ const drawReceiptBox = (doc, rows) => {
   doc.y = top + (rows.length * rowHeight) + 36;
 };
 
+const drawReceiptResults = (doc, results) => {
+  const columns = [56, 220, 320, 396];
+  const widths = [164, 100, 76, 110];
+  const headings = ["PARAMETER", "RESULT", "UNIT", "REFERENCE RANGE"];
+  const startPage = (subtitle = "") => {
+    drawLetterhead(doc);
+    drawTitleBlock(doc, "TEST RESULTS", subtitle);
+    const tableTop = doc.y;
+    doc.rect(pdfLayout.left, tableTop, pdfLayout.right - pdfLayout.left, 21).fill("#187b4b");
+    headings.forEach((heading, index) => doc.fillColor("#ffffff").fontSize(7.5).font("Helvetica-Bold").text(heading, columns[index] + 5, tableTop + 7, { width: widths[index] - 8 }));
+    return tableTop + 21;
+  };
+
+  doc.addPage();
+  let rowTop = startPage("Laboratory result details");
+  if (!results.length) {
+    doc.fillColor("#64748b").fontSize(10).font("Helvetica").text("Test results are not available yet.", pdfLayout.left, rowTop + 18, { width: 450, align: "center" });
+    doc.y = rowTop + 60;
+    return;
+  }
+
+  results.forEach((result, index) => {
+    if (rowTop > 620) {
+      doc.addPage();
+      rowTop = startPage("Continued");
+    }
+    doc.rect(pdfLayout.left, rowTop, pdfLayout.right - pdfLayout.left, 24).fill(index % 2 ? "#f2faf5" : "#ffffff");
+    doc.strokeColor("#cfe4d8").rect(pdfLayout.left, rowTop, pdfLayout.right - pdfLayout.left, 24).stroke();
+    [result.parameter, result.value, result.unit || "", result.normalRange || result.referenceRange || "N/A"].forEach((value, column) => doc.fillColor("#1f2937").fontSize(8.5).font(column === 0 ? "Helvetica-Bold" : "Helvetica").text(String(value ?? "N/A"), columns[column] + 5, rowTop + 7, { width: widths[column] - 8, height: 14, ellipsis: true }));
+    rowTop += 24;
+  });
+  doc.y = rowTop + 18;
+};
+
 const drawDefaultFooter = (doc) => {
   doc.fillColor("#123a82").fontSize(9).text("INDIPATH Super Speciality Pathology Lab, 22 Mahapurush Complex, BazarPeth Kankavali, Tal. Kankavali - 416 602", 45, doc.page.height - 52, { width: 510, align: "center" });
   doc.text("02367-231970, 7448231970  |  indipathlab@gmail.com", { align: "center" });
@@ -410,7 +444,7 @@ const downloadReceipt = async (req, res) => {
 
     const report = await Report.findOne({ bookingId: booking._id })
       .sort({ createdAt: -1 })
-      .populate("approvedBy", "name");
+      .populate("approvedBy", "name qualification registrationNumber signatureUrl");
     const pathologistName = report?.approvedPathologistName || report?.approvedBy?.name || report?.pathologistSignature || "Pending";
 
     const doc = new PDFDocument({ size: "A4", margin: 50 });
@@ -433,13 +467,15 @@ const downloadReceipt = async (req, res) => {
       ["Test Details", booking.testName],
       ["Booking Type", booking.bookingType || "Test"],
       ["Booking ID", booking.bookingCode],
+      ["Sample Type", booking.sampleType || "N/A"],
+      ["Collection", booking.collectionType || "Visit Lab"],
       ["Sample Status", booking.sampleStatus || "Not Collected"],
       ["Report Status", report?.reportStatus || report?.status || "Pending"],
-      ["Pathologist Name", pathologistName]
+      ["Pathologist Name", pathologistName],
+      ["Booking Status", booking.bookingStatus || booking.status || "Pending"]
     ]);
     drawReceiptBox(doc, [
       ["Receipt ID", booking.receiptId || booking.receiptNumber],
-      ["Receipt No.", booking.receiptNumber],
       ["Total Amount", formatCurrency(booking.amount)],
       ["Payment Method", String(booking.paymentMethod || "N/A").toUpperCase()],
       ["Payment Status", booking.paymentStatus],
@@ -450,6 +486,33 @@ const downloadReceipt = async (req, res) => {
     doc.fillColor("#166534").fontSize(11).font("Helvetica-Bold").text("Payment received successfully.", 100, acknowledgementTop + 11, { width: 355, align: "center" });
     doc.fillColor("#334155").fontSize(8.5).font("Helvetica").text("Thank you for choosing INDIPATH Super Speciality Pathology Lab.", 100, acknowledgementTop + 28, { width: 355, align: "center" });
     if (!hasLetterheadImage) drawDefaultFooter(doc);
+
+    drawReceiptResults(doc, Array.isArray(report?.results) ? report.results : []);
+    if (doc.y > 545) {
+      doc.addPage();
+      drawLetterhead(doc);
+      drawTitleBlock(doc, "AUTHORIZATION", booking.testName);
+    }
+    const signatureTop = doc.y + 8;
+    const signatureUrl = report?.pathologistSignatureImage || report?.approvedBy?.signatureUrl || "";
+    const isDataImage = signatureUrl.startsWith("data:image");
+    const signatureFilename = isDataImage ? "" : path.basename(signatureUrl);
+    const signaturePath = signatureFilename ? path.join(__dirname, "..", "uploads", "signatures", signatureFilename) : "";
+    doc.fillColor("#173b8f").fontSize(8).font("Helvetica-Bold").text("AUTHORIZED SIGNATURE", 345, signatureTop, { width: 160, align: "center" });
+    if ((signatureFilename && fs.existsSync(signaturePath)) || isDataImage) {
+      try {
+        const signatureImage = isDataImage ? Buffer.from(signatureUrl.split(",")[1], "base64") : signaturePath;
+        doc.image(signatureImage, 365, signatureTop + 14, { fit: [120, 45], align: "center", valign: "center" });
+      } catch (error) {
+        doc.fillColor("#64748b").fontSize(8).font("Helvetica").text("Signature unavailable", 365, signatureTop + 30, { width: 120, align: "center" });
+      }
+    } else {
+      doc.fillColor("#64748b").fontSize(8).font("Helvetica").text("Pending approval", 365, signatureTop + 30, { width: 120, align: "center" });
+    }
+    const qualification = report?.approvedPathologistQualification || report?.approvedBy?.qualification || "";
+    const registrationNumber = report?.approvedPathologistRegistrationNumber || report?.approvedBy?.registrationNumber || "";
+    doc.fillColor("#173b8f").fontSize(9).font("Helvetica-Bold").text(pathologistName, 345, signatureTop + 64, { width: 160, align: "center" });
+    doc.fillColor("#475569").fontSize(7).font("Helvetica").text([qualification, registrationNumber && `Reg. No. ${registrationNumber}`].filter(Boolean).join(" | "), 345, signatureTop + 77, { width: 160, align: "center" });
     doc.end();
   } catch (error) {
     res.status(500).json({ message: "Receipt download failed" });
