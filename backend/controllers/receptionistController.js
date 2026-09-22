@@ -1,6 +1,7 @@
 const Booking = require("../models/Booking");
 const TechnicianAssignment = require("../models/TechnicianAssignment");
 const Payment = require("../models/Payment");
+const Report = require("../models/Report");
 const Test = require("../models/Test");
 const User = require("../models/User");
 const mongoose = require("mongoose");
@@ -504,6 +505,11 @@ const downloadReceptionistReceipt = async (req, res) => {
       );
     }
 
+    const report = await Report.findOne({ bookingId: booking._id })
+      .sort({ createdAt: -1 })
+      .populate("approvedBy", "name");
+    const pathologistName = report?.approvedPathologistName || report?.approvedBy?.name || report?.pathologistSignature || "Pending";
+
     const doc = new PDFDocument({ size: "A4", margin: 50 });
     const filename = buildPatientPdfFilename(booking.name, booking.patientCode, "RCT");
 
@@ -512,17 +518,30 @@ const downloadReceptionistReceipt = async (req, res) => {
 
     doc.pipe(res);
     drawLetterhead(doc);
-    drawTitleBlock(doc, "PAYMENT RECEIPT", "Official receipt for paid diagnostic booking");
-    drawInfoGrid(doc, "PATIENT & BOOKING INFORMATION", [
+    drawTitleBlock(doc, "TEST RECEIPT", "Patient test, billing and laboratory status receipt");
+    drawInfoGrid(doc, "PATIENT DETAILS", [
       ["Patient Name", booking.name],
       ["Patient ID", booking.patientCode || "Pending"],
-      ["Booking ID", booking.bookingCode],
-      ["Receipt ID", booking.receiptId || booking.receiptNumber],
-      ["Receipt No.", booking.receiptNumber],
+      ["Age / Gender", `${booking.age || "N/A"} / ${booking.gender || "N/A"}`],
+      ["Phone", booking.phone || "N/A"]
+    ]);
+    drawInfoGrid(doc, "TEST DETAILS", [
       ["Test / Package", booking.testName],
-      ["Appointment", `${booking.bookingDate || "N/A"} | ${booking.timeSlot || "N/A"}`]
+      ["Booking Type", booking.bookingType || "Test"],
+      ["Booking ID", booking.bookingCode],
+      ["Appointment", `${booking.bookingDate || booking.date || "N/A"} | ${booking.timeSlot || "N/A"}`],
+      ["Sample Type", booking.sampleType || "N/A"],
+      ["Collection", booking.collectionType || "Visit Lab"]
+    ]);
+    drawInfoGrid(doc, "SAMPLE & REPORT STATUS", [
+      ["Sample Status", booking.sampleStatus || "Not Collected"],
+      ["Report Status", report?.reportStatus || report?.status || "Pending"],
+      ["Pathologist Name", pathologistName],
+      ["Booking Status", booking.bookingStatus || booking.status || "Pending"]
     ]);
     drawReceiptBox(doc, [
+      ["Receipt ID", booking.receiptId || booking.receiptNumber],
+      ["Receipt No.", booking.receiptNumber],
       ["Total Amount", formatCurrency(booking.amount)],
       ["Payment Method", String(booking.paymentMethod || "N/A").toUpperCase()],
       ["Payment Status", booking.paymentStatus],

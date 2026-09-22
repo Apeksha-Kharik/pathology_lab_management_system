@@ -422,7 +422,7 @@ const downloadReceipt = async (req, res) => {
     doc.pipe(res);
     const hasLetterheadImage = drawLetterhead(doc);
     doc.x = 50;
-    drawTitleBlock(doc, "PAYMENT RECEIPT", "Official receipt for paid diagnostic booking");
+    drawTitleBlock(doc, "TEST RECEIPT", "Patient test, billing and laboratory status receipt");
     drawInfoGrid(doc, "PATIENT DETAILS", [
       ["Patient Name", booking.name],
       ["Patient ID", booking.patientCode || "Pending"],
