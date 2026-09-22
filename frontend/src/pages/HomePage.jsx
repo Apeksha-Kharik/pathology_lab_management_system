@@ -88,6 +88,19 @@ const highlights = [
   "Searchable booking and report queues"
 ];
 
+const termsAndConditions = [
+  "Patients must provide accurate information during registration.",
+  "Please follow the laboratory's instructions before sample collection.",
+  "Test reports are confidential and will be shared only with authorized persons.",
+  "Patients should consult a qualified doctor for interpretation of their reports.",
+  "Payment must be completed according to the applicable laboratory charges.",
+  "Report delivery time may vary depending on the test and laboratory conditions.",
+  "The laboratory may reject unsuitable or improperly collected samples.",
+  "Cancellation and refund requests will be handled according to laboratory policy.",
+  "The laboratory may update these terms when required.",
+  "By using our services, you agree to these Terms & Conditions."
+];
+
 function HomePage() {
   const navigate = useNavigate();
 
@@ -113,6 +126,7 @@ function HomePage() {
             <button onClick={() => scrollTo("services")} className="hover:text-emerald-700">Services</button>
             <button onClick={() => scrollTo("process")} className="hover:text-emerald-700">Process</button>
             <button onClick={() => scrollTo("quality")} className="hover:text-emerald-700">Quality</button>
+            <button onClick={() => scrollTo("terms")} className="hover:text-emerald-700">Terms</button>
             <button onClick={() => scrollTo("contact")} className="hover:text-emerald-700">Contact</button>
           </nav>
 
@@ -292,6 +306,28 @@ function HomePage() {
             </button>
           </div>
         </section>
+
+        <section id="terms" className="scroll-mt-24 bg-white py-20">
+          <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+            <SectionHeader
+              eyebrow="Patient Information"
+              title="Terms & Conditions"
+              text="Please read these conditions before registering, booking a test, or using our laboratory services."
+            />
+            <div className="mt-10 overflow-hidden rounded-2xl border border-emerald-100 bg-[#f7fcf9] shadow-sm">
+              <ol className="divide-y divide-emerald-100">
+                {termsAndConditions.map((term, index) => (
+                  <li key={term} className="flex gap-4 px-5 py-4 sm:px-7">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-700 text-xs font-extrabold text-white">
+                      {index + 1}
+                    </span>
+                    <p className="pt-0.5 text-sm font-medium leading-7 text-slate-700 sm:text-base">{term}</p>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </div>
+        </section>
       </main>
 
       <footer id="contact" className="bg-[#063326] text-white">
@@ -322,6 +358,7 @@ function HomePage() {
               <FooterAction label="Patient Login" onClick={() => go("/login")} />
               <FooterAction label="Register Patient" onClick={() => go("/register")} />
               <FooterAction label="Forgot Password" onClick={() => go("/forgot-password")} />
+              <FooterAction label="Terms & Conditions" onClick={() => scrollTo("terms")} />
             </div>
           </div>
         </div>
