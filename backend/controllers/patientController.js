@@ -4,6 +4,7 @@ const Payment = require("../models/Payment");
 const Report = require("../models/Report");
 const Test = require("../models/Test");
 const Package = require("../models/Package");
+const { notifyBookingRequested } = require("../services/patientNotifications");
 
 
 const patientCodeStatuses = ["Confirmed", "Arrived", "Technician Assigned", "Sample Collected", "Processing", "Pending Report Approval", "Completed", "Report Ready"];
@@ -128,6 +129,7 @@ const createBooking = async (req, res) => {
       status: "pending"
     });
 
+    await notifyBookingRequested(booking);
 
     res.status(201).json({ message: "Booking request submitted for receptionist approval", booking });
   } catch (error) {

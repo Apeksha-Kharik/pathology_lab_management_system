@@ -1,5 +1,15 @@
-const { sendWhatsAppDocument } = require('./whatsappService');
+const { sendWhatsAppMessage, sendWhatsAppDocument } = require('./whatsappService');
 const { generateReceiptPdf, generateReportPdf } = require('./patientPdfService');
+
+const notifyBookingRequested = async (booking) => {
+ try {
+  const amount = 'INR ' + Number(booking.amount).toFixed(2);
+  const body = `IndiPath: We received your ${booking.testName} booking request. The receptionist will confirm or reject it.\n\nBooking ID: ${booking.bookingCode}\nDate: ${booking.bookingDate}\nTime Slot: ${booking.timeSlot}\nAmount: ${amount}`;
+  const demoTemplate = process.env.WHATSAPP_TEMPLATE_HELLO;
+  return await sendWhatsAppMessage({ to: booking.phone || booking.userId?.phone, event: 'booking_requested', body,
+   ...(demoTemplate ? { templateName: demoTemplate, parameters: [] } : { parameters: [booking.name, booking.bookingCode, booking.testName, booking.bookingDate, booking.timeSlot, amount] }) });
+ } catch (error) { console.error('Booking WhatsApp notification failed:', error.message); return { sent: false }; }
+};
 
 // Provider/PDF failures must not undo saved payments or approvals.
 const notifyPaymentReceived = async (booking, paymentId) => {
@@ -20,4 +30,4 @@ const notifyReportReady = async (report) => {
 };
 // Routine progress remains visible in the app without WhatsApp messages.
 const notifySampleCollected = async () => ({ sent: false, skipped: true });
-module.exports = { notifyPaymentReceived, notifyReportReady, notifySampleCollected };
+module.exports = { notifyBookingRequested, notifyPaymentReceived, notifyReportReady, notifySampleCollected };

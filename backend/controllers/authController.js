@@ -4,6 +4,7 @@ const pendingRegistrations = require("../services/pendingRegistrations");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const { sendOtpEmail } = require("../config/email");
+const { sendWhatsAppMessage } = require("../services/whatsappService");
 
 const allowedRoles = ["admin", "patient", "receptionist", "technician", "pathologist"];
 
@@ -172,7 +173,21 @@ const verifyOtp = async (req, res) => {
   }
   try {
     // One atomic document insert is the registration commit point.
-    await User.create(pending.details);
+    const user = await User.create(pending.details);
+
+    if (user && user.phone) {
+      try {
+        await sendWhatsAppMessage({
+          to: user.phone,
+          body: `Welcome to INDIPATH, ${user.name}. Your account has been registered successfully. Please log in to book your tests.`,
+          event: "manual",
+          parameters: [user.name]
+        });
+      } catch (notificationError) {
+        console.error("Welcome WhatsApp failed:", notificationError.message);
+      }
+    }
+
     return res.json({ message: "Registration completed. You can now log in." });
   } catch (error) {
     if (error.code === 11000) {

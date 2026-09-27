@@ -2,6 +2,7 @@ const https = require("https");
 const WhatsAppNotification = require("../models/WhatsAppNotification");
 
 const TEMPLATE_ENV_BY_EVENT = {
+  booking_requested: "WHATSAPP_TEMPLATE_BOOKING_REQUEST",
   booking_confirmed: "WHATSAPP_TEMPLATE_BOOKING_CONFIRMED",
   booking_rejected: "WHATSAPP_TEMPLATE_BOOKING_REJECTED",
   payment_received: "WHATSAPP_TEMPLATE_RECEIPT_DOCUMENT",

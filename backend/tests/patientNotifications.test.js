@@ -2,10 +2,12 @@ const { test, beforeEach } = require("node:test");
 const assert = require("node:assert/strict");
 const crypto = require("crypto");
 let messages;
+let textMessages;
 let failSend;
 let captured = true;
 const servicePath = require.resolve("../services/whatsappService");
 require.cache[servicePath] = { id: servicePath, filename: servicePath, loaded: true, exports: {
+  sendWhatsAppMessage: async (message) => { textMessages.push(message); return { sent: true }; },
   sendWhatsAppDocument: async (message) => {
     if (failSend) throw new Error("Provider unavailable");
     messages.push(message);
@@ -18,14 +20,23 @@ require.cache[gatewayPath] = { id: gatewayPath, filename: gatewayPath, loaded: t
   ...gatewayService,
   razorpayRequest: async () => ({ id: "pay_test123", order_id: "order_test", currency: "INR", amount: 50000, status: captured ? "captured" : "authorized", method: "upi" })
 } };
-const { notifyPaymentReceived } = require("../services/patientNotifications");
+const { notifyBookingRequested, notifyPaymentReceived } = require("../services/patientNotifications");
 const { updateSampleStatus } = require("../controllers/technicianController");
 const { verifyPayment } = require("../controllers/paymentController");
 const Booking = require("../models/Booking");
 const Payment = require("../models/Payment");
 const booking = { _id: "booking", name: "Patient", phone: "9876543210", testName: "CBC Test", bookingCode: "BK1024", amount: 500, paymentStatus: "Paid", receiptId: "RCT123" };
 const response = () => ({ code: 200, status(code) { this.code = code; return this; }, json(data) { this.data = data; return this; } });
-beforeEach(() => { messages = []; failSend = false; captured = true; });
+beforeEach(() => { messages = []; textMessages = []; failSend = false; captured = true; });
+
+test("booking request sends an acknowledgement with booking details", async () => {
+  await notifyBookingRequested({ ...booking, bookingDate: "2026-10-01", timeSlot: "09:00-10:00" });
+  assert.equal(textMessages.length, 1);
+  assert.equal(textMessages[0].to, booking.phone);
+  assert.equal(textMessages[0].event, "booking_requested");
+  assert.deepEqual(textMessages[0].parameters.slice(0, 3), ["Patient", "BK1024", "CBC Test"]);
+  assert.match(textMessages[0].body, /receptionist will confirm or reject/);
+});
 
 test("payment sends one receipt PDF with amount", async () => {
   await notifyPaymentReceived(booking, "PAY123");
