@@ -165,6 +165,8 @@ const downloadReport = async (req, res) => {
       return res.status(404).json({ message: "Report not found or not ready" });
     }
 
+    const booking = report.bookingId || {};
+    const results = Array.isArray(report.results) ? report.results : [];
     const filename = buildPatientPdfFilename(booking.name, booking.patientCode || booking.bookingCode, "RPT");
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
