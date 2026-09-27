@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { CalendarDays, CheckCircle2, Eye, EyeOff, Mail, MapPin, Phone, ShieldCheck, UserRound, XCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { cancelRegistration, registerUser, verifyOtp } from "../services/authService";
+import { cancelRegistration, discardRegistrationOnExit, registerUser, verifyOtp } from "../services/authService";
 import logo from "../assets/logo.png";
 import bg1 from "../assets/bg1.png";
 
@@ -11,11 +11,29 @@ const passwordRules = [
   { label: "At least 8 characters", test: (value) => value.length >= 8 },
   { label: "One uppercase letter", test: (value) => /[A-Z]/.test(value) },
   { label: "One lowercase letter", test: (value) => /[a-z]/.test(value) },
-  { label: "One special character", test: (value) => /[!@#$%^&*(),.?":{}|<>]/.test(value) }
+  { label: "One number", test: (value) => /\d/.test(value) },
+  { label: "One special character", test: (value) => /[^A-Za-z0-9]/.test(value) }
 ];
 
 function RegisterPage() {
   const navigate = useNavigate();
+  const registrationId = useRef(null);
+  const mounted = useRef(true);
+  const submitting = useRef(false);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    mounted.current = true;
+    const discard = () => {
+      if (registrationId.current) discardRegistrationOnExit(registrationId.current);
+      registrationId.current = null;
+    };
+    window.addEventListener("pagehide", discard);
+    return () => {
+      mounted.current = false;
+      window.removeEventListener("pagehide", discard);
+      discard();
+    };
+  }, []);
   const [step, setStep] = useState("register");
   const [otp, setOtp] = useState("");
   const [message, setMessage] = useState("");
@@ -51,7 +69,11 @@ function RegisterPage() {
       return `Please fill all required fields: ${missingFields.join(", ")}`;
     }
 
-    if (!emailPattern.test(formData.email)) {
+    if (!/^\d{10}$/.test(formData.phone.trim())) {
+      return "Mobile number must contain exactly 10 digits";
+    }
+
+    if (!emailPattern.test(formData.email.trim())) {
       return "Please enter a valid email";
     }
 
@@ -73,6 +95,7 @@ function RegisterPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitting.current) return;
     const validationError = validate();
 
     if (validationError) {
@@ -81,6 +104,8 @@ function RegisterPage() {
     }
 
     setFormError("");
+    submitting.current = true;
+    setBusy(true);
 
     try {
       const data = await registerUser({
@@ -93,16 +118,25 @@ function RegisterPage() {
         password: formData.password
       });
 
+      if (!mounted.current) {
+        discardRegistrationOnExit(data.registrationId);
+        return;
+      }
+      registrationId.current = data.registrationId;
       setMessage(data.devOtp ? `${data.message} Dev OTP: ${data.devOtp}` : data.message);
       setStep("otp");
     } catch (error) {
       setMessage("");
       setFormError(error.response?.data?.message || "Registration failed");
+    } finally {
+      submitting.current = false;
+      if (mounted.current) setBusy(false);
     }
   };
 
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
+    if (submitting.current) return;
 
     if (!otp.trim()) {
       setFormError("Please enter OTP");
@@ -110,26 +144,38 @@ function RegisterPage() {
     }
 
     setFormError("");
+    submitting.current = true;
+    setBusy(true);
 
     try {
-      const data = await verifyOtp({ email: formData.email, otp: otp.trim() });
+      const data = await verifyOtp({ registrationId: registrationId.current, otp: otp.trim() });
+      registrationId.current = null;
       alert(data.message);
       navigate("/login");
     } catch (error) {
       setMessage("");
-      setFormError(error.response?.data?.message || "OTP verification failed");
+      setFormError(error.response?.data?.message || "Verification could not be confirmed. Try logging in before registering again.");
+      if (registrationId.current) discardRegistrationOnExit(registrationId.current);
+      registrationId.current = null;
+      setOtp("");
+      setStep("register");
+    } finally {
+      submitting.current = false;
+      if (mounted.current) setBusy(false);
     }
   };
 
   const handleCancelRegistration = async () => {
-    if (formData.email) {
+    if (submitting.current) return;
+    if (registrationId.current) {
       try {
-        await cancelRegistration({ email: formData.email });
+        await cancelRegistration({ registrationId: registrationId.current });
       } catch (error) {
         console.error(error);
       }
     }
 
+    registrationId.current = null;
     setOtp("");
     setMessage("");
     setFormError("");
@@ -224,7 +270,7 @@ function RegisterPage() {
                   <input name="confirmPassword" type={showPassword ? "text" : "password"} value={formData.confirmPassword} onChange={handleChange} placeholder="Repeat password" className="field-input" autoComplete="new-password" />
                 </Field>
 
-                <button type="submit" className="w-full rounded-xl bg-emerald-700 px-5 py-4 text-base font-extrabold text-white shadow-lg shadow-emerald-950/10 transition hover:bg-emerald-800 focus:outline-none focus:ring-4 focus:ring-emerald-200">
+                <button type="submit" disabled={busy} className="w-full rounded-xl bg-emerald-700 px-5 py-4 text-base font-extrabold text-white shadow-lg shadow-emerald-950/10 transition hover:bg-emerald-800 focus:outline-none focus:ring-4 focus:ring-emerald-200">
                   Register and Send OTP
                 </button>
               </form>
@@ -233,10 +279,10 @@ function RegisterPage() {
                 <Field icon={ShieldCheck} label="One-time password">
                   <input name="otp" value={otp} onChange={(e) => setOtp(e.target.value)} placeholder="Enter 6 digit OTP" className="field-input" inputMode="numeric" />
                 </Field>
-                <button type="submit" className="w-full rounded-xl bg-emerald-700 px-5 py-4 text-base font-extrabold text-white shadow-lg shadow-emerald-950/10 transition hover:bg-emerald-800 focus:outline-none focus:ring-4 focus:ring-emerald-200">
+                <button type="submit" disabled={busy} className="w-full rounded-xl bg-emerald-700 px-5 py-4 text-base font-extrabold text-white shadow-lg shadow-emerald-950/10 transition hover:bg-emerald-800 focus:outline-none focus:ring-4 focus:ring-emerald-200">
                   Verify Account
                 </button>
-                <button type="button" onClick={handleCancelRegistration} className="w-full rounded-xl border border-emerald-200 px-5 py-3.5 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50">
+                <button type="button" disabled={busy} onClick={handleCancelRegistration} className="w-full rounded-xl border border-emerald-200 px-5 py-3.5 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50">
                   Edit registration details
                 </button>
               </form>

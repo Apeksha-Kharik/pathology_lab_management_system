@@ -30,6 +30,7 @@ const request = (body = {}) => ({ params: { id: bookingId }, user: { _id: patien
 const response = () => ({ statusCode: 200, status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } });
 
 function setup(overrides = {}) {
+  mock.method(require('../services/patientNotifications'), 'notifyPaymentReceived', async () => ({ sent: true }));
   process.env.RAZORPAY_KEY_ID = 'rzp_test_unitTests';
   process.env.RAZORPAY_KEY_SECRET = 'unit-test-secret-not-a-real-key';
   process.env.RAZORPAY_WEBHOOK_SECRET = 'unit-test-webhook-secret';
@@ -306,6 +307,8 @@ test('receptionist cannot manually mark online payment paid', async () => {
 });
 
 test('receptionist confirmation unlocks online eligibility and cannot later reject confirmed booking', async () => {
+  mock.method(require('../models/User'), 'countDocuments', async () => 1);
+  mock.method(Booking, 'countDocuments', async () => 0);
   const whatsapp = require('../services/whatsappService');
   mock.method(whatsapp, 'sendWhatsAppMessage', async () => ({ sent: true }));
   delete require.cache[require.resolve('../controllers/receptionistController')];

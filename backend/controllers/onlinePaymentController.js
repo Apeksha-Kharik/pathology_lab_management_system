@@ -2,6 +2,7 @@ const crypto = require("node:crypto");
 const mongoose = require("mongoose");
 const Booking = require("../models/Booking");
 const Payment = require("../models/Payment");
+const patientNotifications = require("../services/patientNotifications");
 const {
   paymentError, payableStatuses, canPayOnline, amountInPaise,
   validSignature, requireKeys, razorpayRequest, validateCapturedPayment
@@ -37,10 +38,15 @@ const recordCapturedPayment = async (booking, payment) => {
   // Every patient booking already has a Payment record; no concurrent upserts.
   const record = await Payment.findOneAndUpdate({ bookingId: paidBooking._id }, { $set: {
     userId: paidBooking.userId, amount: paidBooking.amount, method: "razorpay", status: "paid",
-    transactionId: payment.id, receiptId: paidBooking.receiptId, receiptNumber: paidBooking.receiptNumber,
+    transactionId: payment.id, gateway: "razorpay", razorpayOrderId: payment.order_id, razorpayPaymentId: payment.id,
+    receiptId: paidBooking.receiptId, receiptNumber: paidBooking.receiptNumber,
     paidAt: paidBooking.paidAt, paymentDate: paidBooking.paymentDate
   } }, { new: true });
   if (!record) throw paymentError("Payment received; billing record needs laboratory review. Do not pay again.", 409);
+  if (updated) {
+    // Receipt delivery must never undo a verified payment.
+    await patientNotifications.notifyPaymentReceived(paidBooking, payment.id).catch(() => {});
+  }
   return paidBooking;
 };
 
@@ -80,7 +86,10 @@ const createOrder = async (req, res) => {
     if (payments.items?.some((payment) => payment.status === "authorized")) {
       throw paymentError("Your payment is awaiting capture. Do not pay again; check back shortly.", 409);
     }
-    res.json({ key: process.env.RAZORPAY_KEY_ID, orderId: booking.razorpayOrderId, amount: amountInPaise(booking.amount), currency: "INR", mode: "test" });
+    res.json({ key: process.env.RAZORPAY_KEY_ID, keyId: process.env.RAZORPAY_KEY_ID,
+      orderId: booking.razorpayOrderId, amount: amountInPaise(booking.amount), currency: "INR", mode: "test",
+      booking: { id: booking._id, code: booking.bookingCode, name: booking.name, email: booking.email, phone: booking.phone }
+    });
   } catch (error) {
     handleError(res, error);
   } finally {

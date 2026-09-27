@@ -3,6 +3,9 @@ const dotenv = require("dotenv");
 const cors = require("cors");
 const path = require("path");
 
+// Resolve configuration from this backend, even when launched from the repo root.
+dotenv.config({ path: path.join(__dirname, ".env") });
+
 const connectDB = require("./config/db");
 const { verifyTransporter } = require("./config/email");
 const ensureDefaultPackages = require("./utils/ensureDefaultPackages");
@@ -18,7 +21,6 @@ const profileRoutes = require("./routes/profileRoutes");
 const documentRoutes = require("./routes/documentRoutes");
 const { validateRequest } = require("./middleware/validateRequest");
 
-dotenv.config();
 verifyTransporter();
 
 const app = express();

@@ -16,11 +16,14 @@ const {
   ,updatePackage
 } = require("../controllers/adminController");
 const { protect, allowRoles } = require("../middleware/authMiddleware");
+const { getStatus: getWhatsAppStatus, sendTest: sendWhatsAppTest } = require("../controllers/whatsappController");
 
 const router = express.Router();
 
 router.get("/tests", getTests);
 router.get("/dashboard-metrics", protect, allowRoles("admin"), getDashboardMetrics);
+router.get("/whatsapp/status", protect, allowRoles("admin"), getWhatsAppStatus);
+router.post("/whatsapp/test", protect, allowRoles("admin"), sendWhatsAppTest);
 router.get("/reports/:reportId/download", protect, allowRoles("admin"), downloadAdminReport);
 router.get("/users", protect, allowRoles("admin"), getUsers);
 router.post("/users", protect, allowRoles("admin"), createUser);

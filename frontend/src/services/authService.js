@@ -49,3 +49,13 @@ export const resetPassword = async (payload) => {
   const response = await api.post("/reset-password", payload);
   return response.data;
 };
+
+// Best effort only: persistence never depends on unload requests arriving.
+export const discardRegistrationOnExit = (registrationId) => {
+  fetch(`${api.defaults.baseURL}/cancel-registration`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ registrationId }),
+    keepalive: true
+  }).catch(() => {});
+};

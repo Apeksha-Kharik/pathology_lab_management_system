@@ -11,10 +11,12 @@ const validateRequest = async (req, res, next) => {
     const body = req.body || {};
 
     for (const field of ["name", "patientName", "emergencyContactName"]) {
+      if (field === "emergencyContactName" && !clean(body[field])) continue;
       if (body[field] !== undefined && (!clean(body[field]) || !NAME.test(clean(body[field])))) return fail(res, "Name may contain only letters and spaces");
     }
     if (body.email !== undefined && (!clean(body.email) || !EMAIL.test(clean(body.email)))) return fail(res, "Enter a valid email address");
     for (const field of ["phone", "mobile", "emergencyContactPhone"]) {
+      if (field === "emergencyContactPhone" && !clean(body[field])) continue;
       if (body[field] !== undefined && (!clean(body[field]) || !PHONE.test(clean(body[field])))) return fail(res, "Mobile number must contain exactly 10 digits");
     }
     if (body.age !== undefined) {

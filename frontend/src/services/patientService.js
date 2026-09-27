@@ -44,6 +44,16 @@ export const downloadReport = async (reportId) => {
   }
 };
 
+export const createPaymentOrder = async (bookingId) => {
+  const response = await api.post(`/payments/${bookingId}/order`);
+  return response.data;
+};
+
+export const verifyPayment = async (bookingId, paymentResponse) => {
+  const response = await api.post(`/payments/${bookingId}/verify`, paymentResponse);
+  return response.data;
+};
+
 export const downloadReceipt = async (bookingId) => {
   const response = await api.get(`/receipts/${bookingId}`, {
     responseType: "blob"
