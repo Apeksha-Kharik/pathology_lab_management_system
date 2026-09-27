@@ -578,7 +578,7 @@ function formatDateTime(value) {
 
 function signatureSource(signatureUrl) {
   if (!signatureUrl || signatureUrl.startsWith("http") || signatureUrl.startsWith("blob:")) return signatureUrl || "";
-  return `http://localhost:5000${signatureUrl}`;
+  return `https://pathology-lab-backend-pcb1.onrender.com${signatureUrl}`;
 }
 
 function formatInputDate(value) {

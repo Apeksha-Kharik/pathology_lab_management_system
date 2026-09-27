@@ -5,7 +5,7 @@ function Reports() {
   const [reports, setReports] = useState([]);
 
   useEffect(() => {
-    fetch(`http://localhost:5000/my-reports/${localStorage.getItem("userId")}`)
+    fetch(`https://pathology-lab-backend-pcb1.onrender.com/my-reports/${localStorage.getItem("userId")}`)
       .then(res => res.json())
       .then(setReports);
   }, []);

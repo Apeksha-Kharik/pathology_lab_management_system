@@ -5,7 +5,7 @@ function History() {
   const [data, setData] = useState([]);
 
   useEffect(() => {
-    fetch(`http://localhost:5000/my-bookings/${localStorage.getItem("userId")}`)
+    fetch(`https://pathology-lab-backend-pcb1.onrender.com/my-bookings/${localStorage.getItem("userId")}`)
       .then(res => res.json())
       .then(setData);
   }, []);

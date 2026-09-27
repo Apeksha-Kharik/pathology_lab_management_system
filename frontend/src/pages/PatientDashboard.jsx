@@ -1613,7 +1613,7 @@ function ReportPreview({ report, user, onClose, onDownload, downloading }) {
       : "text-emerald-700";
   const signatureUrl = report.pathologistSignatureImage || report.approvedBy?.signatureUrl || "";
   const authorizedSignature = report.authorizedSignatureImage || report.authorizedBy?.signatureUrl || signatureUrl;
-  const assetUrl = (value) => !value || value.startsWith("http") || value.startsWith("data:") ? value : `${window.location.protocol}//${window.location.hostname}:5000${value}`;
+  const assetUrl = (value) => !value || value.startsWith("http") || value.startsWith("data:") ? value : `https://pathology-lab-backend-pcb1.onrender.com${value}`;
   const dateTime = (value) => value ? new Date(value).toLocaleString("en-IN") : "N/A";
 
   return (
