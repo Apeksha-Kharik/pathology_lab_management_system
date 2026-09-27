@@ -17,6 +17,8 @@ import TechnicianDashboard from "./pages/TechnicianDashboard";
 import PathologistDashboard from "./pages/PathologistDashboard";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./context/AuthContext";
+import PolicyPage from "./pages/PolicyPage";
+import { policies } from "./data/policies";
 
 function App() {
   return (
@@ -24,6 +26,9 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<HomePage />} />
+          {policies.map((policy) => (
+            <Route key={policy.path} path={policy.path} element={<PolicyPage policy={policy} />} />
+          ))}
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/receptionist/login" element={<ReceptionistLogin />} />

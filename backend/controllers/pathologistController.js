@@ -225,6 +225,11 @@ const approveReport = async (req, res) => {
     report.approvedPathologistName = pathologist.name;
     report.approvedPathologistQualification = pathologist.qualification;
     report.approvedPathologistRegistrationNumber = pathologist.registrationNumber;
+    report.authorizedBy = pathologist._id;
+    report.authorizedPersonName = pathologist.name;
+    report.authorizedSignatureImage = pathologist.signatureUrl;
+    report.authorizationStatus = "Authorized";
+    report.authorizedAt = new Date();
     report.status = "Approved";
     report.reportStatus = "Approved";
     report.finalStatus = "Report Ready";

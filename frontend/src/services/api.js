@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const configuredApiUrl = import.meta.env.VITE_API_URL?.trim();
-const defaultApiUrl = `${window.location.protocol}//${window.location.hostname}:5000`;
+const defaultApiUrl = "https://pathology-lab-backend-pcb1.onrender.com";
 
 const api = axios.create({
   baseURL: (configuredApiUrl || defaultApiUrl).replace(/\/$/, ""),

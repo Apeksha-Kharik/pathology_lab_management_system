@@ -13,6 +13,8 @@ function LoginPage() {
   const { login } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({ email: "", password: "" });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loginError, setLoginError] = useState("");
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -20,17 +22,30 @@ function LoginPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setLoginError("");
 
     if (!formData.email || !formData.password) {
-      alert("Please fill all fields");
+      setLoginError("Please fill all fields");
       return;
     }
 
+    setIsSubmitting(true);
     try {
       const user = await login(formData);
       navigate(roleRoutes[user.role] || "/patient_dashboard");
     } catch (error) {
-      alert(error.response?.data?.message || "Login failed");
+      if (error.code === "ECONNABORTED" || error.code === "ETIMEDOUT") {
+        setLoginError("The server took too long to respond. Please wait a moment and try again.");
+      } else if (!error.response && error.request) {
+        setLoginError("Unable to connect to the login server. Please try again shortly. If this continues, contact the laboratory.");
+      } else if (error.response?.status >= 500) {
+        setLoginError("The login service is temporarily unavailable. Please try again later or contact the laboratory.");
+      } else {
+        setLoginError(error.response?.data?.message || "Unable to complete sign-in. Please try again.");
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -80,6 +95,7 @@ function LoginPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
+              {loginError && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{loginError}</p>}
               <label className="block">
                 <span className="mb-2 block text-sm font-extrabold text-slate-700">Email address</span>
                 <span className="flex min-h-[3.35rem] items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 focus-within:border-emerald-500 focus-within:bg-white focus-within:ring-4 focus-within:ring-emerald-100">
@@ -119,8 +135,8 @@ function LoginPage() {
                 </button>
               </div>
 
-              <button type="submit" className="w-full rounded-xl bg-emerald-700 px-5 py-4 text-base font-extrabold text-white shadow-lg shadow-emerald-950/10 transition hover:bg-emerald-800 focus:outline-none focus:ring-4 focus:ring-emerald-200">
-                Login
+              <button type="submit" disabled={isSubmitting} className="w-full rounded-xl bg-emerald-700 px-5 py-4 text-base font-extrabold text-white shadow-lg shadow-emerald-950/10 transition hover:bg-emerald-800 focus:outline-none focus:ring-4 focus:ring-emerald-200 disabled:cursor-wait disabled:opacity-60">
+                {isSubmitting ? "Signing in…" : "Login"}
               </button>
             </form>
 

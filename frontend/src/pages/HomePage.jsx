@@ -27,6 +27,7 @@ import logo from "../assets/logo.png";
 import bg1 from "../assets/bg1.png";
 import bg2 from "../assets/bg2.png";
 import bg3 from "../assets/bg3.png";
+import PolicyLinks from "../components/PolicyLinks";
 
 const reveal = {
   hidden: { opacity: 0, y: 22 },
@@ -88,6 +89,19 @@ const highlights = [
   "Searchable booking and report queues"
 ];
 
+const termsAndConditions = [
+  "Patients must provide accurate information during registration.",
+  "Please follow the laboratory's instructions before sample collection.",
+  "Test reports are confidential and will be shared only with authorized persons.",
+  "Patients should consult a qualified doctor for interpretation of their reports.",
+  "Payment must be completed according to the applicable laboratory charges.",
+  "Report delivery time may vary depending on the test and laboratory conditions.",
+  "The laboratory may reject unsuitable or improperly collected samples.",
+  "Cancellation and refund requests will be handled according to laboratory policy.",
+  "The laboratory may update these terms when required.",
+  "By using our services, you agree to these Terms & Conditions."
+];
+
 function HomePage() {
   const navigate = useNavigate();
 
@@ -113,6 +127,7 @@ function HomePage() {
             <button onClick={() => scrollTo("services")} className="hover:text-emerald-700">Services</button>
             <button onClick={() => scrollTo("process")} className="hover:text-emerald-700">Process</button>
             <button onClick={() => scrollTo("quality")} className="hover:text-emerald-700">Quality</button>
+            <button onClick={() => scrollTo("terms")} className="hover:text-emerald-700">Terms</button>
             <button onClick={() => scrollTo("contact")} className="hover:text-emerald-700">Contact</button>
           </nav>
 
@@ -292,6 +307,23 @@ function HomePage() {
             </button>
           </div>
         </section>
+
+        <section id="terms" className="scroll-mt-24 bg-white py-20">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+            <div className="rounded-3xl border border-emerald-100 bg-[#f7fcf9] p-7 shadow-md sm:p-10 lg:p-12">
+              <p className="text-sm font-bold uppercase tracking-[0.2em] text-emerald-700">Patient Information</p>
+              <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-emerald-950 sm:text-4xl">Terms & Conditions</h2>
+              <p className="mt-4 max-w-3xl text-base leading-7 text-slate-600">
+                Please read these conditions before registering, booking a test, or using our laboratory services.
+              </p>
+              <ul className="mt-8 grid list-disc gap-x-14 gap-y-4 pl-6 text-base leading-7 text-slate-700 marker:text-emerald-600 sm:grid-cols-2">
+                {termsAndConditions.map((term) => (
+                  <li key={term} className="pl-1">{term}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </section>
       </main>
 
       <footer id="contact" className="bg-[#063326] text-white">
@@ -322,9 +354,11 @@ function HomePage() {
               <FooterAction label="Patient Login" onClick={() => go("/login")} />
               <FooterAction label="Register Patient" onClick={() => go("/register")} />
               <FooterAction label="Forgot Password" onClick={() => go("/forgot-password")} />
+              <FooterAction label="Terms & Conditions" onClick={() => go("/terms-and-conditions")} />
             </div>
           </div>
         </div>
+        <PolicyLinks />
         <div className="border-t border-white/10 px-4 py-5 text-center text-xs font-semibold text-emerald-50/60">
           Copyright 2026 INDIPATH Multidiagnostic LLP. Role-protected diagnostic workflow system.
         </div>

@@ -9,6 +9,7 @@ dotenv.config({ path: path.join(__dirname, ".env") });
 const connectDB = require("./config/db");
 const { verifyTransporter } = require("./config/email");
 const ensureDefaultPackages = require("./utils/ensureDefaultPackages");
+const ensureDefaultTests = require("./utils/ensureDefaultTests");
 
 const authRoutes = require("./routes/authRoutes");
 const adminRoutes = require("./routes/adminRoutes");
@@ -17,6 +18,7 @@ const receptionistRoutes = require("./routes/receptionistRoutes");
 const technicianRoutes = require("./routes/technicianRoutes");
 const pathologistRoutes = require("./routes/pathologistRoutes");
 const profileRoutes = require("./routes/profileRoutes");
+const documentRoutes = require("./routes/documentRoutes");
 const { validateRequest } = require("./middleware/validateRequest");
 
 verifyTransporter();
@@ -31,10 +33,14 @@ const configuredOrigins = String(process.env.FRONTEND_URL || "")
   .split(",")
   .map((origin) => origin.trim().replace(/\/$/, ""))
   .filter(Boolean);
+const allowedOrigins = new Set([
+  "https://pathology-lab-frontend-fywm.onrender.com",
+  ...configuredOrigins
+]);
 
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || configuredOrigins.includes(origin) || localOrigins.some((allowedOrigin) => allowedOrigin.test(origin))) {
+    if (!origin || allowedOrigins.has(origin) || localOrigins.some((allowedOrigin) => allowedOrigin.test(origin))) {
       return callback(null, true);
     }
 
@@ -69,11 +75,13 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/receptionist", receptionistRoutes);
 app.use("/api/technician", technicianRoutes);
 app.use("/api/pathologist", pathologistRoutes);
+app.use("/api/documents", documentRoutes);
 
 const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
   await connectDB();
+  await ensureDefaultTests();
   await ensureDefaultPackages();
 
   app.listen(PORT, () => {

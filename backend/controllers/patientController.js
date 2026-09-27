@@ -143,7 +143,9 @@ const getBookings = async (req, res) => {
 const getReports = async (req, res) => {
   try {
     const reports = await Report.find({ userId: req.user._id, status: "Approved" })
-      .populate("bookingId", "name patientCode bookingCode testName")
+      .populate("bookingId")
+      .populate("approvedBy", "name qualification registrationNumber signatureUrl")
+      .populate("authorizedBy", "name qualification registrationNumber signatureUrl")
       .sort({ approvedAt: -1 });
     res.json(reports);
   } catch (error) {
@@ -157,14 +159,12 @@ const downloadReport = async (req, res) => {
       _id: req.params.reportId,
       userId: req.user._id,
       status: "Approved"
-    }).populate("bookingId").populate("approvedBy", "name qualification registrationNumber signatureUrl");
+    }).populate("bookingId").populate("approvedBy", "name qualification registrationNumber signatureUrl").populate("authorizedBy", "name qualification registrationNumber signatureUrl");
 
     if (!report) {
       return res.status(404).json({ message: "Report not found or not ready" });
     }
 
-    const booking = report.bookingId || {};
-    const results = Array.isArray(report.results) ? report.results : [];
     const filename = buildPatientPdfFilename(booking.name, booking.patientCode || booking.bookingCode, "RPT");
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
@@ -192,16 +192,6 @@ const downloadReceipt = async (req, res) => {
 
     if (booking.paymentStatus !== "Paid") {
       return res.status(400).json({ message: "Receipt is available only after payment is marked as paid" });
-    }
-
-    if (!booking.receiptId) {
-      booking.receiptId = generateReceiptId();
-      await booking.save();
-      await Payment.findOneAndUpdate(
-        { bookingId: booking._id },
-        { receiptId: booking.receiptId },
-        { new: true }
-      );
     }
 
     const filename = buildPatientPdfFilename(booking.name, booking.patientCode || booking.bookingCode, "RCT");
