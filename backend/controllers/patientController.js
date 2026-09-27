@@ -214,8 +214,12 @@ const createBooking = async (req, res) => {
     const {
       testId, packageId, bookingDate, timeSlot, notes, age, gender, sampleType,
       name, patientName: requestedPatientName, phone, email, prescribedBy, doctorNotes,
-      collectionType, address, homeSample
+      collectionType, address, homeSample, paymentPreference = "cash"
     } = req.body;
+
+    if (!["cash", "online"].includes(paymentPreference)) {
+      return res.status(400).json({ message: "Select cash on delivery or online payment" });
+    }
 
     if ((!testId && !packageId) || !bookingDate || !timeSlot) {
       return res.status(400).json({ message: "Select a test or package, preferred date and time slot" });
@@ -271,6 +275,7 @@ const createBooking = async (req, res) => {
       status: "Pending Approval",
       bookingStatus: "Pending Approval",
       paymentStatus: "Unpaid",
+      paymentPreference,
       bookingCode
     });
 
@@ -278,7 +283,7 @@ const createBooking = async (req, res) => {
       bookingId: booking._id,
       userId: req.user._id,
       amount: bookingAmount,
-      method: "cash",
+      method: paymentPreference === "online" ? "razorpay" : "cash",
       status: "pending"
     });
 
@@ -497,6 +502,7 @@ const downloadReceipt = async (req, res) => {
       ["Receipt ID", booking.receiptId || booking.receiptNumber],
       ["Total Amount", formatCurrency(booking.amount)],
       ["Payment Method", String(booking.paymentMethod || "N/A").toUpperCase()],
+      ["Payment Mode", booking.razorpayMode === "test" ? "TEST - No real money received" : "Offline / Live"],
       ["Payment Status", booking.paymentStatus],
       ["Payment Date", formatDateTime(booking.paidAt)]
     ]);

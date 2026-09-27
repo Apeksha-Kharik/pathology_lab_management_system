@@ -6,7 +6,7 @@ const paymentSchema = new mongoose.Schema({
   amount: { type: Number, required: true },
   method: {
     type: String,
-    enum: ["cash", "upi", "card"],
+    enum: ["cash", "upi", "card", "razorpay"],
     default: "cash"
   },
   status: {

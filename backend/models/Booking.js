@@ -53,9 +53,15 @@ const bookingSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ["cash", "upi", "card"],
+    enum: ["cash", "upi", "card", "razorpay"],
     default: "cash"
   },
+  paymentPreference: { type: String, enum: ["cash", "online"], default: "cash" },
+  razorpayOrderId: { type: String },
+  razorpayPaymentId: { type: String },
+  razorpayMode: { type: String, enum: ["test", "live"] },
+  paymentOrderLock: { type: String, select: false },
+  paymentOrderLockUntil: { type: Date, select: false },
   patientArrived: { type: Boolean, default: false },
   paymentDate: { type: Date },
   paidAt: { type: Date },

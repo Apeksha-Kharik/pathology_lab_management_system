@@ -335,6 +335,11 @@ const updateBookingStatus = async (req, res) => {
       return res.status(404).json({ message: "Booking not found" });
     }
 
+    const currentStatus = booking.bookingStatus || booking.status;
+    if ((["Confirmed", "Rejected"].includes(status) && currentStatus !== "Pending Approval")
+      || (status === "Arrived" && currentStatus !== "Confirmed")) {
+      return res.status(409).json({ message: "This booking has already progressed. Refresh the booking list." });
+    }
     booking.bookingStatus = status;
     booking.status = status;
     if (["Confirmed", "Arrived"].includes(status) && !booking.patientCode) {
@@ -349,7 +354,13 @@ const updateBookingStatus = async (req, res) => {
     if (status === "Rejected") {
       booking.rejectionReason = rejectionReason || "No reason provided";
     }
-    await booking.save();
+    const statusUpdate = await Booking.updateOne({ _id: booking._id, bookingStatus: currentStatus }, { $set: {
+      bookingStatus: status, status,
+      ...(booking.patientCode ? { patientCode: booking.patientCode } : {}),
+      ...(status === "Arrived" ? { patientArrived: true } : {}),
+      ...(status === "Rejected" ? { rejectionReason: booking.rejectionReason } : {})
+    } });
+    if (!statusUpdate.modifiedCount) return res.status(409).json({ message: "Booking changed. Refresh and try again." });
 
     if (status === "Confirmed") {
       await notifyPatient(booking, [
@@ -466,6 +477,13 @@ const markPaymentPaid = async (req, res) => {
       return res.status(404).json({ message: "Booking not found" });
     }
 
+    if (booking.paymentPreference === "online") {
+      return res.status(409).json({ message: "Online bookings must be paid through the patient's Pay Now option. Gateway verification updates payment automatically." });
+    }
+    if (!["Confirmed", "Arrived"].includes(booking.bookingStatus) || booking.paymentStatus === "Paid") {
+      return res.status(409).json({ message: "Only confirmed, unpaid bookings can be marked paid" });
+    }
+
     const receiptNumber = booking.receiptNumber || `RCPT-${Date.now()}`;
     const receiptId = booking.receiptId || generateReceiptId();
     const paidAmount = Number(amount || booking.amount);
@@ -575,6 +593,7 @@ const downloadReceptionistReceipt = async (req, res) => {
       ["Receipt ID", booking.receiptId || booking.receiptNumber],
       ["Total Amount", formatCurrency(booking.amount)],
       ["Payment Method", String(booking.paymentMethod || "N/A").toUpperCase()],
+      ["Payment Mode", booking.razorpayMode === "test" ? "TEST - No real money received" : "Offline / Live"],
       ["Payment Status", booking.paymentStatus],
       ["Payment Date", formatDateTime(booking.paidAt)]
     ]);

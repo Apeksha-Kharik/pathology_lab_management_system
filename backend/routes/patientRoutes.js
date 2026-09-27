@@ -11,6 +11,10 @@ const {
 const { protect, allowRoles } = require("../middleware/authMiddleware");
 
 const router = express.Router();
+const { createOrder, verifyPayment } = require("../controllers/onlinePaymentController");
+
+router.post("/bookings/:id/payment/order", protect, allowRoles("patient"), createOrder);
+router.post("/bookings/:id/payment/verify", protect, allowRoles("patient"), verifyPayment);
 
 router.get("/tests", protect, allowRoles("patient"), getTests);
 router.get("/packages", protect, allowRoles("patient"), getPackages);

@@ -482,6 +482,7 @@ function BookingSection({ title, description, bookings, assignmentsByBooking, te
                 <div className="text-right">
                   <StatusBadge value={booking.bookingStatus} />
                   <div className="mt-2"><StatusBadge value={booking.paymentStatus} /></div>
+                  <p className="mt-2 text-xs font-semibold text-slate-500">{booking.paymentPreference === "online" ? "Online payment — patient pays from Booking History" : "Cash on delivery"}</p>
                 </div>
               </div>
 
@@ -491,7 +492,7 @@ function BookingSection({ title, description, bookings, assignmentsByBooking, te
                     <UserCheck size={14} /> Patient Arrived
                   </button>
                 )}
-                {["Confirmed", "Arrived"].includes(booking.bookingStatus) && booking.paymentStatus === "Unpaid" && (
+                {["Confirmed", "Arrived"].includes(booking.bookingStatus) && booking.paymentStatus === "Unpaid" && booking.paymentPreference !== "online" && (
                   <button onClick={() => onPaid(booking)} className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-3 py-2 text-xs font-black text-white shadow-sm transition hover:bg-emerald-800">
                     <CreditCard size={14} /> Mark as Paid
                   </button>

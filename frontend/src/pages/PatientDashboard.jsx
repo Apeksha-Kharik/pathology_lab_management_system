@@ -24,6 +24,8 @@ import {
   X
 } from "lucide-react";
 import { useAuth } from "../context/useAuth";
+import BookingPayment from "../components/BookingPayment";
+import { paymentPreferenceLabel } from "../utils/paymentEligibility";
 import {
   createBooking,
   downloadReport,
@@ -329,6 +331,9 @@ const buildBookingHistoryRows = (localRequests, serverBookings) => {
 
   const serverRows = serverBookings.map((booking) => ({
     id: booking._id,
+    serverBookingId: booking._id,
+    razorpayMode: booking.razorpayMode,
+    paymentPreference: booking.paymentPreference || "cash",
     code: booking.bookingCode || booking._id,
     patientCode: booking.patientCode || "Pending",
     status: booking.bookingStatus || booking.status || "Pending Approval",
@@ -365,6 +370,37 @@ function PatientDashboard() {
   const [cartItems, setCartItems] = useState(() => readStoredCart(cartStorageKey));
   const [bookingRequests, setBookingRequests] = useState(() => readStoredBookingRequests(bookingRequestsStorageKey));
   const [bookingItem, setBookingItem] = useState(null);
+  const [bookingRefreshError, setBookingRefreshError] = useState("");
+  const handlePaymentUpdated = (updated) => {
+    setBookings((current) => current.map((booking) => booking._id === updated._id ? updated : booking));
+  };
+
+  useEffect(() => {
+    if (patientView !== "history") return undefined;
+    let disposed = false;
+    let pending = false;
+    const refreshBookings = async () => {
+      if (document.hidden || pending) return;
+      pending = true;
+      try {
+        const nextBookings = await getBookings();
+        if (!disposed) {
+          setBookings(nextBookings);
+          setBookingRefreshError("");
+        }
+      } catch {
+        if (!disposed) setBookingRefreshError("Unable to refresh bookings. Reopen Booking History to try again.");
+      } finally { pending = false; }
+    };
+    refreshBookings();
+    const timer = window.setInterval(refreshBookings, 15000);
+    window.addEventListener("focus", refreshBookings);
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refreshBookings);
+    };
+  }, [patientView]);
 
   const loadDashboard = async () => {
     try {
@@ -532,7 +568,10 @@ function PatientDashboard() {
         )}
 
         {!loading && patientView === "history" && (
-          <BookingHistoryTable bookings={bookingHistoryRows} />
+          <div>
+            {bookingRefreshError && <p role="status" className="mb-3 text-sm text-amber-800">{bookingRefreshError}</p>}
+            <BookingHistoryTable bookings={bookingHistoryRows} onPaid={handlePaymentUpdated} />
+          </div>
         )}
 
         {!loading && patientView === "downloads" && (
@@ -553,8 +592,8 @@ function PatientDashboard() {
             ) : (
               <section className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-xl shadow-emerald-950/8 sm:p-7">
                 {active === "tests" && <AvailableTests tests={filteredTests} searchTerm={searchTerm} setSearchTerm={setSearchTerm} onBook={() => {}} />}
-                {active === "history" && <BookingHistory bookings={bookings} />}
-                {active === "payments" && <PaymentStatus bookings={bookings} />}
+                {active === "history" && <BookingHistory bookings={bookings} onPaid={handlePaymentUpdated} />}
+                {active === "payments" && <PaymentStatus bookings={bookings} onPaid={handlePaymentUpdated} />}
                 {active === "reports" && <ReportsAndReceipts bookings={bookings} reports={reports} />}
               </section>
             )}
@@ -891,6 +930,7 @@ const nearestLab = {
 };
 
 const createBlankBookingForm = () => ({
+  paymentPreference: "cash",
   name: "",
   age: "",
   gender: "",
@@ -1006,6 +1046,7 @@ function BookingWizardModal({ item, onBookingRequested, onClose, user }) {
           phone: form.mobile,
           email: form.email,
           bookingDate: form.preferredDate,
+          paymentPreference: form.paymentPreference,
           timeSlot: form.timeSlot,
           notes: form.notes,
           doctorNotes: form.prescribedBy,
@@ -1115,6 +1156,13 @@ function BookingWizardModal({ item, onBookingRequested, onClose, user }) {
                 <WizardField label="Prescribed By / Doctor" value={form.prescribedBy} onChange={(value) => updateField("prescribedBy", value)} />
                 <WizardField label="Preferred Date" type="date" value={form.preferredDate} onChange={(value) => updateField("preferredDate", value)} />
                 <WizardSelect label="Time Slot" value={form.timeSlot} onChange={(value) => updateField("timeSlot", value)} options={["", ...timeSlots]} />
+                <fieldset className="md:col-span-2">
+                  <legend className="mb-3 text-sm font-black text-slate-700">Payment choice</legend>
+                  <SegmentedChoice value={form.paymentPreference} onChange={(value) => updateField("paymentPreference", value)} options={[
+                    { value: "cash", label: "Cash on delivery", description: "Pay when you visit the lab or at sample collection." },
+                    { value: "online", label: "Online payment", description: "Pay from Booking History after receptionist confirmation. Razorpay Test Mode is currently enabled." }
+                  ]} />
+                </fieldset>
                 <label className="md:col-span-2">
                   <span className="mb-2 block text-sm font-black text-slate-700">Notes if needed</span>
                   <textarea value={form.notes} onChange={(event) => updateField("notes", event.target.value)} className="min-h-28 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-semibold outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100" />
@@ -1283,6 +1331,7 @@ function BookingReview({ collectionType, form, item, totalAmount }) {
           <ReviewLine label="Patient" value={`${form.name}, ${form.age} yrs, ${form.gender}`} />
           <ReviewLine label="Contact" value={`${form.mobile} | ${form.email}`} />
           <ReviewLine label="Doctor" value={form.prescribedBy || "Not specified"} />
+          <ReviewLine label="Payment choice" value={paymentPreferenceLabel(form.paymentPreference)} />
           <ReviewLine label="Date & Time" value={`${form.preferredDate} | ${form.timeSlot}`} />
           <ReviewLine label="Collection" value={collectionType === "home" ? "Home Collection" : "Visit Lab"} />
           <ReviewLine label={collectionType === "home" ? "Address" : "Lab"} value={collectionType === "home" ? address : `${nearestLab.name}, ${nearestLab.address}`} />
@@ -1293,7 +1342,7 @@ function BookingReview({ collectionType, form, item, totalAmount }) {
       <div className="rounded-3xl bg-emerald-950 p-6 text-white shadow-xl shadow-emerald-950/15">
         <p className="text-xs font-black uppercase tracking-[0.22em] text-emerald-200">Amount</p>
         <p className="mt-3 text-4xl font-black">INR {totalAmount}</p>
-        <p className="mt-3 text-sm font-semibold leading-7 text-emerald-50/80">Payment status will remain pending until lab confirmation or collection payment.</p>
+        <p className="mt-3 text-sm font-semibold leading-7 text-emerald-50/80">{form.paymentPreference === "online" ? "After receptionist confirmation, open Booking History and select Pay Now. Test Mode payments do not charge real money." : "Pay at the lab or during sample collection. Your receipt appears after the receptionist records payment."}</p>
       </div>
     </div>
   );
@@ -1327,7 +1376,8 @@ function BookingSuccess({ bookingId, collectionType, form, item, onBookMore, onD
         <ReviewLine label="Collection" value={collectionType === "home" ? "Home Collection" : "Visit Lab"} />
         <ReviewLine label="Amount" value={`INR ${totalAmount}`} />
         <ReviewLine label="Booking Status" value="Pending Approval" />
-        <ReviewLine label="Payment Status" value="Pending / Pay at lab" />
+        <ReviewLine label="Payment choice" value={paymentPreferenceLabel(form.paymentPreference)} />
+        <ReviewLine label="Payment Status" value={form.paymentPreference === "online" ? "Unpaid / Pay online after confirmation" : "Unpaid / Pay at lab or sample collection"} />
       </div>
 
       <div className="mt-6 grid gap-3 sm:grid-cols-2">
@@ -1424,7 +1474,7 @@ function AvailableTests({ tests, searchTerm, setSearchTerm, onBook }) {
   );
 }
 
-function BookingHistoryTable({ bookings }) {
+function BookingHistoryTable({ bookings, onPaid }) {
   if (!bookings.length) {
     return (
       <section className="rounded-3xl border border-emerald-100 bg-white p-8 text-center shadow-xl shadow-emerald-950/8">
@@ -1467,7 +1517,7 @@ function BookingHistoryTable({ bookings }) {
                 <td className="px-4 py-4 font-black text-emerald-950">{booking.code}</td>
                 <td className="px-4 py-4 font-black text-emerald-800">{booking.patientCode || "Pending"}</td>
                 <td className="px-4 py-4"><StatusBadge value={booking.status} /></td>
-                <td className="px-4 py-4"><StatusBadge value={booking.paymentStatus} /></td>
+                <td className="px-4 py-4"><BookingPayment booking={booking} onPaid={onPaid} /></td>
                 <td className="px-4 py-4 font-bold text-slate-900">{booking.testName}</td>
                 <td className="px-4 py-4 text-slate-600">{booking.bookingType}</td>
                 <td className="px-4 py-4 text-slate-600">{booking.patientName || "N/A"}</td>
@@ -1488,19 +1538,19 @@ function BookingHistoryTable({ bookings }) {
   );
 }
 
-function BookingHistory({ bookings }) {
+function BookingHistory({ bookings, onPaid }) {
   if (!bookings.length) return <EmptyState text="No booking history yet." />;
 
   return (
     <div className="space-y-4">
       {bookings.map((booking) => (
-        <BookingRow key={booking._id} booking={booking} />
+        <BookingRow key={booking._id} booking={booking} onPaid={onPaid} />
       ))}
     </div>
   );
 }
 
-function PaymentStatus({ bookings }) {
+function PaymentStatus({ bookings, onPaid }) {
   if (!bookings.length) return <EmptyState text="No payments to show yet." />;
 
   return (
@@ -1519,7 +1569,7 @@ function PaymentStatus({ bookings }) {
             <tr key={booking._id} className="border-t border-slate-100">
               <td className="p-3 font-semibold">{booking.testName}</td>
               <td className="p-3">INR {booking.amount}</td>
-              <td className="p-3"><StatusBadge value={booking.paymentStatus} /></td>
+              <td className="p-3"><BookingPayment booking={booking} onPaid={onPaid} /></td>
               <td className="p-3"><StatusBadge value={booking.bookingStatus || booking.status} /></td>
             </tr>
           ))}
@@ -1731,7 +1781,7 @@ function ReceiptButton({ booking, user }) {
   );
 }
 
-function BookingRow({ booking }) {
+function BookingRow({ booking, onPaid }) {
   return (
     <div className="rounded-md border border-slate-200 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1745,7 +1795,7 @@ function BookingRow({ booking }) {
         </div>
         <div className="flex flex-wrap gap-2">
           <StatusBadge value={booking.bookingStatus || booking.status} />
-          <StatusBadge value={booking.paymentStatus} />
+          <BookingPayment booking={booking} onPaid={onPaid} />
         </div>
       </div>
     </div>

@@ -48,6 +48,7 @@ app.use(cors({
   credentials: true
 }));
 
+app.post("/api/payments/razorpay/webhook", express.raw({ type: "application/json", limit: "100kb" }), require("./controllers/onlinePaymentController").paymentWebhook);
 app.use(express.json());
 app.use(validateRequest);
 app.use("/uploads/signatures", express.static(path.join(__dirname, "uploads", "signatures"), {

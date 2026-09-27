@@ -17,6 +17,6 @@ Prices currently remain in the existing booking flow. Confirm actual services an
 
 Render must have a static-site rewrite from `/*` to `/index.html` so public policy URLs open directly and survive refreshes.
 
-When checkout is implemented, show links to the terms, privacy and refund policies before payment. Verify payments server-side and implement refund reconciliation; the policy pages alone do not provide those features.
+Test Mode checkout now links the terms, privacy and refund policies before payment and verifies payments server-side. See [RAZORPAY_SETUP.md](RAZORPAY_SETUP.md) for configuration and testing. Refund processing and refund reconciliation still need implementation before live use.
 
 References: https://razorpay.com/terms/ and https://razorpay.com/dispute-guide/
