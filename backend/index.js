@@ -31,10 +31,14 @@ const configuredOrigins = String(process.env.FRONTEND_URL || "")
   .split(",")
   .map((origin) => origin.trim().replace(/\/$/, ""))
   .filter(Boolean);
+const allowedOrigins = new Set([
+  "https://pathology-lab-frontend-fywm.onrender.com",
+  ...configuredOrigins
+]);
 
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || configuredOrigins.includes(origin) || localOrigins.some((allowedOrigin) => allowedOrigin.test(origin))) {
+    if (!origin || allowedOrigins.has(origin) || localOrigins.some((allowedOrigin) => allowedOrigin.test(origin))) {
       return callback(null, true);
     }
 

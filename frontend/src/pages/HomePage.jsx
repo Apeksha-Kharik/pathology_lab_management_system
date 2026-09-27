@@ -27,6 +27,7 @@ import logo from "../assets/logo.png";
 import bg1 from "../assets/bg1.png";
 import bg2 from "../assets/bg2.png";
 import bg3 from "../assets/bg3.png";
+import PolicyLinks from "../components/PolicyLinks";
 
 const reveal = {
   hidden: { opacity: 0, y: 22 },
@@ -353,10 +354,11 @@ function HomePage() {
               <FooterAction label="Patient Login" onClick={() => go("/login")} />
               <FooterAction label="Register Patient" onClick={() => go("/register")} />
               <FooterAction label="Forgot Password" onClick={() => go("/forgot-password")} />
-              <FooterAction label="Terms & Conditions" onClick={() => scrollTo("terms")} />
+              <FooterAction label="Terms & Conditions" onClick={() => go("/terms-and-conditions")} />
             </div>
           </div>
         </div>
+        <PolicyLinks />
         <div className="border-t border-white/10 px-4 py-5 text-center text-xs font-semibold text-emerald-50/60">
           Copyright 2026 INDIPATH Multidiagnostic LLP. Role-protected diagnostic workflow system.
         </div>
