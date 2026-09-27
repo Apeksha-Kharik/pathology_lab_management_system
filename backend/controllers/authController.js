@@ -1,4 +1,6 @@
 const bcrypt = require("bcryptjs");
+const { randomInt } = require("crypto");
+const pendingRegistrations = require("../services/pendingRegistrations");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const { sendOtpEmail } = require("../config/email");
@@ -41,14 +43,13 @@ const buildUserResponse = (user) => ({
   mustChangePassword: user.mustChangePassword
 });
 
-const generateOtp = () => String(Math.floor(100000 + Math.random() * 900000));
+const generateOtp = () => String(randomInt(100000, 1000000));
 
 const getOtpExpiry = () => new Date(Date.now() + 10 * 60 * 1000);
 
 const canExposeDevOtp = () =>
   process.env.NODE_ENV !== "production" && process.env.ALLOW_DEV_OTP !== "false";
 
-const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const getPasswordValidationErrors = (password) => {
   const errors = [];
@@ -65,29 +66,23 @@ const getPasswordValidationErrors = (password) => {
     errors.push("Password must include at least one lowercase character");
   }
 
-  if (!/[!@#$%^&*(),.?":{}|<>]/.test(password || "")) {
+  if (!/\d/.test(password || "")) {
+    errors.push("Password must include at least one number");
+  }
+
+  if (!/[^A-Za-z0-9]/.test(password || "")) {
     errors.push("Password must include at least one special character");
   }
 
   return errors;
 };
 
-const cleanupPendingRegistration = async (email) => {
-  if (!email) {
-    return;
-  }
-
-  await User.deleteMany({
-    email: String(email).toLowerCase().trim(),
-    isVerified: false
-  });
-};
-
 const register = async (req, res) => {
+  let registrationId;
   try {
     const { name, email, password, phone, mobile, age, city, address } = req.body;
     const normalizedName = String(name || "").trim().replace(/\s+/g, " ");
-    const userPhone = phone || mobile;
+    const userPhone = String(phone || mobile || "").trim();
     const normalizedEmail = String(email || "").toLowerCase().trim();
     const patientAge = Number(age);
 
@@ -104,74 +99,62 @@ const register = async (req, res) => {
       return res.status(400).json({ message: passwordErrors.join(". ") });
     }
 
-    const verifiedUser = await User.findOne({ 
-      email: normalizedEmail, 
-      isVerified: true 
-    });
-    
-    if (verifiedUser) {
+    const existingUser = await User.findOne({ email: normalizedEmail });
+
+    if (existingUser) {
       return res.status(400).json({ message: "Email already registered. Please login instead." });
     }
 
-    const nameExists = await User.findOne({
-      role: "patient",
-      name: { $regex: `^${escapeRegex(normalizedName)}$`, $options: "i" }
-    });
-
-    if (nameExists) {
-      return res.status(400).json({ message: "Name already exists" });
-    }
-
-    await User.deleteMany({
-      email: normalizedEmail,
-      isVerified: false
-    });
-
     const hashedPassword = await bcrypt.hash(password, 10);
     const otp = generateOtp();
-    const user = await User.create({
+    const details = {
       name: normalizedName,
       email: normalizedEmail,
       phone: userPhone,
       age: patientAge,
-      city,
-      address,
+      city: String(city).trim(),
+      address: String(address).trim(),
       password: hashedPassword,
       role: "patient",
-      isVerified: false,
-      otp,
-      otpExpiry: getOtpExpiry()
-    });
+      isVerified: true
+    };
+    await new User(details).validate();
+    registrationId = pendingRegistrations.create(details, otp);
 
     try {
       await sendOtpEmail({
-        to: user.email,
+        to: normalizedEmail,
         subject: "Verify your INDIPATH account",
         otp
       });
     } catch (emailError) {
+      console.error("Registration email failure:", {
+        code: emailError.code || "EMAIL_ERROR",
+        responseCode: emailError.responseCode || null
+      });
       if (canExposeDevOtp()) {
-        console.warn(`Registration email unavailable; using development OTP for ${user.email}`);
+        console.warn("Registration email unavailable; using development OTP");
         return res.status(201).json({
           message: "Email delivery is unavailable. Use the development OTP shown below.",
           devOtp: otp,
-          user: buildUserResponse(user)
+          registrationId
         });
       }
 
       // Do not leave an unusable, unverified account when OTP delivery fails.
-      await User.deleteOne({ _id: user._id, isVerified: false });
-      console.error(`Registration OTP delivery failed for ${user.email}: ${emailError.message}`);
+      pendingRegistrations.discard(registrationId);
+      console.error("Registration OTP delivery failed");
       return res.status(503).json({
         message: "Unable to send verification email. Please try again later."
       });
     }
 
     res.status(201).json({
-      message: "Registration successful. OTP sent to your email.",
-      user: buildUserResponse(user)
+      message: "OTP sent to your email. Verify it to complete registration.",
+      registrationId
     });
   } catch (error) {
+    pendingRegistrations.discard(registrationId);
     if (error.name === "ValidationError") {
       const message = Object.values(error.errors)[0]?.message || "Registration validation failed";
       return res.status(400).json({ message });
@@ -182,60 +165,26 @@ const register = async (req, res) => {
 };
 
 const verifyOtp = async (req, res) => {
+  const { registrationId, otp } = req.body;
+  const pending = pendingRegistrations.take(registrationId);
+  if (!pending || pending.otp !== String(otp || "")) {
+    return res.status(400).json({ message: "Invalid or expired OTP. Please start registration again.", registrationCancelled: true });
+  }
   try {
-    const { email, otp } = req.body;
-
-    if (!email || !otp) {
-      return res.status(400).json({ message: "Email and OTP are required" });
-    }
-
-    const user = await User.findOne({ email: email.toLowerCase() });
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    if (!user.otp || user.otp !== otp) {
-      await cleanupPendingRegistration(email);
-      return res.status(400).json({ message: "Invalid OTP. Registration cancelled. Please register again." });
-    }
-
-    if (!user.otpExpiry || user.otpExpiry < new Date()) {
-      await cleanupPendingRegistration(email);
-      return res.status(400).json({ message: "OTP expired. Registration cancelled. Please register again." });
-    }
-
-    user.isVerified = true;
-    user.otp = undefined;
-    user.otpExpiry = undefined;
-    await user.save();
-
-    res.json({ message: "Email verified successfully" });
+    // One atomic document insert is the registration commit point.
+    await User.create(pending.details);
+    return res.json({ message: "Registration completed. You can now log in." });
   } catch (error) {
-    res.status(500).json({ message: "OTP verification failed", error: error.message });
+    if (error.code === 11000) {
+      return res.status(409).json({ message: "Email already registered. Please log in.", registrationCancelled: true });
+    }
+    return res.status(500).json({ message: "Registration could not be completed. Please try again.", registrationCancelled: true });
   }
 };
 
 const cancelRegistration = async (req, res) => {
-  try {
-    const { email } = req.body;
-    const normalizedEmail = String(email || "").toLowerCase().trim();
-
-    if (!normalizedEmail) {
-      return res.status(400).json({ message: "Email is required" });
-    }
-
-    const result = await User.deleteOne({
-      email: normalizedEmail,
-      isVerified: false,
-      otp: { $exists: true }
-    });
-
-    res.json({
-      message: result.deletedCount ? "Registration cancelled successfully" : "No pending registration found"
-    });
-  } catch (error) {
-    res.status(500).json({ message: "Registration cancellation failed", error: error.message });
-  }
+  pendingRegistrations.discard(req.body.registrationId);
+  return res.json({ message: "Pending registration discarded" });
 };
 
 const login = async (req, res) => {

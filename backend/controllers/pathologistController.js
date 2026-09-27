@@ -4,7 +4,7 @@ const User = require("../models/User");
 const fs = require("fs");
 const { sendEmail } = require("../config/email");
 const { writeAuditLog } = require("../utils/auditLogger");
-const { sendWhatsAppMessage } = require("../services/whatsappService");
+const { notifyReportReady } = require("../services/patientNotifications");
 
 const signerFields = "name qualification registrationNumber signatureUrl";
 
@@ -256,20 +256,7 @@ const approveReport = async (req, res) => {
         text: "Your report is ready.\nPlease login to dashboard to download report."
       }).catch((error) => console.error("Report notification email failed:", error.message));
     }
-    const reportPhone = report.bookingId?.phone || report.userId?.phone;
-    if (reportPhone && booking) {
-      sendWhatsAppMessage({
-        to: reportPhone,
-        body: [
-          "INDIPATH report is ready.",
-          "",
-          `Patient ID: ${booking.patientCode || "Pending"}`,
-          `Booking ID: ${booking.bookingCode}`,
-          `Test: ${booking.testName}`,
-          "Please login to your dashboard to download the report."
-        ].join("\n")
-      }).catch((error) => console.error("Report WhatsApp notification failed:", error.message));
-    }
+    await notifyReportReady(report);
 
     await report.populate("approvedBy", signerFields);
     res.json({ message: "Report approved successfully", report });

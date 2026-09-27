@@ -6,7 +6,7 @@ const paymentSchema = new mongoose.Schema({
   amount: { type: Number, required: true },
   method: {
     type: String,
-    enum: ["cash", "upi", "card"],
+    enum: ["cash", "upi", "card", "online"],
     default: "cash"
   },
   status: {
@@ -15,6 +15,10 @@ const paymentSchema = new mongoose.Schema({
     default: "pending"
   },
   transactionId: { type: String },
+  gateway: { type: String, enum: ["razorpay"], default: undefined },
+  razorpayOrderId: { type: String, index: true },
+  razorpayPaymentId: { type: String, index: true },
+  razorpaySignature: { type: String },
   receiptNumber: { type: String },
   receiptId: { type: String },
   paymentDate: { type: Date },

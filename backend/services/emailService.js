@@ -1,16 +1,16 @@
 const nodemailer = require("nodemailer");
 
 const getMailConfig = () => {
-  const host = process.env.EMAIL_HOST || "smtp.gmail.com";
+  const host = (process.env.EMAIL_HOST || "smtp.gmail.com").trim();
   const port = Number(process.env.EMAIL_PORT || 587);
-  const user = process.env.EMAIL_USER;
+  const user = process.env.EMAIL_USER?.trim();
   const pass = process.env.EMAIL_PASS;
-  const from = process.env.EMAIL_FROM || user;
+  const from = process.env.EMAIL_FROM?.trim() || user;
 
   return {
     host,
     port,
-    secure: process.env.EMAIL_SECURE === "true",
+    secure: process.env.EMAIL_SECURE === undefined ? port === 465 : process.env.EMAIL_SECURE === "true",
     user,
     pass,
     from
@@ -29,6 +29,9 @@ const createTransporter = () => {
     host: config.host,
     port: config.port,
     secure: config.secure,
+    connectionTimeout: 5000,
+    greetingTimeout: 5000,
+    socketTimeout: 10000,
     auth: {
       user: config.user,
       pass: config.pass
@@ -64,7 +67,7 @@ const sendEmail = async ({ to, subject, text, html }) => {
     const config = getMailConfig();
     const transporter = createTransporter();
 
-    await transporter.sendMail({
+    const info = await transporter.sendMail({
       from: config.from,
       to,
       subject,
@@ -72,10 +75,21 @@ const sendEmail = async ({ to, subject, text, html }) => {
       html
     });
 
-    console.log(`Email sent successfully to ${to}`);
+    const acceptedCount = info.accepted?.length || 0;
+    const rejectedCount = info.rejected?.length || 0;
+    // SMTP acceptance is not proof of delivery to the recipient's inbox.
+    const sent = acceptedCount > 0 && rejectedCount === 0;
+    console.log("Email SMTP result:", {
+      acceptedCount,
+      rejectedCount,
+      messageId: info.messageId || null,
+      status: sent ? "accepted; inbox delivery not confirmed" : "recipient acceptance failed"
+    });
 
     return {
-      sent: true
+      sent,
+      messageId: info.messageId,
+      ...(sent ? {} : { error: "SMTP did not accept all recipients" })
     };
   } catch (error) {
     console.log("Failed to send email");
@@ -83,7 +97,9 @@ const sendEmail = async ({ to, subject, text, html }) => {
 
     return {
       sent: false,
-      error: error.message
+      error: error.message,
+      code: error.code,
+      responseCode: error.responseCode
     };
   }
 };
@@ -106,7 +122,10 @@ const sendOtpEmail = async ({ to, subject, otp }) => {
   });
 
   if (!result.sent) {
-    throw new Error("Unable to send OTP email");
+    const error = new Error("Unable to send OTP email");
+    error.code = result.code || "EMAIL_NOT_ACCEPTED";
+    error.responseCode = result.responseCode;
+    throw error;
   }
 
   return result;

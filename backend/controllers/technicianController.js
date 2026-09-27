@@ -5,6 +5,7 @@ const Package = require("../models/Package");
 const TechnicianAssignment = require("../models/TechnicianAssignment");
 const mongoose = require("mongoose");
 const User = require("../models/User");
+const { notifySampleCollected } = require("../services/patientNotifications");
 
 const generateSampleId = () => `SMP${Date.now().toString().slice(-8)}${Math.floor(10 + Math.random() * 90)}`;
 const generateReportId = () => `RPT${Date.now().toString().slice(-8)}${Math.floor(10 + Math.random() * 90)}`;
@@ -301,6 +302,7 @@ const updateSampleStatus = async (req, res) => {
       return res.status(404).json({ message: "Assigned booking not found" });
     }
 
+    const firstCollection = status === "Sample Collected" && booking.sampleStatus !== "Collected";
     if (status === "Sample Collected") {
       booking.sampleStatus = "Collected";
     }
@@ -309,6 +311,7 @@ const updateSampleStatus = async (req, res) => {
     booking.status = status;
     await booking.save();
 
+    if (firstCollection) await notifySampleCollected(booking);
     res.json({ message: `Booking status updated to ${status}`, booking });
   } catch (error) {
     res.status(500).json({ message: "Status update failed", error: error.message });

@@ -53,7 +53,7 @@ const bookingSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ["cash", "upi", "card"],
+    enum: ["cash", "upi", "card", "online"],
     default: "cash"
   },
   patientArrived: { type: Boolean, default: false },

@@ -9,6 +9,7 @@ const {
   downloadReceipt
 } = require("../controllers/patientController");
 const { protect, allowRoles } = require("../middleware/authMiddleware");
+const { createPaymentOrder, verifyPayment } = require("../controllers/paymentController");
 
 const router = express.Router();
 
@@ -20,5 +21,7 @@ router.get("/bookings", protect, allowRoles("patient"), getBookings);
 router.get("/reports", protect, allowRoles("patient"), getReports);
 router.get("/reports/:reportId/download", protect, allowRoles("patient"), downloadReport);
 router.get("/receipts/:bookingId", protect, allowRoles("patient"), downloadReceipt);
+router.post("/payments/:bookingId/order", protect, allowRoles("patient"), createPaymentOrder);
+router.post("/payments/:bookingId/verify", protect, allowRoles("patient"), verifyPayment);
 
 module.exports = router;

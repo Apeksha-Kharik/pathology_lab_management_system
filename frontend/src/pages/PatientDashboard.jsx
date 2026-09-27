@@ -30,6 +30,8 @@ import {
   downloadReceipt,
   getBookings,
   getPackages,
+  createPaymentOrder,
+  verifyPayment,
   getReports,
   getTests
 } from "../services/patientService";
@@ -554,7 +556,7 @@ function PatientDashboard() {
               <section className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-xl shadow-emerald-950/8 sm:p-7">
                 {active === "tests" && <AvailableTests tests={filteredTests} searchTerm={searchTerm} setSearchTerm={setSearchTerm} onBook={() => {}} />}
                 {active === "history" && <BookingHistory bookings={bookings} />}
-                {active === "payments" && <PaymentStatus bookings={bookings} />}
+                {active === "payments" && <PaymentStatus bookings={bookings} onPaid={loadDashboard} />}
                 {active === "reports" && <ReportsAndReceipts bookings={bookings} reports={reports} />}
               </section>
             )}
@@ -1500,7 +1502,66 @@ function BookingHistory({ bookings }) {
   );
 }
 
-function PaymentStatus({ bookings }) {
+const loadRazorpayCheckout = () => new Promise((resolve) => {
+  if (window.Razorpay) return resolve(true);
+  const existing = document.querySelector('script[data-razorpay-checkout]');
+  if (existing) {
+    existing.addEventListener("load", () => resolve(true), { once: true });
+    existing.addEventListener("error", () => resolve(false), { once: true });
+    return;
+  }
+  const script = document.createElement("script");
+  script.src = "https://checkout.razorpay.com/v1/checkout.js";
+  script.async = true;
+  script.dataset.razorpayCheckout = "true";
+  script.onload = () => resolve(true);
+  script.onerror = () => resolve(false);
+  document.body.appendChild(script);
+});
+
+function PaymentStatus({ bookings, onPaid }) {
+  const [payingBooking, setPayingBooking] = useState("");
+
+  const handlePay = async (booking) => {
+    if (payingBooking) return;
+    try {
+      setPayingBooking(booking._id);
+      const loaded = await loadRazorpayCheckout();
+      if (!loaded) throw new Error("Unable to load the secure payment window");
+      const order = await createPaymentOrder(booking._id);
+      const checkout = new window.Razorpay({
+        key: order.keyId,
+        amount: order.amount,
+        currency: order.currency,
+        name: "INDIPATH",
+        description: order.booking.testName,
+        order_id: order.orderId,
+        prefill: { name: order.booking.name, email: order.booking.email || "", contact: order.booking.phone || "" },
+        theme: { color: "#047857" },
+        modal: { ondismiss: () => setPayingBooking("") },
+        handler: async (response) => {
+          try {
+            const result = await verifyPayment(booking._id, response);
+            alert(result.message);
+            await onPaid();
+          } catch (error) {
+            alert(error.response?.data?.message || "Payment verification failed. Contact reception if money was deducted.");
+          } finally {
+            setPayingBooking("");
+          }
+        }
+      });
+      checkout.on("payment.failed", (response) => {
+        setPayingBooking("");
+        alert(response.error?.description || "Payment failed. Please try again.");
+      });
+      checkout.open();
+    } catch (error) {
+      setPayingBooking("");
+      alert(error.response?.data?.message || error.message || "Unable to start payment");
+    }
+  };
+
   if (!bookings.length) return <EmptyState text="No payments to show yet." />;
 
   return (
@@ -1512,6 +1573,7 @@ function PaymentStatus({ bookings }) {
             <th className="p-3">Amount</th>
             <th className="p-3">Payment</th>
             <th className="p-3">Booking</th>
+            <th className="p-3">Action</th>
           </tr>
         </thead>
         <tbody>
@@ -1521,6 +1583,7 @@ function PaymentStatus({ bookings }) {
               <td className="p-3">INR {booking.amount}</td>
               <td className="p-3"><StatusBadge value={booking.paymentStatus} /></td>
               <td className="p-3"><StatusBadge value={booking.bookingStatus || booking.status} /></td>
+              <td className="p-3">{booking.paymentStatus !== "Paid" && ["Confirmed", "Arrived"].includes(booking.bookingStatus || booking.status) ? <button type="button" disabled={Boolean(payingBooking)} onClick={() => handlePay(booking)} className="rounded-xl bg-emerald-700 px-4 py-2 text-xs font-black text-white disabled:opacity-50">{payingBooking === booking._id ? "Opening..." : "Pay Now"}</button> : booking.paymentStatus === "Paid" ? <span className="text-xs font-bold text-emerald-700">Payment complete</span> : <span className="text-xs text-slate-500">Available after confirmation</span>}</td>
             </tr>
           ))}
         </tbody>

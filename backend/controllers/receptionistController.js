@@ -8,6 +8,7 @@ const PDFDocument = require("pdfkit");
 const fs = require("fs");
 const path = require("path");
 const { sendWhatsAppMessage } = require("../services/whatsappService");
+const { notifyPaymentReceived } = require("../services/patientNotifications");
 
 const letterheadImagePath = path.join(__dirname, "..", "assets", "indipath-letterhead.png");
 const pdfLayout = {
@@ -101,12 +102,14 @@ const drawReceiptBox = (doc, rows) => {
   doc.y = top + (rows.length * rowHeight) + 36;
 };
 
-const notifyPatient = async (booking, lines) => {
+const notifyPatient = async (booking, event, lines, parameters = []) => {
   const phone = booking.phone || booking.userId?.phone;
   if (!phone) return;
   await sendWhatsAppMessage({
     to: phone,
-    body: lines.filter(Boolean).join("\n")
+    body: lines.filter(Boolean).join("\n"),
+    event,
+    parameters
   });
 };
 
@@ -162,15 +165,37 @@ const getTechnicians = async (req, res) => {
   }
 };
 
-const selectFairTechnician = async () => {
-  const technicians = await User.find({ role: "technician" }).select("name email phone role").sort({ name: 1 });
+const getUnavailableTechniciansForSlot = async (booking) => {
+  const slotBookings = await Booking.find({
+    _id: { $ne: booking._id },
+    bookingDate: booking.bookingDate,
+    timeSlot: booking.timeSlot,
+    bookingStatus: { $nin: ["Pending Approval", "Rejected", "Cancelled", "Completed", "Report Ready"] }
+  }).select("_id assignedTechnician");
+  const slotBookingIds = slotBookings.map((item) => item._id);
+  const pendingAssignments = slotBookingIds.length
+    ? await TechnicianAssignment.find({ booking: { $in: slotBookingIds }, status: "PENDING" }).select("technician")
+    : [];
+  return [...new Set([
+    ...slotBookings.map((item) => item.assignedTechnician).filter(Boolean).map(String),
+    ...pendingAssignments.map((item) => String(item.technician))
+  ])];
+};
+
+const selectFairTechnician = async (excludedTechnicianIds = [], booking = null) => {
+  const unavailableForSlot = booking ? await getUnavailableTechniciansForSlot(booking) : [];
+  const excludedIds = [...new Set([...excludedTechnicianIds.map(String), ...unavailableForSlot])].filter((id) => mongoose.isValidObjectId(id));
+  const technicians = await User.find({
+    role: "technician",
+    ...(excludedIds.length ? { _id: { $nin: excludedIds } } : {})
+  }).select("name email phone role").sort({ name: 1 });
 
   if (!technicians.length) {
     return null;
   }
 
   const activeAssignmentStatuses = ["Technician Assigned", "Sample Collected", "Processing", "Pending Report Approval"];
-  const [workloads, recentAssignments] = await Promise.all([
+  const [bookingWorkloads, pendingWorkloads, recentRequests] = await Promise.all([
     Booking.aggregate([
       {
         $match: {
@@ -180,17 +205,23 @@ const selectFairTechnician = async () => {
       },
       { $group: { _id: "$assignedTechnician", count: { $sum: 1 } } }
     ]),
-    Booking.find({ assignedTechnician: { $ne: null } })
-      .select("assignedTechnician updatedAt")
-      .sort({ updatedAt: -1 })
+    TechnicianAssignment.aggregate([
+      { $match: { status: "PENDING" } },
+      { $group: { _id: "$technician", count: { $sum: 1 } } }
+    ]),
+    TechnicianAssignment.find().select("technician requestedAt").sort({ requestedAt: -1 })
   ]);
 
-  const workloadByTechnician = new Map(workloads.map((item) => [String(item._id), item.count]));
+  const workloadByTechnician = new Map();
+  [...bookingWorkloads, ...pendingWorkloads].forEach((item) => {
+    const id = String(item._id);
+    workloadByTechnician.set(id, (workloadByTechnician.get(id) || 0) + item.count);
+  });
   const lastAssignedByTechnician = new Map();
-  recentAssignments.forEach((booking) => {
-    const technicianId = String(booking.assignedTechnician);
+  recentRequests.forEach((assignment) => {
+    const technicianId = String(assignment.technician);
     if (!lastAssignedByTechnician.has(technicianId)) {
-      lastAssignedByTechnician.set(technicianId, booking.updatedAt?.getTime?.() || 0);
+      lastAssignedByTechnician.set(technicianId, assignment.requestedAt?.getTime?.() || 0);
     }
   });
 
@@ -204,7 +235,7 @@ const selectFairTechnician = async () => {
       a.workload - b.workload ||
       a.lastAssignedAt - b.lastAssignedAt ||
       a.technician.name.localeCompare(b.technician.name)
-    ))[0].technician;
+    ))[0];
 };
 
 const createWalkInBooking = async (req, res) => {
@@ -270,15 +301,16 @@ const createWalkInBooking = async (req, res) => {
       status: "pending"
     });
 
-    await notifyPatient(booking, [
-      "INDIPATH booking confirmed.",
+    await notifyPatient(booking, "booking_confirmed", [
+      `IndiPath: Your ${booking.testName} has been booked successfully.`,
       "",
       `Patient ID: ${booking.patientCode}`,
       `Booking ID: ${booking.bookingCode}`,
       `Test: ${booking.testName}`,
       `Date: ${booking.bookingDate}`,
-      `Time Slot: ${booking.timeSlot}`
-    ]);
+      `Time Slot: ${booking.timeSlot}`,
+        `Amount: INR ${Number(booking.amount).toFixed(2)}`
+    ], [booking.name, booking.patientCode, booking.bookingCode, booking.testName, booking.bookingDate, booking.timeSlot, `INR ${Number(booking.amount).toFixed(2)}`]);
 
     res.status(201).json({ message: "Walk-in booking created successfully", booking });
   } catch (error) {
@@ -300,6 +332,35 @@ const updateBookingStatus = async (req, res) => {
       return res.status(404).json({ message: "Booking not found" });
     }
 
+    if (status === "Confirmed" && booking.bookingStatus === "Pending Approval") {
+      const [technicianCount, reservedBookingCount] = await Promise.all([
+        User.countDocuments({ role: "technician" }),
+        Booking.countDocuments({
+          _id: { $ne: booking._id },
+          bookingDate: booking.bookingDate,
+          timeSlot: booking.timeSlot,
+          bookingStatus: { $nin: ["Pending Approval", "Rejected", "Cancelled", "Completed", "Report Ready"] }
+        })
+      ]);
+      if (!technicianCount || reservedBookingCount >= technicianCount) {
+        booking.bookingStatus = "Rejected";
+        booking.status = "Rejected";
+        booking.rejectionReason = !technicianCount
+          ? "No laboratory technician is currently available."
+          : "The selected appointment slot is full. Please choose another date or time.";
+        await booking.save();
+        await notifyPatient(booking, "booking_rejected", [
+          "INDIPATH booking request rejected.",
+          "",
+          `Booking ID: ${booking.bookingCode}`,
+          `Test: ${booking.testName}`,
+          `Reason: ${booking.rejectionReason}`
+        ], [booking.name, booking.bookingCode, booking.testName, booking.rejectionReason]);
+        return res.json({ message: `Booking automatically rejected: ${booking.rejectionReason}`, booking, autoRejected: true });
+      }
+    }
+
+    const previousStatus = booking.bookingStatus;
     booking.bookingStatus = status;
     booking.status = status;
     if (["Confirmed", "Arrived"].includes(status) && !booking.patientCode) {
@@ -316,26 +377,27 @@ const updateBookingStatus = async (req, res) => {
     }
     await booking.save();
 
-    if (status === "Confirmed") {
-      await notifyPatient(booking, [
-        "INDIPATH booking confirmed.",
+    if (status === "Confirmed" && previousStatus !== status) {
+      await notifyPatient(booking, "booking_confirmed", [
+        `IndiPath: Your ${booking.testName} has been booked successfully.`,
         "",
         `Patient ID: ${booking.patientCode}`,
         `Booking ID: ${booking.bookingCode}`,
         `Test: ${booking.testName}`,
         `Date: ${booking.bookingDate}`,
-        `Time Slot: ${booking.timeSlot}`
-      ]);
+        `Time Slot: ${booking.timeSlot}`,
+        `Amount: INR ${Number(booking.amount).toFixed(2)}`
+      ], [booking.name, booking.patientCode, booking.bookingCode, booking.testName, booking.bookingDate, booking.timeSlot, `INR ${Number(booking.amount).toFixed(2)}`]);
     }
 
-    if (status === "Rejected") {
-      await notifyPatient(booking, [
+    if (status === "Rejected" && previousStatus !== status) {
+      await notifyPatient(booking, "booking_rejected", [
         "INDIPATH booking request rejected.",
         "",
         `Booking ID: ${booking.bookingCode}`,
         `Test: ${booking.testName}`,
         `Reason: ${booking.rejectionReason}`
-      ]);
+      ], [booking.name, booking.bookingCode, booking.testName, booking.rejectionReason]);
     }
 
     res.json({ message: `Booking ${status.toLowerCase()} successfully`, booking });
@@ -363,11 +425,6 @@ const getTechnicianAssignments = async (req, res) => {
 
 const assignTechnician = async (req, res) => {
   try {
-    const technicianId = String(req.body.technicianId || "").trim();
-    if (!mongoose.isValidObjectId(technicianId)) {
-      return res.status(400).json({ message: "Please select a technician." });
-    }
-
     const booking = await Booking.findById(req.params.id);
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
@@ -381,19 +438,18 @@ const assignTechnician = async (req, res) => {
       return res.status(409).json({ message: "The assignment has already been accepted by a technician." });
     }
 
-    const technician = await User.findOne({ _id: technicianId, role: "technician" }).select("name email phone role");
-    if (!technician) {
-      return res.status(404).json({ message: "Selected technician is not available." });
-    }
-
     const pending = await TechnicianAssignment.findOne({ booking: booking._id, status: "PENDING" });
     if (pending) {
-      return res.status(409).json({
-        message: String(pending.technician) === technicianId
-          ? "This technician has already received a pending request."
-          : "Another technician assignment request is still pending."
-      });
+      return res.status(409).json({ message: "A technician assignment request is already pending for this booking." });
     }
+
+    const previousTechnicianIds = await TechnicianAssignment.distinct("technician", { booking: booking._id, status: "REJECTED" });
+    let selection = await selectFairTechnician(previousTechnicianIds, booking);
+    // If every technician rejected previously, start a new fair cycle instead
+    // of leaving the booking permanently unassignable.
+    if (!selection && previousTechnicianIds.length) selection = await selectFairTechnician([], booking);
+    if (!selection) return res.status(409).json({ message: "No technician is available for this booking's date and time slot." });
+    const { technician, workload } = selection;
 
     const assignment = await TechnicianAssignment.create({
       booking: booking._id,
@@ -408,7 +464,7 @@ const assignTechnician = async (req, res) => {
       { path: "requestedBy", select: "name role" }
     ]);
 
-    res.status(201).json({ message: `Assignment request sent to ${technician.name}.`, assignment });
+    res.status(201).json({ message: `Assignment request automatically sent to ${technician.name} (current workload: ${workload}).`, assignment });
   } catch (error) {
     if (error?.code === 11000) {
       return res.status(409).json({ message: "A technician assignment request is already pending for this booking." });
@@ -431,6 +487,7 @@ const markPaymentPaid = async (req, res) => {
       return res.status(404).json({ message: "Booking not found" });
     }
 
+    const alreadyPaid = booking.paymentStatus === "Paid";
     const receiptNumber = booking.receiptNumber || `RCPT-${Date.now()}`;
     const receiptId = booking.receiptId || generateReceiptId();
     const paidAmount = Number(amount || booking.amount);
@@ -466,16 +523,7 @@ const markPaymentPaid = async (req, res) => {
       { upsert: true, new: true }
     );
 
-    await notifyPatient(booking, [
-      "INDIPATH payment received successfully.",
-      "",
-      `Patient ID: ${booking.patientCode || "Pending"}`,
-      `Booking ID: ${booking.bookingCode}`,
-      `Receipt ID: ${booking.receiptId}`,
-      `Test: ${booking.testName}`,
-      `Amount: INR ${paidAmount}`,
-      "Receipt is available in your dashboard."
-    ]);
+    if (!alreadyPaid) await notifyPaymentReceived(booking);
 
     res.json({ message: "Payment marked as paid and receipt generated", booking });
   } catch (error) {

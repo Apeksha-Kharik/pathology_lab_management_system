@@ -9,7 +9,6 @@ import {
   getReceptionistBookings,
   getReceptionistTests,
   getTechnicianAssignments,
-  getTechnicians,
   markPaymentPaid,
   updateBookingStatus
 } from "../services/receptionistService";
@@ -29,9 +28,7 @@ function ReceptionistDashboard() {
   const { user, logout } = useAuth();
   const [bookings, setBookings] = useState([]);
   const [tests, setTests] = useState([]);
-  const [technicians, setTechnicians] = useState([]);
   const [assignments, setAssignments] = useState([]);
-  const [selectedTechnicians, setSelectedTechnicians] = useState({});
   const [sendingAssignment, setSendingAssignment] = useState("");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -44,15 +41,13 @@ function ReceptionistDashboard() {
   const loadData = useCallback(async (searchValue = "") => {
     try {
       setLoading(true);
-      const [bookingData, testData, technicianData, assignmentData] = await Promise.all([
+      const [bookingData, testData, assignmentData] = await Promise.all([
         getReceptionistBookings(searchValue),
         getReceptionistTests(),
-        getTechnicians(),
         getTechnicianAssignments()
       ]);
       setBookings(bookingData || []);
       setTests(testData || []);
-      setTechnicians(technicianData || []);
       setAssignments(assignmentData || []);
     } catch (error) {
       alert(error.response?.data?.message || "Unable to load receptionist dashboard");
@@ -176,18 +171,12 @@ function ReceptionistDashboard() {
   };
 
   const handleAssignTechnician = async (bookingId) => {
-    const technicianId = selectedTechnicians[bookingId];
-    if (!technicianId) {
-      alert("Please select a technician.");
-      return;
-    }
     if (sendingAssignment) return;
     try {
       setSendingAssignment(bookingId);
-      const data = await assignTechnician(bookingId, technicianId);
+      const data = await assignTechnician(bookingId);
       alert(data.message);
       setAssignments((current) => [data.assignment, ...current]);
-      setSelectedTechnicians((current) => ({ ...current, [bookingId]: "" }));
     } catch (error) {
       alert(error.response?.data?.message || "Technician assignment failed");
     } finally {
@@ -259,7 +248,7 @@ function ReceptionistDashboard() {
             {workflowSections.map((section) => section.variant === "pending" ? (
               <PendingBookingsTable key={section.title} bookings={section.bookings} description={section.description} title={section.title} onStatus={handleStatus} />
             ) : (
-              <BookingSection key={section.title} title={section.title} description={section.description} bookings={section.bookings} assignmentsByBooking={assignmentsByBooking} technicians={technicians} selectedTechnicians={selectedTechnicians} onSelectTechnician={(bookingId, technicianId) => setSelectedTechnicians((current) => ({ ...current, [bookingId]: technicianId }))} sendingAssignment={sendingAssignment} onAssignTechnician={handleAssignTechnician} onArrived={(id) => handleStatus(id, "Arrived")} onPaid={setPaymentBooking} onReceipt={handleReceipt} />
+              <BookingSection key={section.title} title={section.title} description={section.description} bookings={section.bookings} assignmentsByBooking={assignmentsByBooking} sendingAssignment={sendingAssignment} onAssignTechnician={handleAssignTechnician} onArrived={(id) => handleStatus(id, "Arrived")} onPaid={setPaymentBooking} onReceipt={handleReceipt} />
             ))}
           </div>
         )}
@@ -457,7 +446,7 @@ function PendingBookingsTable({ bookings, description, onStatus, title }) {
   );
 }
 
-function BookingSection({ title, description, bookings, assignmentsByBooking, technicians, selectedTechnicians, sendingAssignment, onSelectTechnician, onAssignTechnician, onArrived, onPaid, onReceipt }) {
+function BookingSection({ title, description, bookings, assignmentsByBooking, sendingAssignment, onAssignTechnician, onArrived, onPaid, onReceipt }) {
   return (
     <section className="rounded-3xl border border-emerald-100 bg-white p-5 shadow-xl shadow-emerald-950/5 sm:p-6">
       <SectionHeader count={bookings.length} description={description} title={title} />
@@ -466,7 +455,6 @@ function BookingSection({ title, description, bookings, assignmentsByBooking, te
           {bookings.map((booking) => {
             const assignmentHistory = assignmentsByBooking?.get(booking._id) || [];
             const currentAssignment = assignmentHistory.find((assignment) => ["PENDING", "ACCEPTED"].includes(assignment.status)) || assignmentHistory[0];
-            const rejectedTechnicianIds = new Set(assignmentHistory.filter((assignment) => assignment.status === "REJECTED").map((assignment) => assignment.technician?._id || assignment.technician));
             const canRequest = (booking.patientArrived || booking.bookingStatus === "Arrived") && booking.paymentStatus === "Paid" && !booking.assignedTechnician && !assignmentHistory.some((assignment) => ["PENDING", "ACCEPTED"].includes(assignment.status));
             return <div key={booking._id} className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-lg hover:shadow-emerald-950/5">
               <div className="flex items-start justify-between gap-4">
@@ -496,7 +484,7 @@ function BookingSection({ title, description, bookings, assignmentsByBooking, te
                     <CreditCard size={14} /> Mark as Paid
                   </button>
                 )}
-                {canRequest && <div className="flex min-w-full flex-col gap-2 sm:flex-row"><select value={selectedTechnicians[booking._id] || ""} onChange={(event) => onSelectTechnician(booking._id, event.target.value)} className="min-w-0 flex-1 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-bold"><option value="">Select technician</option>{technicians.map((technician) => <option key={technician._id} value={technician._id} disabled={rejectedTechnicianIds.has(technician._id)}>{technician.name}{rejectedTechnicianIds.has(technician._id) ? " (previously rejected)" : ""}</option>)}</select><button type="button" onClick={() => onAssignTechnician(booking._id)} disabled={sendingAssignment === booking._id} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-3 py-2 text-xs font-black text-white disabled:opacity-60"><UserCheck size={14} /> {sendingAssignment === booking._id ? "Sending..." : assignmentHistory.length ? "Assign Another Technician" : "Send Request"}</button></div>}
+                {canRequest && <button type="button" onClick={() => onAssignTechnician(booking._id)} disabled={sendingAssignment === booking._id} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-3 py-2 text-xs font-black text-white disabled:opacity-60"><UserCheck size={14} /> {sendingAssignment === booking._id ? "Finding least-loaded technician..." : assignmentHistory.length ? "Auto Reassign Fairly" : "Auto Send Request"}</button>}
                 {booking.paymentStatus === "Paid" && (
                   <button onClick={() => onReceipt(booking)} className="inline-flex items-center gap-2 rounded-xl bg-emerald-950 px-3 py-2 text-xs font-black text-white shadow-sm transition hover:bg-emerald-900">
                     <Download size={14} /> Generate Receipt
