@@ -1,34 +1,59 @@
-const https = require("https");
+const crypto = require("node:crypto");
+const Razorpay = require("razorpay");
 
-const requestRazorpay = ({ method = "GET", path, body }) => new Promise((resolve, reject) => {
-  const json = body ? JSON.stringify(body) : "";
-  const request = https.request({
-    hostname: "api.razorpay.com",
-    path,
-    method,
-    auth: `${process.env.RAZORPAY_KEY_ID}:${process.env.RAZORPAY_KEY_SECRET}`,
-    headers: { "Content-Type": "application/json", ...(json ? { "Content-Length": Buffer.byteLength(json) } : {}) },
-    timeout: 15000
-  }, (response) => {
-    let responseBody = "";
-    response.on("data", (chunk) => { responseBody += chunk; });
-    response.on("end", () => {
-      let data;
-      try { data = JSON.parse(responseBody); } catch { data = { raw: responseBody }; }
-      if (response.statusCode >= 200 && response.statusCode < 300) return resolve(data);
-      const error = new Error(data.error?.description || `Razorpay returned HTTP ${response.statusCode}`);
-      error.statusCode = response.statusCode;
-      reject(error);
-    });
+const paymentError = (message, status = 400) => Object.assign(new Error(message), { status });
+const payableStatuses = ["Confirmed", "Arrived"];
+const canPayOnline = (booking) => booking.paymentPreference === "online"
+  && payableStatuses.includes(booking.bookingStatus || booking.status)
+  && ["Unpaid", "Failed"].includes(booking.paymentStatus);
+
+const amountInPaise = (amount) => {
+  const value = Math.round(Number(amount) * 100);
+  if (!Number.isSafeInteger(value) || value <= 0) throw paymentError("Invalid booking amount");
+  if (value < 100) throw paymentError("Online payment amount must be at least INR 1 (100 paise)");
+  return value;
+};
+
+const validSignature = (payload, signature, secret) => {
+  if (!secret || typeof signature !== "string" || !/^[a-f0-9]{64}$/i.test(signature)) return false;
+  const expected = crypto.createHmac("sha256", secret).update(payload).digest();
+  return crypto.timingSafeEqual(expected, Buffer.from(signature, "hex"));
+};
+
+const requireKeys = () => {
+  if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+    throw paymentError("Online payment is not configured yet. Please contact the laboratory.", 503);
+  }
+  if (!process.env.RAZORPAY_KEY_ID.startsWith("rzp_test_")) {
+    throw paymentError("Only Razorpay Test Mode is enabled. Configure Test Mode keys on the backend.", 503);
+  }
+};
+
+const razorpayRequest = async (path, body) => {
+  requireKeys();
+  const client = new Razorpay({
+    key_id: process.env.RAZORPAY_KEY_ID,
+    key_secret: process.env.RAZORPAY_KEY_SECRET
   });
-  request.on("timeout", () => request.destroy(new Error("Razorpay request timed out")));
-  request.on("error", reject);
-  if (json) request.write(json);
-  request.end();
-});
+  client.api.rq.defaults.timeout = 20000;
+  try {
+    if (path === "/orders" && body) return await client.orders.create(body);
+    const orderPayments = path.match(/^\/orders\/(order_[A-Za-z0-9]+)\/payments$/);
+    if (orderPayments) return await client.orders.fetchPayments(orderPayments[1]);
+    const payment = path.match(/^\/payments\/(pay_[A-Za-z0-9]+)$/);
+    if (payment) return await client.payments.fetch(payment[1]);
+    throw new Error("Unsupported Razorpay request");
+  } catch {
+    throw paymentError("Payment provider unavailable. Please try again shortly.", 502);
+  }
+};
 
-const createOrder = (body) => requestRazorpay({ method: "POST", path: "/v1/orders", body });
-const fetchPayment = (paymentId) => requestRazorpay({ path: `/v1/payments/${encodeURIComponent(paymentId)}` });
-const isConfigured = () => Boolean(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET);
+const validateCapturedPayment = (booking, payment) => {
+  if (payment.order_id !== booking.razorpayOrderId || payment.currency !== "INR"
+      || payment.amount !== amountInPaise(booking.amount)) {
+    throw paymentError("Payment does not match this booking");
+  }
+  if (payment.status !== "captured") throw paymentError("Payment is awaiting confirmation. Do not pay again; refresh shortly.", 409);
+};
 
-module.exports = { createOrder, fetchPayment, isConfigured };
+module.exports = { paymentError, payableStatuses, canPayOnline, amountInPaise, validSignature, requireKeys, razorpayRequest, validateCapturedPayment };

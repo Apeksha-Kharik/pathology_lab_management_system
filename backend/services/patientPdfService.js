@@ -229,6 +229,7 @@ const renderReceiptPdf = (booking, output) => {
     drawReceiptBox(doc, [
       ["Total Amount", formatCurrency(booking.amount)],
       ["Payment Method", String(booking.paymentMethod || "N/A").toUpperCase()],
+      ["Payment Mode", booking.razorpayMode === "test" ? "TEST - No real money received" : "Offline / Live"],
       ["Payment Status", booking.paymentStatus],
       ["Payment Date", formatDateTime(booking.paidAt)]
     ]);

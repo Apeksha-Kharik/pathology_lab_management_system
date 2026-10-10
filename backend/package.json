@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "test:payments": "node --test tests/onlinePayment.test.js"
   },
   "keywords": [
     "express",
@@ -25,7 +26,8 @@
     "mongoose": "^8.2.1",
     "multer": "^2.2.0",
     "nodemailer": "^8.0.11",
-    "pdfkit": "^0.18.0"
+    "pdfkit": "^0.18.0",
+    "razorpay": "^2.9.8"
   },
   "devDependencies": {
     "nodemon": "^3.1.0"

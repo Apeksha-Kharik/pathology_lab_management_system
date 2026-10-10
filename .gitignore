@@ -1,5 +1,7 @@
 node_modules
 .env
+.env.*
+!.env.example
 dist
 backend/uploads/signatures/*
 !backend/uploads/signatures/.gitkeep
