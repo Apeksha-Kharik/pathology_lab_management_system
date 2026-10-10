@@ -7,7 +7,9 @@ let response;
 let outgoing;
 let original;
 beforeEach((t) => {
-  original = { EMAIL_USER: process.env.EMAIL_USER, EMAIL_PASS: process.env.EMAIL_PASS, EMAIL_FROM: process.env.EMAIL_FROM };
+  original = { EMAIL_PROVIDER: process.env.EMAIL_PROVIDER, RESEND_API_KEY: process.env.RESEND_API_KEY, EMAIL_USER: process.env.EMAIL_USER, EMAIL_PASS: process.env.EMAIL_PASS, EMAIL_FROM: process.env.EMAIL_FROM };
+  process.env.EMAIL_PROVIDER = "smtp";
+  delete process.env.RESEND_API_KEY;
   process.env.EMAIL_USER = "sender@example.test";
   process.env.EMAIL_PASS = "test-only";
   process.env.EMAIL_FROM = "sender@example.test";
@@ -62,5 +64,43 @@ test("real mail composer addresses the intended recipient and includes the OTP",
 });
 test("missing credentials cannot report OTP success", async () => {
   delete process.env.EMAIL_PASS;
+  await assert.rejects(sendOtpEmail(message), /not configured/);
+});
+
+
+test("HTTPS email accepts OTP without SMTP credentials and uses the configured sender", async (t) => {
+  process.env.EMAIL_PROVIDER = "resend";
+  process.env.RESEND_API_KEY = "fake-key";
+  delete process.env.EMAIL_USER;
+  delete process.env.EMAIL_PASS;
+  t.mock.method(nodemailer, "createTransport", () => { throw new Error("SMTP must not be used"); });
+  t.mock.method(global, "fetch", async (url, options) => {
+    assert.equal(url, "https://api.resend.com/emails");
+    assert.equal(options.headers.Authorization, "Bearer fake-key");
+    const payload = JSON.parse(options.body);
+    assert.deepEqual(payload.to, [message.to]);
+    assert.equal(payload.from, "sender@example.test");
+    assert.match(payload.text, /123456/);
+    assert.match(payload.html, /123456/);
+    return { ok: true, json: async () => ({ id: "https-message" }) };
+  });
+  assert.equal((await sendOtpEmail(message)).messageId, "https-message");
+});
+
+test("HTTPS rejection or missing message ID cannot report successful OTP delivery", async (t) => {
+  process.env.EMAIL_PROVIDER = "resend";
+  process.env.RESEND_API_KEY = "fake-key";
+  t.mock.method(global, "fetch", async () => ({ ok: false, status: 403, json: async () => ({ name: "validation_error" }) }));
+  await assert.rejects(sendOtpEmail(message), { code: "validation_error", responseCode: 403 });
+  t.mock.method(global, "fetch", async () => ({ ok: true, status: 200, json: async () => ({}) }));
+  await assert.rejects(sendOtpEmail(message), /Unable to send OTP/);
+});
+
+test("HTTPS timeout and missing API key fail safely", async (t) => {
+  process.env.EMAIL_PROVIDER = "resend";
+  process.env.RESEND_API_KEY = "fake-key";
+  t.mock.method(global, "fetch", async () => { throw Object.assign(new Error("timeout"), { name: "TimeoutError" }); });
+  await assert.rejects(sendOtpEmail(message), { code: "ETIMEDOUT" });
+  delete process.env.RESEND_API_KEY;
   await assert.rejects(sendOtpEmail(message), /not configured/);
 });

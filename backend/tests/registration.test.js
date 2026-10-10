@@ -12,6 +12,11 @@ require.cache[emailPath] = { id: emailPath, filename: emailPath, loaded: true, e
     if (emailFails) throw new Error("SMTP unavailable");
   }
 } };
+let welcome;
+const whatsappPath = require.resolve("../services/whatsappService");
+require.cache[whatsappPath] = { id: whatsappPath, filename: whatsappPath, loaded: true, exports: {
+  sendWhatsAppMessage: (...args) => welcome(...args)
+} };
 const { register, verifyOtp, cancelRegistration } = require("../controllers/authController");
 const details = { name: "Test Patient", email: "patient@example.test", password: "Password1!", phone: "9876543210", age: 25, city: "Mumbai", address: "Test address" };
 let writes;
@@ -22,6 +27,7 @@ beforeEach((t) => {
   writes = [];
   ids = [];
   emailFails = false;
+  welcome = async () => ({ sent: true });
   t.mock.method(User, "findOne", async () => null);
   t.mock.method(User, "create", async (data) => { writes.push(data); return data; });
 });
@@ -102,5 +108,23 @@ test("duplicate email at commit returns conflict and never deletes existing acco
   t.mock.method(User, "deleteOne", () => assert.fail("Must not delete an existing user"));
   assert.equal((await call(verifyOtp, { registrationId: start.data.registrationId, otp: deliveredOtp })).code, 409);
   await call(cancelRegistration, { email: details.email });
+  assert.equal(writes.length, 0);
+});
+
+
+test("verification returns after creating account even while welcome WhatsApp is pending", async () => {
+  const start = await call(register, details);
+  welcome = () => new Promise(() => {});
+  const result = await call(verifyOtp, { registrationId: start.data.registrationId, otp: deliveredOtp });
+  assert.equal(result.code, 200);
+  assert.equal(writes.length, 1);
+});
+
+test("invalid email, phone, whitespace address and non-string password cannot start registration", async () => {
+  for (const change of [{ email: "invalid" }, { phone: "123" }, { city: " " }, { address: " " }, { password: 12345678 }]) {
+    const result = await call(register, { ...details, ...change });
+    assert.equal(result.code, 400);
+    assert.equal(result.data.registrationId, undefined);
+  }
   assert.equal(writes.length, 0);
 });

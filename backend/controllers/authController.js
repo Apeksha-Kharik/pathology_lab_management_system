@@ -86,8 +86,10 @@ const register = async (req, res) => {
     const userPhone = String(phone || mobile || "").trim();
     const normalizedEmail = String(email || "").toLowerCase().trim();
     const patientAge = Number(age);
+    const normalizedCity = String(city || "").trim();
+    const normalizedAddress = String(address || "").trim();
 
-    if (!normalizedName || !normalizedEmail || !password || !userPhone || !age || !city || !address) {
+    if (!normalizedName || !normalizedEmail || !password || !userPhone || !age || !normalizedCity || !normalizedAddress) {
       return res.status(400).json({ message: "Name, age, email, phone, city, address and password are required" });
     }
 
@@ -95,6 +97,10 @@ const register = async (req, res) => {
       return res.status(400).json({ message: "Age must be a whole number between 18 and 120" });
     }
 
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail) || !/^\d{10}$/.test(userPhone)) {
+      return res.status(400).json({ message: "Enter a valid email and a 10-digit mobile number" });
+    }
+    if (typeof password !== "string") return res.status(400).json({ message: "Enter a valid password" });
     const passwordErrors = getPasswordValidationErrors(password);
     if (passwordErrors.length) {
       return res.status(400).json({ message: passwordErrors.join(". ") });
@@ -113,8 +119,8 @@ const register = async (req, res) => {
       email: normalizedEmail,
       phone: userPhone,
       age: patientAge,
-      city: String(city).trim(),
-      address: String(address).trim(),
+      city: normalizedCity,
+      address: normalizedAddress,
       password: hashedPassword,
       role: "patient",
       isVerified: true
@@ -146,7 +152,10 @@ const register = async (req, res) => {
       pendingRegistrations.discard(registrationId);
       console.error("Registration OTP delivery failed");
       return res.status(503).json({
-        message: "Unable to send verification email. Please try again later."
+        message: emailError.code === "EMAIL_NOT_CONFIGURED"
+          ? "Verification email is currently unavailable. Please contact the lab."
+          : "Unable to send verification email. Please try again later.",
+        code: "VERIFICATION_EMAIL_UNAVAILABLE"
       });
     }
 
@@ -176,16 +185,13 @@ const verifyOtp = async (req, res) => {
     const user = await User.create(pending.details);
 
     if (user && user.phone) {
-      try {
-        await sendWhatsAppMessage({
-          to: user.phone,
-          body: `Welcome to INDIPATH, ${user.name}. Your account has been registered successfully. Please log in to book your tests.`,
-          event: "manual",
-          parameters: [user.name]
-        });
-      } catch (notificationError) {
-        console.error("Welcome WhatsApp failed:", notificationError.message);
-      }
+      // The account is already committed; WhatsApp delivery must not delay verification.
+      Promise.resolve().then(() => sendWhatsAppMessage({
+        to: user.phone,
+        body: `Welcome to INDIPATH, ${user.name}. Your account has been registered successfully. Please log in to book your tests.`,
+        event: "manual",
+        parameters: [user.name]
+      })).catch((error) => console.error("Welcome WhatsApp failed:", error.message));
     }
 
     return res.json({ message: "Registration completed. You can now log in." });

@@ -17,7 +17,11 @@ const getMailConfig = () => {
   };
 };
 
+const getMailProvider = () => process.env.EMAIL_PROVIDER?.trim().toLowerCase() || (process.env.RESEND_API_KEY?.trim() ? "resend" : "smtp");
+
 const hasMailConfig = () => {
+  if (getMailProvider() === "resend") return Boolean(process.env.RESEND_API_KEY?.trim() && process.env.EMAIL_FROM?.trim());
+  if (getMailProvider() !== "smtp") return false;
   const config = getMailConfig();
   return Boolean(config.user && config.pass && config.from);
 };
@@ -45,6 +49,13 @@ const verifyTransporter = async () => {
     return;
   }
 
+  if (getMailProvider() === "resend") {
+    console.log("HTTPS email provider configured (send acceptance checked when sending)");
+    return;
+  }
+  if (process.env.RENDER && [25, 465, 587].includes(getMailConfig().port)) {
+    console.warn("SMTP ports are blocked on Render Free instances. Use EMAIL_PROVIDER=resend, RESEND_API_KEY and a verified EMAIL_FROM, or a paid instance supporting SMTP.");
+  }
   try {
     const transporter = createTransporter();
     await transporter.verify();
@@ -55,6 +66,27 @@ const verifyTransporter = async () => {
   }
 };
 
+const sendResendEmail = async ({ to, subject, text, html }) => {
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY.trim()}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from: process.env.EMAIL_FROM.trim(), to: Array.isArray(to) ? to : [to], subject, text, html }),
+      signal: AbortSignal.timeout(10000)
+    });
+    const data = await response.json();
+    if (!response.ok || !data.id) {
+      console.error("HTTPS email rejected:", { status: response.status, code: data.name || "EMAIL_NOT_ACCEPTED" });
+      return { sent: false, error: "Email provider rejected the request", code: data.name || "EMAIL_NOT_ACCEPTED", responseCode: response.status };
+    }
+    console.log("HTTPS email accepted; inbox delivery not confirmed:", data.id);
+    return { sent: true, messageId: data.id };
+  } catch (error) {
+    console.error("HTTPS email request failed:", error.name);
+    return { sent: false, error: "Email provider request failed", code: error.name === "TimeoutError" ? "ETIMEDOUT" : "EMAIL_API_ERROR" };
+  }
+};
+
 const sendEmail = async ({ to, subject, text, html }) => {
   if (!hasMailConfig()) {
     console.log("Email configuration not found.");
@@ -62,6 +94,8 @@ const sendEmail = async ({ to, subject, text, html }) => {
       sent: false
     };
   }
+
+  if (getMailProvider() === "resend") return sendResendEmail({ to, subject, text, html });
 
   try {
     const config = getMailConfig();
@@ -106,7 +140,7 @@ const sendEmail = async ({ to, subject, text, html }) => {
 
 const sendOtpEmail = async ({ to, subject, otp }) => {
   if (!hasMailConfig()) {
-    throw new Error("Email service is not configured");
+    throw Object.assign(new Error("Email service is not configured"), { code: "EMAIL_NOT_CONFIGURED" });
   }
 
   const result = await sendEmail({

@@ -20,6 +20,7 @@ function RegisterPage() {
   const registrationId = useRef(null);
   const mounted = useRef(true);
   const submitting = useRef(false);
+  const feedbackRef = useRef(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     mounted.current = true;
@@ -39,6 +40,9 @@ function RegisterPage() {
   const [message, setMessage] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState("");
+  useEffect(() => {
+    if (formError || message) feedbackRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [formError, message]);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -109,12 +113,12 @@ function RegisterPage() {
 
     try {
       const data = await registerUser({
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
+        name: formData.name.trim(),
+        email: formData.email.trim().toLowerCase(),
+        phone: formData.phone.trim(),
         age: formData.age,
-        city: formData.city,
-        address: formData.address,
+        city: formData.city.trim(),
+        address: formData.address.trim(),
         password: formData.password
       });
 
@@ -127,7 +131,13 @@ function RegisterPage() {
       setStep("otp");
     } catch (error) {
       setMessage("");
-      setFormError(error.response?.data?.message || "Registration failed");
+      setFormError(error.response?.data?.message || (
+        error.code === "ECONNABORTED"
+          ? "Registration timed out. Please try again."
+          : !error.response
+            ? "Unable to reach the server. Check that the backend is running and try again."
+            : "Registration failed. Please try again."
+      ));
     } finally {
       submitting.current = false;
       if (mounted.current) setBusy(false);
@@ -138,8 +148,8 @@ function RegisterPage() {
     e.preventDefault();
     if (submitting.current) return;
 
-    if (!otp.trim()) {
-      setFormError("Please enter OTP");
+    if (!/^\d{6}$/.test(otp.trim())) {
+      setFormError("Please enter the 6-digit OTP from your email");
       return;
     }
 
@@ -209,14 +219,15 @@ function RegisterPage() {
               </p>
             </div>
 
+            <div ref={feedbackRef} />
             {message && (
-              <div className="mb-5 rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-sm font-semibold leading-6 text-emerald-900">
+              <div role="status" className="mb-5 rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-sm font-semibold leading-6 text-emerald-900">
                 {message}
               </div>
             )}
 
             {formError && (
-              <div className="mb-5 rounded-xl border border-red-100 bg-red-50 p-4 text-sm font-semibold leading-6 text-red-800">
+              <div role="alert" className="mb-5 rounded-xl border border-red-100 bg-red-50 p-4 text-sm font-semibold leading-6 text-red-800">
                 {formError}
               </div>
             )}
@@ -271,7 +282,7 @@ function RegisterPage() {
                 </Field>
 
                 <button type="submit" disabled={busy} className="w-full rounded-xl bg-emerald-700 px-5 py-4 text-base font-extrabold text-white shadow-lg shadow-emerald-950/10 transition hover:bg-emerald-800 focus:outline-none focus:ring-4 focus:ring-emerald-200">
-                  Register and Send OTP
+                  {busy ? "Sending OTP?" : "Register and Send OTP"}
                 </button>
               </form>
             ) : (
@@ -280,7 +291,7 @@ function RegisterPage() {
                   <input name="otp" value={otp} onChange={(e) => setOtp(e.target.value)} placeholder="Enter 6 digit OTP" className="field-input" inputMode="numeric" />
                 </Field>
                 <button type="submit" disabled={busy} className="w-full rounded-xl bg-emerald-700 px-5 py-4 text-base font-extrabold text-white shadow-lg shadow-emerald-950/10 transition hover:bg-emerald-800 focus:outline-none focus:ring-4 focus:ring-emerald-200">
-                  Verify Account
+                  {busy ? "Verifying?" : "Verify Account"}
                 </button>
                 <button type="button" disabled={busy} onClick={handleCancelRegistration} className="w-full rounded-xl border border-emerald-200 px-5 py-3.5 text-sm font-bold text-emerald-800 transition hover:bg-emerald-50">
                   Edit registration details
