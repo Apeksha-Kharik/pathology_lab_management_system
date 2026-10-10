@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { bookingWhatsAppUrl } from "../services/bookingWhatsApp";
 import { motion as Motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
@@ -196,24 +197,6 @@ const _healthPackageCards = [
   }
 ];
 
-const popularTestCards = [
-  { id: "test-01", type: "test", title: "Complete Blood Count", icon: TestTube2, chips: ["29 parameters", "Same day", "Blood"], price: 299 },
-  { id: "test-02", type: "test", title: "Thyroid Profile Total", icon: HeartPulse, chips: ["T3 T4 TSH", "12 hr report", "Serum"], price: 449 },
-  { id: "test-03", type: "test", title: "Lipid Profile", icon: FlaskConical, chips: ["9 parameters", "Fasting", "Serum"], price: 599 },
-  { id: "test-04", type: "test", title: "Liver Function Test", icon: ShieldCheck, chips: ["12 parameters", "Same day", "Serum"], price: 699 },
-  { id: "test-05", type: "test", title: "Kidney Function Test", icon: BadgeCheck, chips: ["11 parameters", "Same day", "Serum"], price: 649 },
-  { id: "test-06", type: "test", title: "HbA1c", icon: TestTube2, chips: ["Diabetes", "3 month avg", "Blood"], price: 399 },
-  { id: "test-07", type: "test", title: "Vitamin D Total", icon: HeartPulse, chips: ["Deficiency", "24 hr report", "Serum"], price: 899 },
-  { id: "test-08", type: "test", title: "Vitamin B12", icon: FlaskConical, chips: ["Energy", "24 hr report", "Serum"], price: 749 },
-  { id: "test-09", type: "test", title: "CRP Quantitative", icon: ShieldCheck, chips: ["Inflammation", "Same day", "Blood"], price: 499 },
-  { id: "test-10", type: "test", title: "Urine Routine", icon: BadgeCheck, chips: ["Microscopy", "Same day", "Urine"], price: 199 },
-  { id: "test-11", type: "test", title: "Blood Sugar Fasting", icon: TestTube2, chips: ["Glucose", "Fasting", "Plasma"], price: 99 },
-  { id: "test-12", type: "test", title: "Electrolytes Profile", icon: HeartPulse, chips: ["Na K Cl", "Same day", "Serum"], price: 499 },
-  { id: "test-13", type: "test", title: "Iron Studies", icon: FlaskConical, chips: ["Anemia", "24 hr report", "Serum"], price: 799 },
-  { id: "test-14", type: "test", title: "Dengue NS1 Antigen", icon: ShieldCheck, chips: ["Fever", "Rapid report", "Blood"], price: 699 },
-  { id: "test-15", type: "test", title: "ESR", icon: BadgeCheck, chips: ["Inflammation", "Same day", "Blood"], price: 149 }
-];
-
 const packageImages = [bg2, bg1, bg3];
 const testIcons = [TestTube2, HeartPulse, FlaskConical, ShieldCheck, BadgeCheck];
 
@@ -277,24 +260,10 @@ const getCartStorageKey = (user) => {
   return `indipath_cart_${identifier}`;
 };
 
-const getBookingRequestsStorageKey = (user) => {
-  const identifier = user?.id || user?._id || user?.email || "guest";
-  return `indipath_booking_requests_${identifier}`;
-};
-
 const readStoredCart = (storageKey) => {
   try {
     const savedCart = localStorage.getItem(storageKey);
     return savedCart ? JSON.parse(savedCart) : [];
-  } catch {
-    return [];
-  }
-};
-
-const readStoredBookingRequests = (storageKey) => {
-  try {
-    const savedRequests = localStorage.getItem(storageKey);
-    return savedRequests ? JSON.parse(savedRequests) : [];
   } catch {
     return [];
   }
@@ -309,26 +278,7 @@ const getSampleCollectionLabel = (collectionType) => {
   return "N/A";
 };
 
-const buildBookingHistoryRows = (localRequests, serverBookings) => {
-  const localRows = localRequests.map((booking) => ({
-    id: booking.bookingId,
-    code: booking.bookingId,
-    patientCode: booking.patientCode || "Pending",
-    status: booking.status || "Pending Approval",
-    paymentStatus: booking.paymentStatus || "Pending",
-    testName: booking.itemTitle,
-    bookingType: booking.itemType,
-    patientName: booking.patient?.name || "",
-    age: booking.patient?.age || "",
-    gender: booking.patient?.gender || "",
-    mobile: booking.patient?.mobile || "",
-    email: booking.patient?.email || "",
-    sampleCollection: getSampleCollectionLabel(booking.collectionType),
-    date: booking.preferredDate,
-    timeSlot: booking.timeSlot,
-    amount: booking.amount
-  }));
-
+const buildBookingHistoryRows = (serverBookings) => {
   const serverRows = serverBookings.map((booking) => ({
     id: booking._id,
     code: booking.bookingCode || booking._id,
@@ -348,14 +298,13 @@ const buildBookingHistoryRows = (localRequests, serverBookings) => {
     amount: booking.amount || ""
   }));
 
-  return [...localRows, ...serverRows];
+  return serverRows;
 };
 
 function PatientDashboard() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const cartStorageKey = useMemo(() => getCartStorageKey(user), [user]);
-  const bookingRequestsStorageKey = useMemo(() => getBookingRequestsStorageKey(user), [user]);
   const [active, setActive] = useState("tests");
   const [patientView, setPatientView] = useState("book");
   const [tests, setTests] = useState([]);
@@ -365,7 +314,6 @@ function PatientDashboard() {
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [cartItems, setCartItems] = useState(() => readStoredCart(cartStorageKey));
-  const [bookingRequests, setBookingRequests] = useState(() => readStoredBookingRequests(bookingRequestsStorageKey));
   const [bookingItem, setBookingItem] = useState(null);
 
   const loadDashboard = async () => {
@@ -418,10 +366,7 @@ function PatientDashboard() {
     [packages]
   );
 
-  const popularTestRows = useMemo(
-    () => tests.length ? tests.map(mapTestToCard) : popularTestCards,
-    [tests]
-  );
+  const popularTestRows = useMemo(() => tests.map(mapTestToCard), [tests]);
 
   const filteredHealthPackages = useMemo(
     () => filterShowcaseItems(healthPackageRows, searchTerm),
@@ -466,22 +411,14 @@ function PatientDashboard() {
     setBookingItem(null);
   };
 
-  const handleBookingRequested = (request) => {
-    if (request?.serverBooking) {
-      loadDashboard();
-      return;
-    }
-
-    setBookingRequests((currentRequests) => {
-      const nextRequests = [request, ...currentRequests];
-      localStorage.setItem(bookingRequestsStorageKey, JSON.stringify(nextRequests));
-      return nextRequests;
-    });
+  const handleBookingRequested = ({ item: bookedItem } = {}) => {
+    if (bookedItem?.id) handleRemoveFromCart(bookedItem.id);
+    loadDashboard();
   };
 
   const bookingHistoryRows = useMemo(
-    () => buildBookingHistoryRows(bookingRequests, bookings),
-    [bookingRequests, bookings]
+    () => buildBookingHistoryRows(bookings),
+    [bookings]
   );
 
   return (
@@ -933,6 +870,7 @@ function BookingWizardModal({ item, onBookingRequested, onClose, user }) {
   const [collectionType, setCollectionType] = useState("home");
   const [error, setError] = useState("");
   const [bookingId, setBookingId] = useState("");
+  const [whatsAppUrl, setWhatsAppUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState(() => createSelfBookingForm(user));
 
@@ -999,57 +937,33 @@ function BookingWizardModal({ item, onBookingRequested, onClose, user }) {
       setSubmitting(true);
       setError("");
 
-      if (item.sourceId) {
-        const data = await createBooking({
-          ...(item.bookingType === "Package" ? { packageId: item.sourceId } : { testId: item.sourceId }),
-          age: form.age,
-          gender: form.gender,
-          patientName: form.name,
-          phone: form.mobile,
-          email: form.email,
-          bookingDate: form.preferredDate,
-          timeSlot: form.timeSlot,
-          notes: form.notes,
-          doctorNotes: form.prescribedBy,
-          homeSample: collectionType === "home",
-          collectionType: collectionType === "home" ? "Home Collection" : "Visit Lab",
-          address: location,
-          sampleType: ""
-        });
-
-        setBookingId(data.booking?.bookingCode || id);
-        onBookingRequested({ serverBooking: data.booking });
-        setStep(4);
-        return;
+      if (!item.sourceId) {
+        throw new Error("This sample item is not connected to the booking system. Refresh the page and choose an available test.");
       }
 
-      onBookingRequested({
-        bookingId: id,
-        status: "Pending Approval",
-        paymentStatus: "Pending",
-        itemId: item.id,
-        itemTitle: item.title,
-        itemType: item.type === "package" ? "Package" : "Test",
-        amount: totalAmount,
-        patient: {
-          name: form.name,
-          age: form.age,
-          gender: form.gender,
-          mobile: form.mobile,
-          email: form.email,
-          prescribedBy: form.prescribedBy,
-          notes: form.notes
-        },
-        collectionType: collectionType === "home" ? "Home Collection" : "Visit Lab",
-        location,
-        preferredDate: form.preferredDate,
+      const data = await createBooking({
+        ...(item.bookingType === "Package" ? { packageId: item.sourceId } : { testId: item.sourceId }),
+        age: form.age,
+        gender: form.gender,
+        patientName: form.name,
+        phone: form.mobile,
+        email: form.email,
+        bookingDate: form.preferredDate,
         timeSlot: form.timeSlot,
-        createdAt: new Date().toISOString()
+        notes: form.notes,
+        doctorNotes: form.prescribedBy,
+        homeSample: collectionType === "home",
+        collectionType: collectionType === "home" ? "Home Collection" : "Visit Lab",
+        address: location,
+        sampleType: ""
       });
-      setBookingId(id);
+
+      setBookingId(data.booking?.bookingCode || id);
+      if (data.booking) setWhatsAppUrl(bookingWhatsAppUrl(data.booking));
+      onBookingRequested({ serverBooking: data.booking, item });
       setStep(4);
     } catch (error) {
-      setError(error.response?.data?.message || "Booking request failed");
+      setError(error.response?.data?.message || error.message || "Booking request failed");
     } finally {
       setSubmitting(false);
     }
@@ -1179,6 +1093,7 @@ function BookingWizardModal({ item, onBookingRequested, onClose, user }) {
 
           {step === 4 && (
             <BookingSuccess
+              whatsAppUrl={whatsAppUrl}
               bookingId={bookingId}
               collectionType={collectionType}
               form={form}
@@ -1310,7 +1225,7 @@ function ReviewLine({ label, value }) {
   );
 }
 
-function BookingSuccess({ bookingId, collectionType, form, item, onBookMore, onDownload, totalAmount }) {
+function BookingSuccess({ bookingId, collectionType, form, item, onBookMore, onDownload, totalAmount, whatsAppUrl }) {
   return (
     <div className="mx-auto max-w-3xl text-center">
       <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
@@ -1333,6 +1248,10 @@ function BookingSuccess({ bookingId, collectionType, form, item, onBookMore, onD
       </div>
 
       <div className="mt-6 grid gap-3 sm:grid-cols-2">
+        {whatsAppUrl && <div className="sm:col-span-2">
+          <a href={whatsAppUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-black text-white">Message lab on WhatsApp</a>
+          <p className="mt-2 text-sm text-slate-600">Your booking details are filled in. Tap Send in WhatsApp to message the lab.</p>
+        </div>}
         <button onClick={onDownload} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-5 py-3 text-sm font-black text-emerald-800 transition hover:bg-emerald-50">
           <Download size={18} /> Download
         </button>

@@ -23,10 +23,13 @@ const getWhatsAppStatus = () => ({
   accessTokenConfigured: Boolean(process.env.WHATSAPP_ACCESS_TOKEN),
   apiVersion: process.env.WHATSAPP_API_VERSION || "v23.0",
   defaultCountryCode: process.env.WHATSAPP_DEFAULT_COUNTRY_CODE || "91",
+  notificationMode: "plain_text",
   templates: Object.fromEntries(Object.entries(TEMPLATE_ENV_BY_EVENT).map(([event, key]) => [event, Boolean(process.env[key])]))
 });
 
 const saveNotification = async (entry) => {
+  // Log the outcome without exposing patient phone numbers or access tokens.
+  console.log(`[WhatsApp] ${entry.event}: ${entry.status}${entry.error ? ` - ${entry.error}` : ' - accepted by Meta (delivery not yet confirmed)'}`);
   try { await WhatsAppNotification.create(entry); }
   catch (error) { console.error(`WhatsApp notification log failed: ${error.message}`); }
 };
@@ -54,20 +57,20 @@ const requestCloudApi = (payload) => new Promise((resolve) => {
   request.end();
 });
 
-const buildPayload = ({ phone, body, event, parameters = [], templateName }) => {
-  const selectedTemplate = templateName || process.env[TEMPLATE_ENV_BY_EVENT[event]];
-  if (selectedTemplate) {
-    const values = parameters.map((value) => ({ type: "text", text: String(value ?? "N/A") }));
-    return { messaging_product: "whatsapp", recipient_type: "individual", to: phone, type: "template", template: { name: selectedTemplate, language: { code: process.env.WHATSAPP_TEMPLATE_LANGUAGE || "en_US" }, ...(values.length ? { components: [{ type: "body", parameters: values }] } : {}) } };
-  }
-  return { messaging_product: "whatsapp", recipient_type: "individual", to: phone, type: "text", text: { preview_url: false, body } };
-};
+const buildPayload = ({ phone, body }) => ({
+  messaging_product: "whatsapp", recipient_type: "individual", to: phone,
+  type: "text", text: { preview_url: false, body }
+});
 
 const sendWhatsAppMessage = async ({ to, body, event = "manual", parameters = [], templateName }) => {
   const phone = normalizeWhatsAppNumber(to);
   const status = getWhatsAppStatus();
-  const messageType = templateName || process.env[TEMPLATE_ENV_BY_EVENT[event]] ? "template" : "text";
-  if (!phone || !body) return { sent: false, skipped: true, error: "Phone number and message are required" };
+  const messageType = "text";
+  if (!phone || !body) {
+    console.warn(`[WhatsApp] ${event}: SKIPPED - Phone number and message are required`);
+    return { sent: false, skipped: true, error: "Phone number and message are required" };
+  }
+  console.log(`[WhatsApp] ${event}: sending ${messageType}`);
   if (!status.configured) {
     await saveNotification({ phone, event, messageType, status: "SKIPPED", error: "WhatsApp credentials are not configured" });
     return { sent: false, skipped: true, error: "WhatsApp credentials are not configured" };
@@ -82,9 +85,14 @@ const sendWhatsAppMessage = async ({ to, body, event = "manual", parameters = []
 
 const sendWhatsAppDocument = async ({ to, event, buffer, filename, caption, parameters = [] }) => {
   const phone = normalizeWhatsAppNumber(to);
-  const templateName = process.env[event === "payment_received" ? "WHATSAPP_TEMPLATE_RECEIPT_DOCUMENT" : "WHATSAPP_TEMPLATE_REPORT_DOCUMENT"];
-  const messageType = templateName ? "template" : "document";
-  if (!phone || !getWhatsAppStatus().configured) return { sent: false, skipped: true, error: "WhatsApp phone or credentials missing" };
+  const messageType = "document";
+  if (!phone || !getWhatsAppStatus().configured) {
+    const error = "WhatsApp phone or credentials missing";
+    if (phone) await saveNotification({ phone, event, messageType, status: "SKIPPED", error });
+    else console.warn(`[WhatsApp] ${event}: SKIPPED - ${error}`);
+    return { sent: false, skipped: true, error };
+  }
+  console.log(`[WhatsApp] ${event}: uploading PDF and sending ${messageType}`);
   try {
     const form = new FormData();
     form.append("messaging_product", "whatsapp");
@@ -97,13 +105,8 @@ const sendWhatsAppDocument = async ({ to, event, buffer, filename, caption, para
     const media = await upload.json();
     if (!upload.ok || !media.id) throw new Error(media.error?.message || "PDF upload failed");
     const document = { id: media.id, filename };
-    const payload = { messaging_product: "whatsapp", to: phone, type: templateName ? "template" : "document" };
-    if (templateName) {
-      payload.template = { name: templateName, language: { code: process.env.WHATSAPP_TEMPLATE_LANGUAGE || "en_US" }, components: [
-        { type: "header", parameters: [{ type: "document", document }] },
-        ...(parameters.length ? [{ type: "body", parameters: parameters.map(value => ({ type: "text", text: String(value ?? "N/A") })) }] : [])
-      ] };
-    } else payload.document = { ...document, caption };
+    const payload = { messaging_product: "whatsapp", to: phone, type: "document",
+      document: { ...document, caption } };
     const result = await requestCloudApi(payload);
     if (!result.ok) throw new Error(result.data?.error?.message || `WhatsApp API returned HTTP ${result.statusCode}`);
     const messageId = result.data?.messages?.[0]?.id || "";

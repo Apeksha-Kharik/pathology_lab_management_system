@@ -3,10 +3,10 @@ const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
 const https = require('https');
 const Notification = require('../models/WhatsAppNotification');
-const { sendWhatsAppDocument } = require('../services/whatsappService');
+const { sendWhatsAppMessage, sendWhatsAppDocument } = require('../services/whatsappService');
 const { generateReceiptPdf, generateReportPdf } = require('../services/patientPdfService');
 
-test('document upload, media message, template header, and failed upload', async t => {
+test('plain text and document messages ignore configured templates; failed upload is contained', async t => {
   const old = { ...process.env };
   t.after(() => { for (const k of Object.keys(process.env)) if (!(k in old)) delete process.env[k]; Object.assign(process.env, old); });
   process.env.WHATSAPP_ACCESS_TOKEN = 'fake';
@@ -31,11 +31,16 @@ test('document upload, media message, template header, and failed upload', async
   assert.equal(payloads[0].type, 'document');
   process.env.WHATSAPP_TEMPLATE_RECEIPT_DOCUMENT = 'receipt_pdf';
   await sendWhatsAppDocument(input);
-  assert.equal(payloads[1].template.components[0].parameters[0].document.id, 'media-123');
-  assert.equal(payloads[1].template.components[1].parameters.length, 3);
+  assert.equal(payloads[1].type, 'document');
+  assert.equal(payloads[1].template, undefined);
+  process.env.WHATSAPP_TEMPLATE_BOOKING_REQUEST = 'booking_request';
+  await sendWhatsAppMessage({ to: input.to, event: 'booking_requested', body: 'Booking received', templateName: 'ignored' });
+  assert.equal(payloads[2].type, 'text');
+  assert.equal(payloads[2].text.body, 'Booking received');
+  assert.equal(payloads[2].template, undefined);
   t.mock.method(global, 'fetch', async () => ({ ok: false, json: async () => ({ error: { message: 'Upload denied' } }) }));
   assert.equal((await sendWhatsAppDocument(input)).sent, false);
-  assert.equal(payloads.length, 2);
+  assert.equal(payloads.length, 3);
   assert.equal(logs.at(-1).status, 'FAILED');
 });
 

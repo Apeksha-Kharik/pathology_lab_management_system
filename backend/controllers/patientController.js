@@ -124,6 +124,7 @@ const createBooking = async (req, res) => {
       status: "pending"
     });
 
+    console.log(`[Booking] ${booking.bookingCode}: saved; starting patient WhatsApp acknowledgement`);
     await notifyBookingRequested(booking);
 
     res.status(201).json({ message: "Booking request submitted for receptionist approval", booking });

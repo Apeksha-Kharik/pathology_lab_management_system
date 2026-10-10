@@ -9,7 +9,7 @@ const PDFDocument = require("pdfkit");
 const fs = require("fs");
 const path = require("path");
 const { sendWhatsAppMessage } = require("../services/whatsappService");
-const { notifyPaymentReceived } = require("../services/patientNotifications");
+const { notifyBookingConfirmed, notifyPaymentReceived } = require("../services/patientNotifications");
 
 const letterheadImagePath = path.join(__dirname, "..", "assets", "indipath-letterhead.png");
 const pdfLayout = {
@@ -336,16 +336,7 @@ const createWalkInBooking = async (req, res) => {
       status: "pending"
     });
 
-    await notifyPatient(booking, "booking_confirmed", [
-      `IndiPath: Your ${booking.testName} has been booked successfully.`,
-      "",
-      `Patient ID: ${booking.patientCode}`,
-      `Booking ID: ${booking.bookingCode}`,
-      `Test: ${booking.testName}`,
-      `Date: ${booking.bookingDate}`,
-      `Time Slot: ${booking.timeSlot}`,
-        `Amount: INR ${Number(booking.amount).toFixed(2)}`
-    ], [booking.name, booking.patientCode, booking.bookingCode, booking.testName, booking.bookingDate, booking.timeSlot, `INR ${Number(booking.amount).toFixed(2)}`]);
+    await notifyBookingConfirmed(booking);
 
     res.status(201).json({ message: "Walk-in booking created successfully", booking });
   } catch (error) {
@@ -413,16 +404,7 @@ const updateBookingStatus = async (req, res) => {
     await booking.save();
 
     if (status === "Confirmed" && previousStatus !== status) {
-      await notifyPatient(booking, "booking_confirmed", [
-        `IndiPath: Your ${booking.testName} has been booked successfully.`,
-        "",
-        `Patient ID: ${booking.patientCode}`,
-        `Booking ID: ${booking.bookingCode}`,
-        `Test: ${booking.testName}`,
-        `Date: ${booking.bookingDate}`,
-        `Time Slot: ${booking.timeSlot}`,
-        `Amount: INR ${Number(booking.amount).toFixed(2)}`
-      ], [booking.name, booking.patientCode, booking.bookingCode, booking.testName, booking.bookingDate, booking.timeSlot, `INR ${Number(booking.amount).toFixed(2)}`]);
+      await notifyBookingConfirmed(booking);
     }
 
     if (status === "Rejected" && previousStatus !== status) {

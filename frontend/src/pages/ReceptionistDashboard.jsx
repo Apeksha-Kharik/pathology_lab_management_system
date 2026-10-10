@@ -38,9 +38,9 @@ function ReceptionistDashboard() {
 
   const today = new Date().toISOString().slice(0, 10);
 
-  const loadData = useCallback(async (searchValue = "") => {
+  const loadData = useCallback(async (searchValue = "", { quiet = false } = {}) => {
     try {
-      setLoading(true);
+      if (!quiet) setLoading(true);
       const [bookingData, testData, assignmentData] = await Promise.all([
         getReceptionistBookings(searchValue),
         getReceptionistTests(),
@@ -50,9 +50,9 @@ function ReceptionistDashboard() {
       setTests(testData || []);
       setAssignments(assignmentData || []);
     } catch (error) {
-      alert(error.response?.data?.message || "Unable to load receptionist dashboard");
+      if (!quiet) alert(error.response?.data?.message || "Unable to load receptionist dashboard");
     } finally {
-      setLoading(false);
+      if (!quiet) setLoading(false);
     }
   }, []);
 
@@ -61,14 +61,14 @@ function ReceptionistDashboard() {
   }, [loadData]);
 
   useEffect(() => {
-    const refreshAssignments = () => getTechnicianAssignments().then((data) => setAssignments(data || [])).catch(() => {});
-    const interval = window.setInterval(refreshAssignments, 10000);
-    window.addEventListener("focus", refreshAssignments);
+    const refreshDashboard = () => loadData(search, { quiet: true });
+    const interval = window.setInterval(refreshDashboard, 15000);
+    window.addEventListener("focus", refreshDashboard);
     return () => {
       window.clearInterval(interval);
-      window.removeEventListener("focus", refreshAssignments);
+      window.removeEventListener("focus", refreshDashboard);
     };
-  }, []);
+  }, [loadData, search]);
 
   const pendingBookings = useMemo(() => bookings.filter((booking) => booking.bookingStatus === "Pending Approval"), [bookings]);
   const todaysBookings = useMemo(() => bookings.filter((booking) => booking.bookingDate === today && booking.bookingStatus !== "Rejected"), [bookings, today]);
