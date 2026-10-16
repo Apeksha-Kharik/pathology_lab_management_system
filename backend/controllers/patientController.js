@@ -177,6 +177,7 @@ const downloadReport = async (req, res) => {
     const results = Array.isArray(report.results) ? report.results : [];
     const filename = buildPatientPdfFilename(booking.name, booking.patientCode || booking.bookingCode, "RPT");
     res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Cache-Control", "private, no-store");
     res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
     renderReportPdf(report, req.user, res);
   } catch (error) {
@@ -206,6 +207,7 @@ const downloadReceipt = async (req, res) => {
 
     const filename = buildPatientPdfFilename(booking.name, booking.patientCode || booking.bookingCode, "RCT");
     res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Cache-Control", "private, no-store");
     res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
     renderReceiptPdf(booking, res);
   } catch (error) {

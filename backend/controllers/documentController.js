@@ -2,6 +2,26 @@ const mongoose = require("mongoose");
 const Booking = require("../models/Booking");
 const Payment = require("../models/Payment");
 const Report = require("../models/Report");
+const { renderReportPdf, buildPatientPdfFilename } = require('../services/patientPdfService');
+
+const downloadTechnicianReport = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.reportId)) return res.status(400).json({ message: 'Invalid report ID' });
+    const report = await Report.findById(req.params.reportId).populate('bookingId').populate('approvedBy', 'name qualification registrationNumber signatureUrl');
+    if (!report) return res.status(404).json({ message: 'Report not found' });
+    // Ownership follows the submitting technician even if the booking is reassigned.
+    if (String(report.technicianId || '') !== String(req.user._id)) return res.status(403).json({ message: 'You cannot download this report' });
+    if (!['Pending Approval', 'Pending Review', 'Approved', 'Rejected'].includes(report.status)) return res.status(409).json({ message: 'Submit the report before downloading its PDF' });
+    const filename = buildPatientPdfFilename(report.bookingId?.name, report.bookingId?.patientCode || report.reportId, 'RPT');
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    renderReportPdf(report, {}, res);
+  } catch (error) {
+    if (!res.headersSent) res.status(500).json({ message: 'Unable to download report PDF' });
+    else res.destroy(error);
+  }
+};
 
 const canAccess = (user, report, booking, requireApproved = true) => {
   const role = String(user.role || "").toLowerCase();
@@ -13,7 +33,7 @@ const canAccess = (user, report, booking, requireApproved = true) => {
   return false;
 };
 
-const getReportDocument = async (req, res) => {
+const reportDocument = (asPdf = false) => async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.reportId)) return res.status(400).json({ message: "Invalid report ID" });
     const report = await Report.findById(req.params.reportId)
@@ -24,12 +44,25 @@ const getReportDocument = async (req, res) => {
       .populate("authorizedBy", "name qualification registrationNumber signatureUrl");
     if (!report) return res.status(404).json({ message: "Report not found" });
     if (!canAccess(req.user, report, report.bookingId)) return res.status(403).json({ message: "You cannot access this report" });
+    if (asPdf) {
+      if (!['Pending Approval', 'Pending Review', 'Approved', 'Rejected'].includes(report.status)) return res.status(409).json({ message: 'Submit the report before viewing its PDF' });
+      const booking = report.bookingId || {};
+      const filename = buildPatientPdfFilename(booking.name, booking.patientCode || report.reportId, 'RPT');
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+      res.setHeader('Cache-Control', 'private, no-store');
+      renderReportPdf(report, report.userId || {}, res);
+      return;
+    }
     const payment = await Payment.findOne({ bookingId: report.bookingId?._id }).select("amount method status transactionId receiptNumber receiptId paidAt paymentDate");
     res.json({ report, booking: report.bookingId, payment });
   } catch (error) {
-    res.status(500).json({ message: "Unable to load report document", error: error.message });
+    if (!res.headersSent) res.status(500).json({ message: "Unable to load report document" });
+    else res.destroy(error);
   }
 };
+const getReportDocument = reportDocument();
+const getReportPdf = reportDocument(true);
 
 const getReceiptDocument = async (req, res) => {
   try {
@@ -48,4 +81,4 @@ const getReceiptDocument = async (req, res) => {
   }
 };
 
-module.exports = { getReportDocument, getReceiptDocument };
+module.exports = { getReportDocument, getReportPdf, getReceiptDocument, downloadTechnicianReport };

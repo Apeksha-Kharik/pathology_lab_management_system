@@ -1,530 +1,259 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowUpDown, CheckCircle2, ClipboardList, CreditCard, Download, Eye, History, LogOut, Plus, Search, UserCheck, UserRound, XCircle } from "lucide-react";
+import "../styles/receptionDesk.css";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CalendarDays, ClipboardList, CreditCard, Download, Eye, History, LogOut, Plus, RefreshCw, Search, UserCheck, X } from "lucide-react";
 import { useAuth } from "../context/useAuth";
 import logo from "../assets/logo.png";
-import {
-  createWalkInBooking,
-  assignTechnician,
-  downloadReceptionistReceipt,
-  getReceptionistBookings,
-  getReceptionistTests,
-  getTechnicianAssignments,
-  markPaymentPaid,
-  updateBookingStatus
-} from "../services/receptionistService";
+import { createWalkInBooking, assignTechnician, downloadReceptionistReceipt, getReceptionistBookings, getReceptionistTests, getTechnicianAssignments, markPaymentPaid, updateBookingStatus } from "../services/receptionistService";
+import { bookingActions, currentAssignment, bookingStatus, canAssign, isPaymentDue, receptionToday, searchBookings } from "../utils/receptionDesk";
 
-const safeFilePart = (value) => String(value || "patient").trim().replace(/[^a-z0-9-_]+/gi, "-").replace(/^-+|-+$/g, "") || "patient";
-
-const buildPatientPdfFilename = (booking) => `${safeFilePart(booking.name)}-${safeFilePart(booking.patientCode || "pending-patient-id")}-RCT.pdf`;
-const receptionistFont = "Aptos, 'Avenir Next', Inter, 'Segoe UI', system-ui, sans-serif";
-const getPatientIdText = (booking) => {
-  if (booking.patientCode) return booking.patientCode;
-  if (booking.bookingStatus === "Pending Approval") return "Pending approval";
-  if (booking.bookingStatus === "Rejected") return "Not issued";
-  return "Generating ID";
-};
+const receptionistFont = "Aptos, Inter, 'Segoe UI', system-ui, sans-serif";
+const money = value => `INR ${Number(value || 0).toLocaleString('en-IN')}`;
+const displayDate = value => value ? new Date(`${String(value).slice(0, 10)}T12:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Not scheduled';
+const getPatientIdText = booking => booking.patientCode || (bookingStatus(booking) === 'Pending Approval' ? 'Issued after confirmation' : bookingStatus(booking) === 'Rejected' ? 'Not issued' : 'Pending');
+const formatAssignmentDate = value => value ? new Date(value).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' }) : 'Not recorded';
+const fileName = booking => `${String(booking.name || 'patient').replace(/[^a-z0-9-_]+/gi, '-')}-${booking.patientCode || 'pending'}-RCT.pdf`;
+const tabs = [
+  { id: 'requests', label: 'Booking requests', icon: ClipboardList },
+  { id: 'appointments', label: 'Appointments', icon: CalendarDays },
+  { id: 'assignments', label: 'Technician assignments', icon: UserCheck },
+  { id: 'payments', label: 'Payments', icon: CreditCard },
+  { id: 'history', label: 'Patient history', icon: History }
+];
+const buttonClass = 'inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 disabled:cursor-not-allowed disabled:opacity-50';
+const primaryClass = 'inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
 
 function ReceptionistDashboard() {
   const { user, logout } = useAuth();
   const [bookings, setBookings] = useState([]);
   const [tests, setTests] = useState([]);
   const [assignments, setAssignments] = useState([]);
-  const [sendingAssignment, setSendingAssignment] = useState("");
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [notice, setNotice] = useState(null);
+  const [activeView, setActiveView] = useState('requests');
+  const [appointmentScope, setAppointmentScope] = useState('today');
+  const [paymentScope, setPaymentScope] = useState('due');
+  const [historySort, setHistorySort] = useState('newest');
+  const [selectedId, setSelectedId] = useState(null);
   const [showWalkIn, setShowWalkIn] = useState(false);
   const [paymentBooking, setPaymentBooking] = useState(null);
-  const [activeView, setActiveView] = useState("workflow");
+  const [busyId, setBusyId] = useState('');
+  const requestVersion = useRef(0);
+  const actionInFlight = useRef(false);
+  const today = receptionToday();
+  const closeDetails = useCallback(() => setSelectedId(null), []);
+  const invalidateRequests = useCallback(() => { requestVersion.current++; }, []);
 
-  const today = new Date().toISOString().slice(0, 10);
-
-  const loadData = useCallback(async (searchValue = "", { quiet = false } = {}) => {
+  const loadData = useCallback(async ({ quiet = false } = {}) => {
+    const version = ++requestVersion.current;
+    if (!quiet) setRefreshing(true);
     try {
-      if (!quiet) setLoading(true);
-      const [bookingData, testData, assignmentData] = await Promise.all([
-        getReceptionistBookings(searchValue),
-        getReceptionistTests(),
-        getTechnicianAssignments()
-      ]);
+      const [bookingData, testData, assignmentData] = await Promise.all([getReceptionistBookings(), getReceptionistTests(), getTechnicianAssignments()]);
+      if (version !== requestVersion.current) return;
       setBookings(bookingData || []);
       setTests(testData || []);
       setAssignments(assignmentData || []);
+      if (!quiet) setNotice(null);
     } catch (error) {
-      if (!quiet) alert(error.response?.data?.message || "Unable to load receptionist dashboard");
+      if (version === requestVersion.current) setNotice({ type: 'error', text: error.response?.data?.message || 'Unable to refresh bookings. Please try again.' });
     } finally {
-      if (!quiet) setLoading(false);
+      if (version === requestVersion.current) { setLoading(false); setRefreshing(false); }
     }
   }, []);
 
   useEffect(() => {
-    loadData("");
-  }, [loadData]);
+    loadData();
+    const refresh = () => { if (!actionInFlight.current) loadData({ quiet: true }); };
+    const interval = window.setInterval(refresh, 15000);
+    window.addEventListener('focus', refresh);
+    return () => { invalidateRequests(); window.clearInterval(interval); window.removeEventListener('focus', refresh); };
+  }, [loadData, invalidateRequests]);
 
-  useEffect(() => {
-    const refreshDashboard = () => loadData(search, { quiet: true });
-    const interval = window.setInterval(refreshDashboard, 15000);
-    window.addEventListener("focus", refreshDashboard);
-    return () => {
-      window.clearInterval(interval);
-      window.removeEventListener("focus", refreshDashboard);
-    };
-  }, [loadData, search]);
-
-  const pendingBookings = useMemo(() => bookings.filter((booking) => booking.bookingStatus === "Pending Approval"), [bookings]);
-  const todaysBookings = useMemo(() => bookings.filter((booking) => booking.bookingDate === today && booking.bookingStatus !== "Rejected"), [bookings, today]);
-  const pendingPayments = useMemo(() => bookings.filter((booking) => ["Confirmed", "Arrived"].includes(booking.bookingStatus) && booking.paymentStatus === "Unpaid"), [bookings]);
-  const paidAwaitingArrival = useMemo(() => bookings.filter((booking) => booking.bookingStatus === "Confirmed" && booking.paymentStatus === "Paid" && !booking.patientArrived), [bookings]);
   const assignmentsByBooking = useMemo(() => {
     const grouped = new Map();
-    assignments.forEach((assignment) => {
-      const bookingId = assignment.booking?._id || assignment.booking;
-      if (!grouped.has(bookingId)) grouped.set(bookingId, []);
-      grouped.get(bookingId).push(assignment);
+    assignments.forEach(assignment => {
+      const id = String(assignment.booking?._id || assignment.booking);
+      grouped.set(id, [...(grouped.get(id) || []), assignment]);
     });
     return grouped;
   }, [assignments]);
-  const readyForAssignment = useMemo(() => bookings.filter((booking) => {
-    const history = assignmentsByBooking.get(booking._id) || [];
-    const hasActiveRequest = history.some((assignment) => ["PENDING", "ACCEPTED"].includes(assignment.status));
-    return (booking.patientArrived || booking.bookingStatus === "Arrived") && booking.paymentStatus === "Paid" && !booking.assignedTechnician && !hasActiveRequest && !["Processing", "Pending Report Approval", "Report Ready"].includes(booking.bookingStatus);
-  }), [bookings, assignmentsByBooking]);
-  const workflowSections = [
-    {
-      title: "New Booking Requests",
-      description: "Patient-submitted bookings waiting for receptionist confirmation or rejection.",
-      bookings: pendingBookings,
-      variant: "pending"
-    },
-    {
-      title: "Today's Schedule",
-      description: "All non-rejected appointments dated today, including confirmed, arrived, paid, and assigned visits.",
-      bookings: todaysBookings
-    },
-    {
-      title: "Payment Due",
-      description: "Confirmed or arrived patients whose payment still needs to be collected.",
-      bookings: pendingPayments
-    },
-    {
-      title: "Paid - Awaiting Arrival",
-      description: "Payment is complete, but arrival still needs to be marked before technician assignment.",
-      bookings: paidAwaitingArrival
-    },
-    {
-      title: "Ready for Technician Assignment",
-      description: "Arrived, paid patients ready for automatic fair technician assignment.",
-      bookings: readyForAssignment
+  const pending = bookings.filter(booking => bookingStatus(booking) === 'Pending Approval');
+  const scheduled = bookings.filter(booking => (booking.bookingDate || booking.date) === today && !['Rejected', 'Cancelled'].includes(bookingStatus(booking)));
+  const paymentDue = bookings.filter(isPaymentDue);
+  const assignmentBookings = bookings.filter(booking => !['Rejected', 'Cancelled', 'Completed', 'Report Ready'].includes(bookingStatus(booking)) && (canAssign(booking, assignmentsByBooking.get(booking._id)) || assignmentsByBooking.has(booking._id) || booking.assignedTechnician));
+  const selectedBooking = bookings.find(booking => booking._id === selectedId);
+  const pools = { requests: pending, appointments: bookings.filter(booking => !['Rejected', 'Cancelled'].includes(bookingStatus(booking))), assignments: assignmentBookings, payments: bookings.filter(booking => isPaymentDue(booking) || booking.paymentStatus === 'Paid'), history: bookings };
+  let visible = searchBookings(pools[activeView], search);
+  if (activeView === 'appointments' && appointmentScope !== 'all') visible = visible.filter(booking => appointmentScope === 'today' ? (booking.bookingDate || booking.date) === today : (booking.bookingDate || booking.date) > today);
+  if (activeView === 'payments' && paymentScope !== 'all') visible = visible.filter(booking => paymentScope === 'due' ? isPaymentDue(booking) : booking.paymentStatus === 'Paid');
+  visible = [...visible].sort((a, b) => {
+    const direction = activeView === 'history' && historySort === 'newest' ? -1 : 1;
+    return String(a.bookingDate || a.date || '').localeCompare(String(b.bookingDate || b.date || '')) * direction;
+  });
+  const counts = { requests: pending.length, appointments: scheduled.length, assignments: assignmentBookings.length, payments: paymentDue.length, history: bookings.length };
+  const descriptions = { requests: 'Confirm new requests or open the details to review and reject a booking.', appointments: 'Mark patients arrived here. Send technician requests separately in Technician assignments.', assignments: 'Send technician requests after payment is paid; arrival is recorded separately. Track technician acceptance or rejection. After rejection, use Auto Reassign Fairly to request another available technician. Updates refresh every 15 seconds.', payments: 'Collect offline payments and access receipts for paid bookings.', history: 'Find previous visits, contact details, and payment receipts.' };
+
+  const replaceBooking = booking => { if (booking?._id) setBookings(current => current.map(item => item._id === booking._id ? { ...item, ...booking } : item)); };
+  const handleStatus = async (id, status) => {
+    if (actionInFlight.current) return;
+    let rejectionReason = '';
+    let appointment = {};
+    const booking = bookings.find(item => item._id === id);
+    if (status === 'Confirmed' && booking && (!booking.timeSlot || !booking.bookingDate)) {
+      const bookingDate = window.prompt('This older booking has incomplete appointment details. Enter the appointment date (YYYY-MM-DD).', receptionToday());
+      if (bookingDate === null) return;
+      const timeSlot = window.prompt('Enter the appointment time slot agreed with the patient.');
+      if (timeSlot === null) return;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(bookingDate.trim()) || !timeSlot.trim()) {
+        setNotice({ type: 'error', text: 'Enter a valid appointment date and time slot. The booking has not been changed.' });
+        return;
+      }
+      appointment = { bookingDate: bookingDate.trim(), timeSlot: timeSlot.trim() };
     }
+    if (status === 'Rejected') {
+      const reason = window.prompt('Reason for rejecting this booking');
+      if (reason === null) return;
+      if (!reason.trim()) { setNotice({ type: 'error', text: 'Enter a rejection reason. The booking has not been changed.' }); return; }
+      rejectionReason = reason.trim();
+    }
+    actionInFlight.current = true;
+    requestVersion.current++;
+    setBusyId(id);
+    try {
+      const data = await updateBookingStatus(id, status, rejectionReason, appointment);
+      replaceBooking(data.booking);
+      setNotice({ type: 'success', text: data.message });
+    } catch (error) {
+      if (error.response?.status === 409) await loadData({ quiet: true });
+      setNotice({ type: 'error', text: error.response?.data?.message || 'Booking update failed.' });
+    }
+    finally { actionInFlight.current = false; setBusyId(''); setLoading(false); setRefreshing(false); }
+  };
+  const handleReceipt = async (booking, download = false) => {
+    if (actionInFlight.current) return;
+    actionInFlight.current = true;
+    setBusyId(booking._id);
+    try {
+      const blob = await downloadReceptionistReceipt(booking._id);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      if (download) link.download = fileName(booking);
+      else { link.target = '_blank'; link.rel = 'noopener noreferrer'; }
+      document.body.appendChild(link); link.click(); link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch { setNotice({ type: 'error', text: 'Unable to open the receipt. Please try again.' }); }
+    finally { actionInFlight.current = false; setBusyId(''); }
+  };
+  const handleAssign = async booking => {
+    if (actionInFlight.current) return;
+    actionInFlight.current = true;
+    requestVersion.current++;
+    setBusyId(booking._id);
+    try {
+      const data = await assignTechnician(booking._id);
+      if (data.assignment) setAssignments(current => [data.assignment, ...current.filter(item => item._id !== data.assignment._id)]);
+      setNotice({ type: 'success', text: data.message });
+    } catch (error) { setNotice({ type: 'error', text: error.response?.data?.message || 'Technician assignment failed.' }); }
+    finally { actionInFlight.current = false; setBusyId(''); setLoading(false); setRefreshing(false); }
+  };
+  const handleAction = (booking, action) => {
+    if (action.type === 'confirm') handleStatus(booking._id, 'Confirmed');
+    else if (action.type === 'arrival') handleStatus(booking._id, 'Arrived');
+    else if (action.type === 'payment') { setSelectedId(null); setPaymentBooking(booking); }
+    else if (action.type === 'assign') handleAssign(booking);
+    else if (action.type === 'receipt') handleReceipt(booking);
+    else setSelectedId(booking._id);
+  };
+  const summary = [
+    { view: 'requests', label: 'Booking requests', value: pending.length, caption: 'Waiting for confirmation', icon: ClipboardList },
+    { view: 'appointments', label: "Today's appointments", value: scheduled.length, caption: displayDate(today), icon: CalendarDays },
+    { view: 'payments', label: 'Payments due', value: paymentDue.length, caption: `${money(paymentDue.reduce((sum, booking) => sum + Number(booking.amount || 0), 0))} outstanding`, icon: CreditCard }
   ];
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    loadData(search);
-  };
-
-  const replaceBooking = (updatedBooking) => {
-    if (!updatedBooking?._id) return;
-    setBookings((current) => current.map((booking) => booking._id === updatedBooking._id ? updatedBooking : booking));
-  };
-
-  const handleStatus = async (bookingId, status) => {
-    const rejectionReason = status === "Rejected"
-      ? window.prompt("Reason for rejection", "Requested slot unavailable") || ""
-      : "";
-
-    try {
-      const data = await updateBookingStatus(bookingId, status, rejectionReason);
-      alert(data.message);
-      replaceBooking(data.booking);
-    } catch (error) {
-      alert(error.response?.data?.message || "Status update failed");
-    }
-  };
-
-  const handleReceipt = async (booking) => {
-    try {
-      const blob = await downloadReceptionistReceipt(booking._id);
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = buildPatientPdfFilename(booking);
-      link.click();
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      alert(error.response?.data?.message || "Receipt generation failed");
-    }
-  };
-
-  const handleViewReceipt = async (booking) => {
-    try {
-      const blob = await downloadReceptionistReceipt(booking._id);
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
-      link.click();
-      window.setTimeout(() => window.URL.revokeObjectURL(url), 60000);
-    } catch (error) {
-      alert(error.response?.data?.message || "Receipt preview failed");
-    }
-  };
-
-  const handleAssignTechnician = async (bookingId) => {
-    if (sendingAssignment) return;
-    try {
-      setSendingAssignment(bookingId);
-      const data = await assignTechnician(bookingId);
-      alert(data.message);
-      setAssignments((current) => [data.assignment, ...current]);
-    } catch (error) {
-      alert(error.response?.data?.message || "Technician assignment failed");
-    } finally {
-      setSendingAssignment("");
-    }
-  };
-
-  const handleLogout = () => {
-    logout();
-    window.location.href = "/login";
-  };
-
-  return (
-    <div className="min-h-screen bg-[#f6fbf8] text-slate-900" style={{ fontFamily: receptionistFont }}>
-      <header className="sticky top-0 z-40 border-b border-emerald-100 bg-white/95 shadow-lg shadow-emerald-950/5 backdrop-blur">
-        <div className="mx-auto grid max-w-7xl gap-4 px-4 py-4 lg:grid-cols-[auto_minmax(320px,1fr)_auto] lg:items-center lg:px-6">
-          <div className="flex items-center gap-3">
-            <img src={logo} alt="INDIPATH logo" className="h-12 w-12 rounded-xl object-contain shadow-sm" />
-            <div>
-              <span className="block text-xl font-black leading-none tracking-tight text-emerald-950">INDIPATH</span>
-              <span className="mt-1 block text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">Reception Desk</span>
-            </div>
+  return <div className="reception-dashboard min-h-screen bg-slate-50 text-slate-900" style={{ fontFamily: receptionistFont }}>
+    <aside className="desk-sidebar">
+      <div className="desk-sidebar-brand"><span className="desk-brand-mark"><img src={logo} alt="" /></span><div><p>INDIPATH</p><span>Laboratory management</span></div></div>
+      <div className="desk-sidebar-caption">RECEPTION WORKSPACE</div>
+      <nav role="tablist" aria-label="Reception tasks" className="desk-sidebar-nav">{tabs.map(({ id, label, icon }) => <button key={id} id={`desktop-tab-${id}`} type="button" role="tab" aria-selected={activeView === id} aria-controls="reception-task-panel" onClick={() => setActiveView(id)}>{React.createElement(icon, { size: 18 })}<span>{label}</span><small>{counts[id]}</small></button>)}</nav>
+      <div className="desk-sidebar-footer"><span className="desk-footer-mark">+</span><div><strong>Patient care starts here.</strong><p>Super Speciality Pathology Lab</p></div></div>
+    </aside>
+    <header className="desk-topbar border-b border-slate-200 bg-white">
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+        <div className="desk-topbar-brand flex items-center gap-3"><img src={logo} alt="INDIPATH" className="h-10 w-10 object-contain" /><div><p className="font-bold tracking-tight text-emerald-950">INDIPATH</p><p className="text-xs text-slate-500">Reception desk</p></div></div>
+        <div className="desk-breadcrumb"><span>Workspace</span><span>/</span><strong>Reception</strong></div>
+        <div className="flex items-center gap-3 sm:gap-5"><span className="desk-date"><CalendarDays size={15} />{displayDate(today)}</span><div className="desk-account"><span className="desk-avatar">{String(user?.name || 'R').trim().split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase()}</span><div><p>{user?.name || 'Receptionist'}</p><span>Receptionist</span></div></div><button aria-label="Log out" type="button" onClick={() => { logout(); window.location.href = '/login'; }} className={buttonClass}><LogOut size={16} /><span className="hidden sm:inline">Log out</span></button></div>
+      </div>
+    </header>
+    <main className="desk-shell mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+      <div className="desk-page-heading flex flex-wrap items-center justify-between gap-4"><div><p className="desk-eyebrow">PATIENT SERVICES</p><h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Reception overview</h1><p className="mt-1 text-sm text-slate-500">Manage patient visits, payments, and technician handoffs.</p></div><button type="button" onClick={() => setShowWalkIn(true)} className={primaryClass}><Plus size={17} />Add walk-in patient</button></div>
+      <div className="desk-stats grid gap-4 sm:grid-cols-3">{summary.map(({ view, label, value, caption, icon }) => <button key={view} type="button" onClick={() => { setActiveView(view); setSearch(''); if (view === 'appointments') setAppointmentScope('today'); if (view === 'payments') setPaymentScope('due'); }} className={`desk-stat desk-stat-${view} rounded-xl border border-slate-200 bg-white p-5 text-left transition hover:border-emerald-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600`}><div className="flex items-center justify-between"><span className="text-sm font-medium text-slate-600">{label}</span><span className="desk-stat-icon">{React.createElement(icon, { size: 21 })}</span></div><p className="desk-stat-value mt-3 text-3xl font-bold tracking-tight">{loading ? '-' : value}</p><p className="desk-stat-caption mt-1 text-xs text-slate-500">{caption}</p></button>)}</div>
+      {notice && <div role={notice.type === 'error' ? 'alert' : 'status'} className={`flex items-start justify-between gap-3 rounded-lg border px-4 py-3 text-sm ${notice.type === 'error' ? 'border-red-200 bg-red-50 text-red-800' : 'border-emerald-200 bg-emerald-50 text-emerald-900'}`}><span>{notice.text}</span><button type="button" aria-label="Dismiss message" onClick={() => setNotice(null)}><X size={17} /></button></div>}
+      <section className="desk-workspace overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <div className="desk-mobile-nav flex gap-1 overflow-x-auto border-b border-slate-200 px-3" role="tablist" aria-label="Reception tasks">{tabs.map(({ id, label, icon }) => <button key={id} type="button" role="tab" aria-selected={activeView === id} aria-controls="reception-task-panel" id={`tab-${id}`} onClick={() => setActiveView(id)} className={`inline-flex shrink-0 items-center gap-2 border-b-2 px-3 py-4 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-600 ${activeView === id ? 'border-emerald-700 text-emerald-800' : 'border-transparent text-slate-500 hover:text-slate-900'}`}>{React.createElement(icon, { size: 16 })}{label}<span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600">{counts[id]}</span></button>)}</div>
+        <div id="reception-task-panel" role="tabpanel" aria-label={tabs.find(tab => tab.id === activeView).label} className="desk-task-panel p-4 sm:p-5">
+          <div className="desk-table-heading mb-5 flex flex-wrap items-end justify-between gap-4"><div><h2 className="text-lg font-bold">{tabs.find(tab => tab.id === activeView).label}</h2><p className="mt-1 text-sm text-slate-500">{descriptions[activeView]}</p></div><button type="button" disabled={refreshing || Boolean(busyId)} onClick={() => loadData()} className={buttonClass}><RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} />{refreshing ? 'Refreshing' : 'Refresh'}</button></div>
+          <div className="desk-toolbar mb-4 flex flex-wrap items-center gap-3"><label className="flex min-w-0 flex-1 basis-64 items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 focus-within:border-emerald-600"><Search size={17} className="shrink-0 text-slate-400" /><input aria-label="Search bookings" placeholder="Search patient, booking, phone, or test" value={search} onChange={event => setSearch(event.target.value)} className="min-w-0 flex-1 text-sm outline-none" />{search && <button type="button" aria-label="Clear search" onClick={() => setSearch('')}><X size={15} /></button>}</label>
+            {activeView === 'appointments' && <select aria-label="Appointment period" value={appointmentScope} onChange={event => setAppointmentScope(event.target.value)} className={buttonClass}><option value="today">Today</option><option value="upcoming">Upcoming</option><option value="all">All dates</option></select>}
+            {activeView === 'payments' && <select aria-label="Payment filter" value={paymentScope} onChange={event => setPaymentScope(event.target.value)} className={buttonClass}><option value="due">Payment due</option><option value="paid">Paid / receipts</option><option value="all">All payments</option></select>}
+            {activeView === 'history' && <select aria-label="Sort history by date" value={historySort} onChange={event => setHistorySort(event.target.value)} className={buttonClass}><option value="newest">Newest first</option><option value="oldest">Oldest first</option></select>}
+            <span className="text-xs text-slate-500">{visible.length} booking{visible.length === 1 ? '' : 's'}</span>
           </div>
-
-          <form onSubmit={handleSearch} className="mx-auto flex w-full max-w-2xl items-center gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-2 shadow-inner shadow-emerald-950/5">
-            <Search className="shrink-0 text-emerald-700" size={20} />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search patient, booking ID, or phone"
-              className="min-w-0 flex-1 bg-transparent py-2 text-sm font-semibold text-slate-700 outline-none placeholder:text-slate-400"
-            />
-            <button className="rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-black text-white shadow-lg shadow-emerald-950/10 transition hover:bg-emerald-800 focus:outline-none focus:ring-4 focus:ring-emerald-100">
-              Search
-            </button>
-          </form>
-
-          <div className="flex items-center justify-between gap-3 lg:justify-end">
-            <div className="hidden items-center gap-3 rounded-2xl border border-emerald-100 bg-white px-3 py-2 shadow-sm sm:flex">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-800">
-                <UserRound size={18} />
-              </span>
-              <div className="max-w-36">
-                <p className="truncate text-sm font-black text-emerald-950">{user?.name || "Receptionist"}</p>
-                <p className="truncate text-xs font-semibold text-slate-500">{user?.email || "Front Desk"}</p>
-              </div>
-            </div>
-            <button onClick={handleLogout} className="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-white px-4 py-2.5 text-sm font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50 focus:outline-none focus:ring-4 focus:ring-emerald-100">
-              <LogOut size={18} /> Logout
-            </button>
-          </div>
+          {loading ? <div role="status" className="py-16 text-center text-sm text-slate-500">Loading bookings...</div> : visible.length ? <div className="desk-table-wrap overflow-x-auto rounded-lg border border-slate-200"><table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-slate-50 text-xs text-slate-500"><tr>{['Patient', 'Test / package', 'Appointment', 'Status', activeView === 'assignments' ? 'Technician' : 'Payment', 'Actions'].map(heading => <th scope="col" key={heading} className="px-4 py-3 font-semibold last:text-right">{heading}</th>)}</tr></thead><tbody>{visible.map(booking => {
+            const history = assignmentsByBooking.get(booking._id) || [];
+            const current = currentAssignment(history);
+            const actions = bookingActions(booking, history, activeView);
+            return <tr key={booking._id} className="border-t border-slate-100 align-top hover:bg-slate-50/70"><td className="px-4 py-4"><div className="desk-patient"><span aria-hidden="true" className="desk-patient-avatar">{String(booking.name || 'P').trim().split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase()}</span><div><button type="button" onClick={() => setSelectedId(booking._id)} className="text-left font-semibold text-slate-900 hover:text-emerald-800 hover:underline">{booking.name || 'Patient'}</button><p className="mt-1 text-xs text-slate-500">{booking.bookingCode || '-'}</p></div></div></td><td className="max-w-56 px-4 py-4 leading-5 text-slate-700">{booking.testName}</td><td className="whitespace-nowrap px-4 py-4 text-slate-700">{displayDate(booking.bookingDate || booking.date)}<p className="mt-1 text-xs text-slate-500">{booking.timeSlot || 'Appointment time missing'}</p></td><td className="px-4 py-4"><StatusBadge value={bookingStatus(booking)} /></td><td className="px-4 py-4">{activeView === 'assignments' ? <><p className="mb-1 font-medium text-slate-700">{booking.assignedTechnician?.name || current?.technician?.name || (booking.assignedTechnician ? 'Assigned technician' : 'Not assigned')}</p>{current ? <><AssignmentStatus status={current.status} />{current.respondedAt && <p className="mt-2 text-xs text-slate-500">Responded {formatAssignmentDate(current.respondedAt)}</p>}{current.status === 'REJECTED' && <p className="mt-2 max-w-64 break-words text-xs text-red-700">{current.rejectionReason || 'No reason provided.'} You can send another technician request.</p>}</> : <span className="text-xs text-slate-500">{booking.assignedTechnician ? 'Assigned' : 'Ready to assign'}</span>}</> : <><p className="mb-1 font-semibold">{money(booking.amount)}</p><StatusBadge value={booking.paymentStatus || 'Unpaid'} /></>}</td><td className="px-4 py-4"><div className="flex flex-col items-end gap-2">{activeView !== 'history' && actions.map(action => (action.type === 'waiting' ? <span key={action.type} className="max-w-40 text-right text-xs text-slate-500">{action.label}</span> : <button key={action.type} type="button" disabled={Boolean(busyId)} onClick={() => handleAction(booking, action)} className={`${primaryClass} whitespace-nowrap text-xs`}>{busyId === booking._id ? 'Please wait...' : action.label}</button>))}<button type="button" onClick={() => setSelectedId(booking._id)} className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-emerald-800"><Eye size={14} />Details</button></div></td></tr>;
+          })}</tbody></table></div> : <div className="rounded-lg border border-dashed border-slate-200 px-6 py-14 text-center"><p className="font-semibold text-slate-700">{search ? 'No matching bookings' : 'No bookings in this view'}</p><p className="mt-2 text-sm text-slate-500">{search ? 'Try another name, booking ID, phone number, or test.' : 'New items will appear here as bookings progress.'}</p></div>}
         </div>
-      </header>
+      </section>
+    </main>
+    {selectedBooking && <BookingDrawer view={activeView} booking={selectedBooking} history={assignmentsByBooking.get(selectedId) || []} busy={Boolean(busyId)} onClose={closeDetails} onAction={action => handleAction(selectedBooking, action)} onReject={() => handleStatus(selectedId, 'Rejected')} onReceipt={download => handleReceipt(selectedBooking, download)} />}
+    {showWalkIn && <WalkInModal tests={tests} onClose={() => setShowWalkIn(false)} onCreated={() => { setShowWalkIn(false); loadData(); }} />}
+    {paymentBooking && <PaymentModal booking={paymentBooking} onClose={() => setPaymentBooking(null)} onPaid={updated => { setPaymentBooking(null); replaceBooking(updated); setNotice({ type: 'success', text: 'Payment recorded. Receipt is available in booking details.' }); }} />}
+  </div>;
+}
 
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
-        <ReceptionDeskNav
-          activeView={activeView}
-          onHistory={() => setActiveView("history")}
-          onWalkIn={() => setShowWalkIn(true)}
-          onWorkflow={() => setActiveView("workflow")}
-        />
-
-        {loading ? (
-          <div className="rounded-3xl border border-emerald-100 bg-white p-8 text-center text-sm font-bold text-slate-500 shadow-xl shadow-emerald-950/5">Loading bookings...</div>
-        ) : activeView === "history" ? (
-          <PatientHistoryTable bookings={bookings} onViewReceipt={handleViewReceipt} />
-        ) : (
-          <div className="space-y-5">
-            {workflowSections.map((section) => section.variant === "pending" ? (
-              <PendingBookingsTable key={section.title} bookings={section.bookings} description={section.description} title={section.title} onStatus={handleStatus} />
-            ) : (
-              <BookingSection key={section.title} title={section.title} description={section.description} bookings={section.bookings} assignmentsByBooking={assignmentsByBooking} sendingAssignment={sendingAssignment} onAssignTechnician={handleAssignTechnician} onArrived={(id) => handleStatus(id, "Arrived")} onPaid={setPaymentBooking} onReceipt={handleReceipt} />
-            ))}
-          </div>
-        )}
-      </main>
-
-      {showWalkIn && <WalkInModal tests={tests} onClose={() => setShowWalkIn(false)} onCreated={() => { setShowWalkIn(false); loadData(); }} />}
-      {paymentBooking && <PaymentModal booking={paymentBooking} onClose={() => setPaymentBooking(null)} onPaid={(updatedBooking) => { setPaymentBooking(null); replaceBooking(updatedBooking); }} />}
+function BookingDrawer({ view, booking, history, busy, onClose, onAction, onReject, onReceipt }) {
+  const panel = useRef(null);
+  useEffect(() => {
+    const previous = document.activeElement;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const keydown = event => {
+      if (event.key === 'Escape') onClose();
+      if (event.key === 'Tab') {
+        const controls = [...panel.current.querySelectorAll('button:not([disabled]), a[href], summary, input, select, textarea')].filter(element => element.getClientRects().length);
+        const first = controls[0];
+        const last = controls[controls.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      }
+    };
+    document.addEventListener('keydown', keydown);
+    return () => { document.body.style.overflow = overflow; document.removeEventListener('keydown', keydown); previous?.focus?.(); };
+  }, [onClose]);
+  const action = bookingActions(booking, history, view).find(item => !['receipt', 'payment'].includes(item.type)) || { type: 'details' };
+  const fields = [['Patient ID', getPatientIdText(booking)], ['Age / gender', [booking.age, booking.gender].filter(value => value !== undefined && value !== null && value !== '').join(' / ')], ['Phone', booking.phone], ['Email', booking.email], ['Appointment', `${displayDate(booking.bookingDate || booking.date)} | ${booking.timeSlot || 'Appointment time missing'}`], ['Collection', booking.collectionType || 'Visit Lab'], ['Sample', booking.sampleType], ['Address', booking.address], ['Prescribed by', booking.prescribedBy || booking.doctorNotes], ['Notes', booking.notes]];
+  return <div className="fixed inset-0 z-40 flex justify-end bg-slate-950/35" onClick={onClose}><aside ref={panel} role="dialog" aria-modal="true" aria-labelledby="booking-details-title" onClick={event => event.stopPropagation()} className="desk-drawer flex h-full w-full max-w-lg flex-col bg-white shadow-xl">
+    <div className="flex items-start justify-between gap-4 border-b border-slate-200 p-5"><div><p className="text-xs font-medium text-slate-500">{booking.bookingCode}</p><h2 id="booking-details-title" className="mt-1 text-xl font-bold">{booking.name}</h2><p className="mt-1 text-sm text-slate-600">{booking.testName}</p></div><button autoFocus type="button" aria-label="Close booking details" onClick={onClose} className={buttonClass}><X size={18} /></button></div>
+    <div className="flex-1 space-y-6 overflow-y-auto p-5"><div className="flex flex-wrap gap-2"><StatusBadge value={bookingStatus(booking)} /><StatusBadge value={booking.paymentStatus || 'Unpaid'} /></div><dl className="space-y-4">{fields.filter(([, value]) => value !== undefined && value !== null && value !== '').map(([label, value]) => <div key={label} className="grid grid-cols-[105px_1fr] gap-4 text-sm"><dt className="text-slate-500">{label}</dt><dd className="break-words font-medium text-slate-800">{value}</dd></div>)}</dl>
+      <section className="rounded-xl border border-slate-200 p-4"><div className="flex justify-between"><h3 className="font-semibold">Payment</h3><span className="font-bold">{money(booking.amount)}</span></div><p className="mt-2 text-sm text-slate-500">{booking.paymentPreference === 'online' ? 'Patient pays online from Booking History.' : 'Payment collected at the desk or sample visit.'}</p>{isPaymentDue(booking) && booking.paymentPreference !== 'online' && <button type="button" disabled={busy} onClick={() => onAction({ type: 'payment' })} className={`${primaryClass} mt-3`}><CreditCard size={15} />Collect payment</button>}{booking.paymentStatus === 'Paid' && <div className="mt-3 flex flex-wrap gap-2"><button type="button" disabled={busy} onClick={() => onReceipt(false)} className={buttonClass}><Eye size={15} />View receipt</button><button type="button" disabled={busy} onClick={() => onReceipt(true)} className={buttonClass}><Download size={15} />Download</button></div>}</section>
+      {history.length > 0 && <details className="rounded-xl border border-slate-200 p-4"><summary className="cursor-pointer text-sm font-semibold">Technician assignment history ({history.length})</summary><ol className="mt-4 space-y-4">{history.map(item => <li key={item._id} className="border-l-2 border-slate-200 pl-3 text-sm"><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-medium">{item.technician?.name || 'Technician'}</span><AssignmentStatus status={item.status} /></div><p className="mt-1 text-xs text-slate-500">Requested {formatAssignmentDate(item.requestedAt)}</p>{item.respondedAt && <p className="mt-1 text-xs text-slate-500">Responded {formatAssignmentDate(item.respondedAt)}</p>}{item.rejectionReason && <p className="mt-2 text-sm text-slate-600">{item.rejectionReason}</p>}</li>)}</ol></details>}
+      {booking.rejectionReason && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-800"><strong>Rejection reason:</strong> {booking.rejectionReason}</div>}
     </div>
-  );
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white p-5">{bookingStatus(booking) === 'Pending Approval' ? <button type="button" disabled={busy} onClick={onReject} className="rounded-lg px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50">Reject booking</button> : <span className="text-xs text-slate-500">Booking details</span>}{!['details', 'receipt'].includes(action.type) && <button type="button" disabled={busy || action.type === 'waiting'} onClick={() => onAction(action)} className={primaryClass}>{busy ? 'Please wait...' : action.label}</button>}</div>
+  </aside></div>;
 }
-
-function ReceptionDeskNav({ activeView, onHistory, onWalkIn, onWorkflow }) {
-  return (
-    <section className="mb-7 overflow-hidden rounded-3xl border border-emerald-100 bg-white shadow-xl shadow-emerald-950/5">
-      <div className="grid gap-3 border-b border-emerald-100 p-4 sm:grid-cols-3">
-        <button
-          type="button"
-          onClick={onWorkflow}
-          className={`flex min-h-24 items-center gap-4 rounded-2xl px-4 py-3 text-left transition focus:outline-none focus:ring-4 focus:ring-emerald-100 ${activeView === "workflow" ? "bg-emerald-700 text-white shadow-lg shadow-emerald-950/10" : "bg-emerald-50 text-emerald-950 hover:bg-emerald-100"}`}
-        >
-          <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${activeView === "workflow" ? "bg-white/15 text-white" : "bg-white text-emerald-700"}`}>
-            <ClipboardList size={21} />
-          </span>
-          <span>
-            <span className="block text-sm font-black">Bookings</span>
-            <span className={`mt-1 block text-xs font-semibold ${activeView === "workflow" ? "text-emerald-50/85" : "text-slate-500"}`}>Reception workflow</span>
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={onHistory}
-          className={`flex min-h-24 items-center gap-4 rounded-2xl px-4 py-3 text-left transition focus:outline-none focus:ring-4 focus:ring-emerald-100 ${activeView === "history" ? "bg-emerald-700 text-white shadow-lg shadow-emerald-950/10" : "bg-emerald-50 text-emerald-950 hover:bg-emerald-100"}`}
-        >
-          <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${activeView === "history" ? "bg-white/15 text-white" : "bg-white text-emerald-700"}`}>
-            <History size={21} />
-          </span>
-          <span>
-            <span className="block text-sm font-black">Patient History</span>
-            <span className={`mt-1 block text-xs font-semibold ${activeView === "history" ? "text-emerald-50/85" : "text-slate-500"}`}>Visit records</span>
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={onWalkIn}
-          className="flex min-h-24 items-center gap-4 rounded-2xl bg-emerald-950 px-4 py-3 text-left text-white shadow-lg shadow-emerald-950/10 transition hover:bg-emerald-900 focus:outline-none focus:ring-4 focus:ring-emerald-100"
-        >
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white">
-            <Plus size={21} />
-          </span>
-          <span>
-            <span className="block text-sm font-black">Walk-In Patient</span>
-            <span className="mt-1 block text-xs font-semibold text-emerald-50/85">Create confirmed visit</span>
-          </span>
-        </button>
-      </div>
-    </section>
-  );
-}
-
-function PatientHistoryTable({ bookings, onViewReceipt }) {
-  const [dateSort, setDateSort] = useState("desc");
-
-  const sortedBookings = useMemo(() => {
-    const direction = dateSort === "asc" ? 1 : -1;
-    return [...bookings].sort((a, b) => {
-      const dateA = new Date(a.bookingDate || a.date || a.createdAt || 0).getTime();
-      const dateB = new Date(b.bookingDate || b.date || b.createdAt || 0).getTime();
-      return (dateA - dateB) * direction;
-    });
-  }, [bookings, dateSort]);
-
-  return (
-    <section className="rounded-3xl border border-emerald-100 bg-white p-5 shadow-xl shadow-emerald-950/5 sm:p-6">
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-xl font-black tracking-tight text-emerald-950">All Patient History</h2>
-          <p className="mt-1 text-sm font-semibold text-slate-500">Essential booking records for receptionist follow-up.</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setDateSort((current) => current === "desc" ? "asc" : "desc")}
-          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-white px-4 py-2.5 text-sm font-black text-emerald-800 shadow-sm transition hover:bg-emerald-50 focus:outline-none focus:ring-4 focus:ring-emerald-100"
-        >
-          <ArrowUpDown size={16} /> Date {dateSort === "desc" ? "Newest First" : "Oldest First"}
-        </button>
-      </div>
-
-      {sortedBookings.length ? (
-        <div className="overflow-x-auto rounded-2xl border border-emerald-100">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-emerald-50 text-xs uppercase tracking-[0.12em] text-emerald-900">
-              <tr>
-                <th className="p-3">Patient ID</th>
-                <th className="p-3">Patient Name</th>
-                <th className="p-3">Mobile</th>
-                <th className="p-3">Test / Package</th>
-                <th className="p-3">
-                  <button type="button" onClick={() => setDateSort((current) => current === "desc" ? "asc" : "desc")} className="inline-flex items-center gap-2 font-black uppercase">
-                    Date <ArrowUpDown size={14} />
-                  </button>
-                </th>
-                <th className="p-3">Time</th>
-                <th className="p-3">Booking Status</th>
-                <th className="p-3">Payment</th>
-                <th className="p-3">Payment Receipt</th>
-                <th className="p-3 text-right">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedBookings.map((booking) => (
-                <tr key={booking._id} className="border-t border-emerald-100 text-slate-600 transition-colors hover:bg-emerald-50/50">
-                  <td className="p-3 font-black text-emerald-700">{getPatientIdText(booking)}</td>
-                  <td className="p-3 font-bold text-slate-800">{booking.name || "-"}</td>
-                  <td className="p-3">{booking.phone || "-"}</td>
-                  <td className="p-3">{booking.testName || "-"}</td>
-                  <td className="p-3 font-semibold">{booking.bookingDate || booking.date || "-"}</td>
-                  <td className="p-3">{booking.timeSlot || "-"}</td>
-                  <td className="p-3"><StatusBadge value={booking.bookingStatus || booking.status || "Pending"} /></td>
-                  <td className="p-3"><StatusBadge value={booking.paymentStatus || "Unpaid"} /></td>
-                  <td className="p-3">
-                    <button
-                      type="button"
-                      onClick={() => onViewReceipt(booking)}
-                      disabled={booking.paymentStatus !== "Paid"}
-                      className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-black text-emerald-800 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <Eye size={14} /> View
-                    </button>
-                  </td>
-                  <td className="p-3 text-right font-black text-emerald-950">INR {Number(booking.amount || 0).toLocaleString("en-IN")}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <Empty text="No patient history found." />
-      )}
-    </section>
-  );
-}
-
-function PendingBookingsTable({ bookings, description, onStatus, title }) {
-  return (
-    <section className="rounded-3xl border border-emerald-100 bg-white p-5 shadow-xl shadow-emerald-950/5 sm:p-6">
-      <SectionHeader count={bookings.length} description={description} title={title} />
-      {bookings.length ? (
-        <div className="overflow-x-auto rounded-2xl border border-emerald-100">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-emerald-50 text-xs uppercase tracking-[0.12em] text-emerald-900">
-              <tr>
-                <th className="p-3">Booking ID</th>
-                <th className="p-3">Patient ID</th>
-                <th className="p-3">Patient Name</th>
-                <th className="p-3">Phone</th>
-                <th className="p-3">Test Name</th>
-                <th className="p-3">Date</th>
-                <th className="p-3">Time Slot</th>
-                <th className="p-3">Status</th>
-                <th className="p-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {bookings.map((booking) => (
-                <tr key={booking._id} className="border-t border-emerald-100 text-slate-600 transition-colors hover:bg-emerald-50/50">
-                  <td className="p-3 font-bold">{booking.bookingCode}</td>
-                  <td className="p-3 font-bold text-emerald-700">{getPatientIdText(booking)}</td>
-                  <td className="p-3">{booking.name}</td>
-                  <td className="p-3">{booking.phone}</td>
-                  <td className="p-3">{booking.testName}</td>
-                  <td className="p-3">{booking.bookingDate}</td>
-                  <td className="p-3">{booking.timeSlot}</td>
-                  <td className="p-3"><StatusBadge value={booking.bookingStatus} /></td>
-                  <td className="p-3">
-                    <div className="flex justify-end gap-2">
-                      <button onClick={() => onStatus(booking._id, "Confirmed")} className="inline-flex items-center gap-1 rounded-xl bg-emerald-700 px-3 py-2 text-xs font-black text-white shadow-sm transition hover:bg-emerald-800">
-                        <CheckCircle2 size={14} /> Confirm
-                      </button>
-                      <button onClick={() => onStatus(booking._id, "Rejected")} className="inline-flex items-center gap-1 rounded-xl bg-red-600 px-3 py-2 text-xs font-black text-white shadow-sm transition hover:bg-red-700">
-                        <XCircle size={14} /> Reject
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <Empty text="No pending booking requests." />
-      )}
-    </section>
-  );
-}
-
-function BookingSection({ title, description, bookings, assignmentsByBooking, sendingAssignment, onAssignTechnician, onArrived, onPaid, onReceipt }) {
-  return (
-    <section className="rounded-3xl border border-emerald-100 bg-white p-5 shadow-xl shadow-emerald-950/5 sm:p-6">
-      <SectionHeader count={bookings.length} description={description} title={title} />
-      {bookings.length ? (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {bookings.map((booking) => {
-            const assignmentHistory = assignmentsByBooking?.get(booking._id) || [];
-            const currentAssignment = assignmentHistory.find((assignment) => ["PENDING", "ACCEPTED"].includes(assignment.status)) || assignmentHistory[0];
-            const canRequest = (booking.patientArrived || booking.bookingStatus === "Arrived") && booking.paymentStatus === "Paid" && !booking.assignedTechnician && !assignmentHistory.some((assignment) => ["PENDING", "ACCEPTED"].includes(assignment.status));
-            return <div key={booking._id} className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-emerald-200 hover:shadow-lg hover:shadow-emerald-950/5">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-400">{booking.bookingCode}</p>
-                  <p className="mt-1 text-xs font-black uppercase tracking-[0.12em] text-emerald-700">Patient ID: {getPatientIdText(booking)}</p>
-                  <h3 className="mt-3 text-lg font-black tracking-tight text-emerald-950">{booking.testName}</h3>
-                  <p className="mt-2 text-sm font-semibold text-slate-500">Patient: {booking.name}</p>
-                  <p className="text-sm font-semibold text-slate-500">Phone: {booking.phone}</p>
-                  <p className="text-sm font-semibold text-slate-500">{booking.bookingDate} | {booking.timeSlot}</p>
-                  {currentAssignment && <p className="mt-2 text-sm font-semibold text-slate-600">Technician: {currentAssignment.technician?.name || "Assigned technician"} <AssignmentStatus status={currentAssignment.status} /></p>}
-                </div>
-                <div className="text-right">
-                  <StatusBadge value={booking.bookingStatus} />
-                  <div className="mt-2"><StatusBadge value={booking.paymentStatus} /></div>
-                  <p className="mt-2 text-xs font-semibold text-slate-500">{booking.paymentPreference === "online" ? "Online payment — patient pays from Booking History" : "Cash on delivery"}</p>
-                </div>
-              </div>
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                {booking.bookingStatus === "Confirmed" && !booking.patientArrived && (
-                  <button onClick={() => onArrived(booking._id)} className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-3 py-2 text-xs font-black text-white shadow-sm transition hover:bg-emerald-800">
-                    <UserCheck size={14} /> Patient Arrived
-                  </button>
-                )}
-                {["Confirmed", "Arrived"].includes(booking.bookingStatus) && booking.paymentStatus === "Unpaid" && booking.paymentPreference !== "online" && (
-                  <button onClick={() => onPaid(booking)} className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-3 py-2 text-xs font-black text-white shadow-sm transition hover:bg-emerald-800">
-                    <CreditCard size={14} /> Mark as Paid
-                  </button>
-                )}
-                {canRequest && <button type="button" onClick={() => onAssignTechnician(booking._id)} disabled={sendingAssignment === booking._id} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-3 py-2 text-xs font-black text-white disabled:opacity-60"><UserCheck size={14} /> {sendingAssignment === booking._id ? "Finding least-loaded technician..." : assignmentHistory.length ? "Auto Reassign Fairly" : "Auto Send Request"}</button>}
-                {booking.paymentStatus === "Paid" && (
-                  <button onClick={() => onReceipt(booking)} className="inline-flex items-center gap-2 rounded-xl bg-emerald-950 px-3 py-2 text-xs font-black text-white shadow-sm transition hover:bg-emerald-900">
-                    <Download size={14} /> Generate Receipt
-                  </button>
-                )}
-              </div>
-              {assignmentHistory.length > 0 && <div className="mt-4 border-t border-emerald-100 pt-3"><p className="text-xs font-black uppercase tracking-wider text-slate-400">Assignment History</p><div className="mt-2 space-y-2">{assignmentHistory.map((assignment) => <div key={assignment._id} className="rounded-xl bg-slate-50 p-3 text-xs text-slate-600"><div className="flex items-center justify-between gap-2"><strong>{assignment.technician?.name || "Technician"}</strong><AssignmentStatus status={assignment.status} /></div><p className="mt-1">Requested: {formatAssignmentDate(assignment.requestedAt)}</p>{assignment.respondedAt && <p>Responded: {formatAssignmentDate(assignment.respondedAt)}</p>}{assignment.rejectionReason && <p>Reason: {assignment.rejectionReason}</p>}{assignment.status === "PENDING" && <p className="text-amber-700">Waiting for technician response...</p>}</div>)}</div></div>}
-            </div>;
-          })}
-        </div>
-      ) : (
-        <Empty text={`No ${title.toLowerCase()}.`} />
-      )}
-    </section>
-  );
-}
-
-const formatAssignmentDate = (value) => value ? new Date(value).toLocaleString("en-IN") : "N/A";
 
 function AssignmentStatus({ status }) {
-  const classes = status === "ACCEPTED" ? "bg-emerald-100 text-emerald-800" : status === "REJECTED" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-800";
-  return <span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-black ${classes}`}>{status}</span>;
-}
-
-function SectionHeader({ count, description, title }) {
-  return (
-    <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-      <div>
-        <h2 className="text-xl font-black tracking-tight text-emerald-950">{title}</h2>
-        {description && <p className="mt-1 max-w-3xl text-sm font-semibold leading-6 text-slate-500">{description}</p>}
-      </div>
-      <span className="inline-flex w-fit items-center rounded-xl bg-emerald-50 px-3 py-1.5 text-xs font-black uppercase tracking-[0.1em] text-emerald-700">
-        {count} item{count === 1 ? "" : "s"}
-      </span>
-    </div>
-  );
+  return <StatusBadge value={({ PENDING: 'Awaiting response', ACCEPTED: 'Accepted', REJECTED: 'Rejected' })[status] || status} />;
 }
 
 function WalkInModal({ tests, onClose, onCreated }) {
+  const [submitting, setSubmitting] = useState(false);
+  const submitInFlight = useRef(false);
   const [collectionType, setCollectionType] = useState("Visit Lab");
   const [form, setForm] = useState({
     name: "",
@@ -534,7 +263,7 @@ function WalkInModal({ tests, onClose, onCreated }) {
     gender: "",
     prescribedBy: "",
     testId: "",
-    bookingDate: new Date().toISOString().slice(0, 10),
+    bookingDate: receptionToday(),
     timeSlot: "Walk-in",
     notes: "",
     houseNo: "",
@@ -551,6 +280,7 @@ function WalkInModal({ tests, onClose, onCreated }) {
 
   const submit = async (e) => {
     e.preventDefault();
+    if (submitInFlight.current) return;
 
     if (!form.name || !form.phone || !form.email || !form.age || !form.gender || !form.testId || !form.bookingDate || !form.timeSlot) {
       alert("Patient name, phone, email, age, gender, test, date and time are required");
@@ -571,6 +301,8 @@ function WalkInModal({ tests, onClose, onCreated }) {
       ? `${form.houseNo}, ${form.building ? `${form.building}, ` : ""}${form.street}, ${form.landmark ? `${form.landmark}, ` : ""}${form.area}, ${form.city}, ${form.taluka}, ${form.district}, ${form.state} - ${form.pinCode}`
       : "";
 
+    submitInFlight.current = true;
+    setSubmitting(true);
     try {
       const data = await createWalkInBooking({
         ...form,
@@ -582,12 +314,15 @@ function WalkInModal({ tests, onClose, onCreated }) {
       onCreated();
     } catch (error) {
       alert(error.response?.data?.message || "Walk-in booking failed");
+    } finally {
+      submitInFlight.current = false;
+      setSubmitting(false);
     }
   };
 
   return (
     <Modal title="Add Walk-In Patient" onClose={onClose}>
-      <form onSubmit={submit} className="space-y-3">
+      <form onSubmit={submit} aria-busy={submitting} className="space-y-3">
         <Input placeholder="Patient name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
         <div className="grid gap-3 sm:grid-cols-2">
           <Input placeholder="Phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
@@ -609,7 +344,7 @@ function WalkInModal({ tests, onClose, onCreated }) {
           {tests.map((test) => <option key={test._id} value={test._id}>{test.testName} - INR {test.price}</option>)}
         </select>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Input type="date" value={form.bookingDate} onChange={(e) => setForm({ ...form, bookingDate: e.target.value })} />
+          <Input type="date" aria-label="Booking date" value={form.bookingDate} onChange={(e) => setForm({ ...form, bookingDate: e.target.value })} />
           <Input placeholder="Time slot" value={form.timeSlot} onChange={(e) => setForm({ ...form, timeSlot: e.target.value })} />
         </div>
         <select value={collectionType} onChange={(e) => setCollectionType(e.target.value)} className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 font-semibold outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100">
@@ -631,13 +366,15 @@ function WalkInModal({ tests, onClose, onCreated }) {
           </div>
         )}
         <textarea placeholder="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="min-h-24 w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 font-semibold outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100" />
-        <button className="w-full rounded-2xl bg-emerald-700 p-3.5 font-black text-white shadow-lg shadow-emerald-950/10 transition hover:bg-emerald-800">Create Confirmed Booking</button>
+        <button disabled={submitting} className="disabled:opacity-50 w-full rounded-2xl bg-emerald-700 p-3.5 font-black text-white shadow-lg shadow-emerald-950/10 transition hover:bg-emerald-800">{submitting ? 'Creating booking...' : 'Create Confirmed Booking'}</button>
       </form>
     </Modal>
   );
 }
 
 function PaymentModal({ booking, onClose, onPaid }) {
+  const [submitting, setSubmitting] = useState(false);
+  const submitInFlight = useRef(false);
   const [form, setForm] = useState({
     amount: booking.amount || "",
     paymentMethod: "cash"
@@ -645,12 +382,15 @@ function PaymentModal({ booking, onClose, onPaid }) {
 
   const submit = async (e) => {
     e.preventDefault();
+    if (submitInFlight.current) return;
 
     if (!form.amount || Number(form.amount) <= 0) {
       alert("Enter a valid amount");
       return;
     }
 
+    submitInFlight.current = true;
+    setSubmitting(true);
     try {
       const data = await markPaymentPaid(booking._id, {
         amount: Number(form.amount),
@@ -660,19 +400,22 @@ function PaymentModal({ booking, onClose, onPaid }) {
       onPaid(data.booking);
     } catch (error) {
       alert(error.response?.data?.message || "Payment update failed");
+    } finally {
+      submitInFlight.current = false;
+      setSubmitting(false);
     }
   };
 
   return (
     <Modal title={`Mark Payment Paid - ${booking.bookingCode}`} onClose={onClose}>
-      <form onSubmit={submit} className="space-y-3">
+      <form onSubmit={submit} aria-busy={submitting} className="space-y-3">
         <Input type="number" placeholder="Amount" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
         <select value={form.paymentMethod} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })} className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 font-semibold outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100">
           <option value="cash">Cash</option>
           <option value="upi">UPI</option>
           <option value="card">Card</option>
         </select>
-        <button className="w-full rounded-2xl bg-emerald-700 p-3.5 font-black text-white shadow-lg shadow-emerald-950/10 transition hover:bg-emerald-800">Save Payment</button>
+        <button disabled={submitting} className="disabled:opacity-50 w-full rounded-2xl bg-emerald-700 p-3.5 font-black text-white shadow-lg shadow-emerald-950/10 transition hover:bg-emerald-800">{submitting ? 'Saving payment...' : 'Save Payment'}</button>
       </form>
     </Modal>
   );
@@ -680,7 +423,7 @@ function PaymentModal({ booking, onClose, onPaid }) {
 
 function Modal({ title, children, onClose }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-emerald-950/35 p-4 backdrop-blur-md">
+    <div className="desk-modal fixed inset-0 z-50 flex items-center justify-center bg-emerald-950/35 p-4 backdrop-blur-md">
       <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-emerald-100 bg-white p-5 shadow-2xl shadow-emerald-950/15 sm:p-6">
         <div className="mb-5 flex items-center justify-between">
           <h2 className="text-xl font-black tracking-tight text-emerald-950">{title}</h2>
@@ -693,21 +436,18 @@ function Modal({ title, children, onClose }) {
 }
 
 function StatusBadge({ value }) {
-  const classes = value === "Paid" || value === "Confirmed" || value === "Arrived" || value === "Technician Assigned"
-    ? "bg-emerald-100 text-emerald-700"
-    : value === "Rejected"
-      ? "bg-red-100 text-red-700"
-      : "bg-amber-100 text-amber-700";
-
-  return <span className={`inline-block rounded-lg px-2.5 py-1 text-xs font-black uppercase tracking-[0.08em] ${classes}`}>{value}</span>;
+  const classes = ['Paid', 'Confirmed', 'Arrived', 'Accepted', 'Report Ready', 'Completed'].includes(value)
+    ? 'bg-emerald-50 text-emerald-800 ring-emerald-100'
+    : ['Rejected', 'Declined', 'Cancelled', 'Failed'].includes(value)
+      ? 'bg-red-50 text-red-700 ring-red-100'
+      : ['Pending Approval', 'Unpaid', 'Awaiting response'].includes(value)
+        ? 'bg-amber-50 text-amber-800 ring-amber-100'
+        : 'bg-slate-100 text-slate-600 ring-slate-200';
+  return <span className={`inline-flex rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${classes}`}>{value || 'Pending'}</span>;
 }
 
 function Input(props) {
-  return <input {...props} className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 font-semibold outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100" />;
-}
-
-function Empty({ text }) {
-  return <p className="rounded-2xl border border-emerald-100 bg-emerald-50 p-6 text-center text-sm font-bold text-slate-500">{text}</p>;
+  return <input aria-label={props.placeholder} {...props} className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 font-semibold outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100" />;
 }
 
 export default ReceptionistDashboard;

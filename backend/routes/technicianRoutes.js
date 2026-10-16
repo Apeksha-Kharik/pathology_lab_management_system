@@ -13,6 +13,7 @@ const {
 const { protect, allowRoles } = require("../middleware/authMiddleware");
 
 const router = express.Router();
+router.get('/reports/:reportId/pdf', protect, allowRoles('technician'), require('../controllers/documentController').downloadTechnicianReport);
 
 router.get("/bookings", protect, allowRoles("technician", "admin"), getTechnicianBookings);
 router.get("/assignment-requests", protect, allowRoles("technician"), getAssignmentRequests);

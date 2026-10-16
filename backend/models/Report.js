@@ -22,6 +22,7 @@ const reportSchema = new mongoose.Schema({
   reportLetterhead: { type: String, default: "" },
   reportDescription: { type: String, default: "" },
   results: [resultSchema],
+  reviewWarnings: [{ type: String }],
   technicianRemarks: { type: String },
   pathologistId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },

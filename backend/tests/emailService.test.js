@@ -104,3 +104,19 @@ test("HTTPS timeout and missing API key fail safely", async (t) => {
   delete process.env.RESEND_API_KEY;
   await assert.rejects(sendOtpEmail(message), /not configured/);
 });
+
+
+test("SMTP forwards PDF attachments and HTTPS serializes PDF bytes as base64", async (t) => {
+  const pdf = Buffer.from("%PDF-test");
+  const attachments = [{ filename: "receipt.pdf", content: pdf, contentType: "application/pdf" }];
+  await sendEmail({ to: message.to, subject: "Receipt", text: "Attached", attachments });
+  assert.equal(outgoing.attachments[0].content, pdf);
+  process.env.EMAIL_PROVIDER = "resend";
+  process.env.RESEND_API_KEY = "fake-key";
+  t.mock.method(global, "fetch", async (url, options) => {
+    const payload = JSON.parse(options.body);
+    assert.deepEqual(payload.attachments, [{ filename: "receipt.pdf", content: pdf.toString("base64") }]);
+    return { ok: true, json: async () => ({ id: "attached-message" }) };
+  });
+  assert.equal((await sendEmail({ to: message.to, subject: "Receipt", text: "Attached", attachments })).sent, true);
+});

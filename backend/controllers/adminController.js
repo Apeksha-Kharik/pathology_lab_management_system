@@ -1,32 +1,14 @@
+const { renderReportPdf, buildPatientPdfFilename } = require("../services/patientPdfService");
 const User = require("../models/User");
 const Test = require("../models/Test");
 const Package = require("../models/Package");
 const Booking = require("../models/Booking");
 const Payment = require("../models/Payment");
 const Report = require("../models/Report");
-const PDFDocument = require("pdfkit");
-const fs = require("fs");
-const path = require("path");
 const bcrypt = require("bcryptjs");
 const mongoose = require("mongoose");
 const { normalizeRole } = require("./authController");
 const { writeAuditLog } = require("../utils/auditLogger");
-
-const letterheadImagePath = path.join(__dirname, "..", "assets", "indipath-letterhead.png");
-const pdfLayout = { left: 56, right: 506, contentTop: 124, contentBottom: 650 };
-
-const drawLetterhead = (doc) => {
-  if (fs.existsSync(letterheadImagePath)) {
-    doc.image(letterheadImagePath, 0, 0, { cover: [doc.page.width, doc.page.height], align: "center", valign: "center" });
-    doc.y = pdfLayout.contentTop;
-    return true;
-  }
-  doc.y = 72;
-  return false;
-};
-
-const safeFilePart = (value) => String(value || "patient").trim().replace(/[^a-z0-9-_]+/gi, "-").replace(/^-+|-+$/g, "") || "patient";
-const formatDateTime = (value) => value ? new Date(value).toLocaleString("en-IN") : "N/A";
 
 const getDashboardMetrics = async (req, res) => {
   try {
@@ -176,60 +158,14 @@ const downloadAdminReport = async (req, res) => {
     }
 
     const booking = report.bookingId || {};
-    const doc = new PDFDocument({ size: "A4", margin: 50 });
-    const filename = `${safeFilePart(booking.name)}-${safeFilePart(booking.patientCode || booking.bookingCode)}-RPT.pdf`;
-
+    const filename = buildPatientPdfFilename(booking.name, booking.patientCode || booking.bookingCode, "RPT");
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
-    doc.pipe(res);
-    drawLetterhead(doc);
-
-    doc.roundedRect(pdfLayout.left, doc.y, pdfLayout.right - pdfLayout.left, 38, 4).fill("#173b8f");
-    doc.fillColor("#ffffff").fontSize(16).font("Helvetica-Bold").text("DIAGNOSTIC TEST REPORT", pdfLayout.left + 10, doc.y + 10, { width: 430, align: "center" });
-    doc.y += 54;
-
-    const details = [
-      ["Patient Name", booking.name],
-      ["Age / Gender", `${booking.age || "N/A"} / ${booking.gender || "N/A"}`],
-      ["Patient ID", booking.patientCode || "Pending"],
-      ["Booking ID", booking.bookingCode || "N/A"],
-      ["Report ID", report.reportId || "N/A"],
-      ["Test", report.testName],
-      ["Approved", formatDateTime(report.approvedAt)]
-    ];
-    details.forEach(([label, value], index) => {
-      const column = index % 2;
-      const row = Math.floor(index / 2);
-      const x = column ? 292 : 62;
-      const y = doc.y + (row * 22);
-      doc.fillColor("#173b8f").fontSize(8).font("Helvetica-Bold").text(label.toUpperCase(), x, y, { width: 86 });
-      doc.fillColor("#1f2937").fontSize(9).font("Helvetica").text(String(value || "N/A"), x + 90, y, { width: 126, height: 18, ellipsis: true });
-    });
-    doc.y += 98;
-
-    const columns = [50, 215, 315, 390];
-    const widths = [165, 100, 75, 115];
-    doc.rect(50, doc.y, 455, 20).fill("#187b4b");
-    ["PARAMETER", "RESULT", "UNIT", "REFERENCE RANGE"].forEach((heading, index) => doc.fillColor("#ffffff").fontSize(8).font("Helvetica-Bold").text(heading, columns[index] + 5, doc.y + 6, { width: widths[index] - 8 }));
-    let rowTop = doc.y + 20;
-    (report.results || []).forEach((result, index) => {
-      if (rowTop > pdfLayout.contentBottom - 40) {
-        doc.addPage();
-        drawLetterhead(doc);
-        rowTop = doc.y;
-      }
-      doc.rect(50, rowTop, 455, 22).fill(index % 2 ? "#ffffff" : "#f8fffb");
-      [result.parameter, result.value, result.unit || "", result.normalRange || result.referenceRange || ""].forEach((value, column) => {
-        doc.fillColor("#1f2937").fontSize(8.5).font(column === 0 ? "Helvetica-Bold" : "Helvetica").text(String(value || "N/A"), columns[column] + 5, rowTop + 7, { width: widths[column] - 8, height: 12, ellipsis: true });
-      });
-      rowTop += 22;
-    });
-    doc.y = rowTop + 18;
-    doc.fillColor("#334155").fontSize(9).font("Helvetica-Bold").text("Pathologist Remarks:", 50, doc.y);
-    doc.font("Helvetica").text(report.pathologistRemarks || "N/A", 160, doc.y - 11, { width: 345, height: 40, ellipsis: true });
-    doc.end();
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Cache-Control", "private, no-store");
+    renderReportPdf(report, {}, res);
   } catch (error) {
-    res.status(500).json({ message: "Admin report download failed", error: error.message });
+    if (!res.headersSent) res.status(500).json({ message: "Admin report download failed" });
+    else res.destroy(error);
   }
 };
 

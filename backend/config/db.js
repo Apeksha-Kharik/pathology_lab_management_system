@@ -8,6 +8,8 @@ const connectDB = async () => {
 
         const serverSelectionTimeoutMS = Number(process.env.MONGO_CONNECTION_TIMEOUT_MS) || 30000;
         const conn = await mongoose.connect(process.env.MONGO_URI, {
+            // Use IPv4: IPv6 routing can fail even when Atlas is reachable over IPv4.
+            family: 4,
             // Atlas discovery and TLS negotiation may exceed five seconds on
             // the first connection or on slower networks.
             serverSelectionTimeoutMS,

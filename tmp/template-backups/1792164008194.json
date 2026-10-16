@@ -1,0 +1,242 @@
+[
+  {
+    "collection": "tests",
+    "id": "69cdfa4dc07979492a1ce4b2",
+    "name": "Complete Blood Count(CBC)",
+    "before": [
+      {
+        "parameter": "Hemoglobin",
+        "value": "",
+        "unit": "g/dL",
+        "referenceRange": "Male: 13–17   Female: 12–15",
+        "_id": "6ab8c8e9e13ec9aca439e725"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "Hemoglobin",
+        "value": "",
+        "unit": "g/dL",
+        "referenceRange": "Male: 13–17   Female: 12–15",
+        "_id": "6ab8c8e9e13ec9aca439e725"
+      },
+      {
+        "parameter": "RBC Count",
+        "value": "",
+        "unit": "million/µL",
+        "referenceRange": "Male: 4.5–5.9 / Female: 4.1–5.1"
+      },
+      {
+        "parameter": "WBC Count",
+        "value": "",
+        "unit": "cells/µL",
+        "referenceRange": "4,000–11,000"
+      },
+      {
+        "parameter": "Platelet Count",
+        "value": "",
+        "unit": "/µL",
+        "referenceRange": "150,000–450,000"
+      }
+    ]
+  },
+  {
+    "collection": "tests",
+    "id": "6ab2761e919d55245e089261",
+    "name": "Lipid Profile",
+    "before": [
+      {
+        "parameter": "Total Cholesterol",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "<200",
+        "_id": "6ab8cc68e13ec9aca439e91d"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "Total Cholesterol",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "<200",
+        "_id": "6ab8cc68e13ec9aca439e91d"
+      },
+      {
+        "parameter": "HDL Cholesterol",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "> 40"
+      },
+      {
+        "parameter": "LDL Cholesterol",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "< 100"
+      },
+      {
+        "parameter": "Triglycerides",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "< 150"
+      }
+    ]
+  },
+  {
+    "collection": "tests",
+    "id": "6ab2761e919d55245e08925b",
+    "name": "CBC — Complete Blood Count",
+    "before": [
+      {
+        "parameter": "Platelet Count",
+        "value": "",
+        "unit": "/µL",
+        "referenceRange": "150,000–450,000",
+        "_id": "6ab8ca41e13ec9aca439e7c4"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "Platelet Count",
+        "value": "",
+        "unit": "/µL",
+        "referenceRange": "150,000–450,000",
+        "_id": "6ab8ca41e13ec9aca439e7c4"
+      },
+      {
+        "parameter": "Hemoglobin",
+        "value": "",
+        "unit": "g/dL",
+        "referenceRange": "Male: 13–17 / Female: 12–15"
+      },
+      {
+        "parameter": "RBC Count",
+        "value": "",
+        "unit": "million/µL",
+        "referenceRange": "Male: 4.5–5.9 / Female: 4.1–5.1"
+      },
+      {
+        "parameter": "WBC Count",
+        "value": "",
+        "unit": "cells/µL",
+        "referenceRange": "4,000–11,000"
+      }
+    ]
+  },
+  {
+    "collection": "tests",
+    "id": "6ab2761e919d55245e089262",
+    "name": "Liver Function Test (LFT)",
+    "before": [
+      {
+        "parameter": "Total Bilirubin",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "0.2–1.2",
+        "_id": "6ab8ccebe13ec9aca439e95a"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "Total Bilirubin",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "0.2–1.2",
+        "_id": "6ab8ccebe13ec9aca439e95a"
+      },
+      {
+        "parameter": "SGPT",
+        "value": "",
+        "unit": "U/L",
+        "referenceRange": "7 - 56"
+      }
+    ]
+  },
+  {
+    "collection": "packages",
+    "id": "6a8308d1ba20afff1d1201da",
+    "name": "Lifestyle Fitness Check",
+    "before": [],
+    "after": [
+      {
+        "parameter": "Complete Blood Count(CBC) - Hemoglobin",
+        "value": "",
+        "unit": "g/dL",
+        "referenceRange": "Male: 13–17   Female: 12–15"
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - RBC Count",
+        "value": "",
+        "unit": "million/µL",
+        "referenceRange": "Male: 4.5–5.9 / Female: 4.1–5.1"
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - WBC Count",
+        "value": "",
+        "unit": "cells/µL",
+        "referenceRange": "4,000–11,000"
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - Platelet Count",
+        "value": "",
+        "unit": "/µL",
+        "referenceRange": "150,000–450,000"
+      },
+      {
+        "parameter": "Blood Sugar - Fasting Blood Glucose",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "70–99"
+      },
+      {
+        "parameter": "Thyroid Function Test (TFT) - T3 T4 TSH",
+        "value": "",
+        "unit": "ng/dL",
+        "referenceRange": "80–200"
+      }
+    ]
+  },
+  {
+    "collection": "packages",
+    "id": "6a8308d1ba20afff1d1201d4",
+    "name": "Fever Infection Complete Panel",
+    "before": [],
+    "after": [
+      {
+        "parameter": "Complete Blood Count(CBC) - Hemoglobin",
+        "value": "",
+        "unit": "g/dL",
+        "referenceRange": "Male: 13–17   Female: 12–15"
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - RBC Count",
+        "value": "",
+        "unit": "million/µL",
+        "referenceRange": "Male: 4.5–5.9 / Female: 4.1–5.1"
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - WBC Count",
+        "value": "",
+        "unit": "cells/µL",
+        "referenceRange": "4,000–11,000"
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - Platelet Count",
+        "value": "",
+        "unit": "/µL",
+        "referenceRange": "150,000–450,000"
+      },
+      {
+        "parameter": "Blood Sugar - Fasting Blood Glucose",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "70–99"
+      },
+      {
+        "parameter": "Thyroid Function Test (TFT) - T3 T4 TSH",
+        "value": "",
+        "unit": "ng/dL",
+        "referenceRange": "80–200"
+      }
+    ]
+  }
+]

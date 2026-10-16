@@ -1,7 +1,9 @@
+import ReportPdfPreview from "../components/ReportPdfPreview";
 import React, { useEffect, useMemo, useState } from "react";
 import { AlertCircle, CheckCircle2, ClipboardList, Edit3, Eye, FileText, FlaskConical, LogOut, PlayCircle, Save, Search, Send, XCircle } from "lucide-react";
 import { useAuth } from "../context/useAuth";
 import {
+  downloadTechnicianReport,
   getTechnicianBookings,
   getAssignmentRequests,
   acceptAssignmentRequest,
@@ -18,6 +20,7 @@ const blankResult = { parameter: "", value: "", unit: "", normalRange: "", statu
 const technicianFont = "Aptos, 'Avenir Next', Inter, 'Segoe UI', system-ui, sans-serif";
 
 const getReportTemplate = (booking) => {
+  if (booking.packageId?.reportTemplate?.length) return booking.packageId.reportTemplate;
   if (booking.bookingType === "Package" && Array.isArray(booking.packageTests) && booking.packageTests.length) {
     return booking.packageTests.flatMap((test) => {
       const rows = Array.isArray(test.reportTemplate) && test.reportTemplate.length ? test.reportTemplate : [{ parameter: "Result", value: "", unit: "", referenceRange: "" }];
@@ -29,11 +32,11 @@ const getReportTemplate = (booking) => {
 };
 
 const getReportTemplateDetails = (booking) => {
-  const source = [booking.testId, booking.packageId].find((item) => item?.reportTemplate?.length || item?.reportLetterhead || item?.reportDescription);
+  const source = [booking.packageId, booking.testId].find((item) => item?.reportTemplate?.length || item?.reportLetterhead || item?.reportDescription);
   return {
     letterhead: booking.report?.reportLetterhead || source?.reportLetterhead || "",
     description: booking.report?.reportDescription || source?.reportDescription || "",
-    hasTemplate: Boolean(source?.reportTemplate?.length)
+    hasTemplate: Boolean(getReportTemplate(booking).length)
   };
 };
 
@@ -48,6 +51,9 @@ const toResultRow = (row = {}) => ({
 const buildReportRows = (booking) => {
   const savedResults = booking.report?.results || [];
   const template = getReportTemplate(booking);
+  if (["Pending Approval", "Pending Review", "Approved"].includes(booking.report?.status)) {
+    return savedResults.map(toResultRow);
+  }
 
   if (!template.length) return savedResults.length ? savedResults.map(toResultRow) : [blankResult];
 
@@ -58,13 +64,10 @@ const buildReportRows = (booking) => {
   );
   const templateRows = template.map((templateRow) => {
     const savedRow = savedByParameter.get((templateRow.parameter || "").trim().toLowerCase());
-    return toResultRow({ ...templateRow, ...savedRow });
+    return toResultRow({ ...savedRow, ...templateRow, value: savedRow?.value ?? "", status: savedRow?.status || "Not Set" });
   });
-  const additionalRows = savedResults.filter((row) => !template.some(
-    (templateRow) => (templateRow.parameter || "").trim().toLowerCase() === (row.parameter || "").trim().toLowerCase()
-  ));
 
-  return [...templateRows, ...additionalRows.map(toResultRow)];
+  return templateRows;
 };
 
 function TechnicianDashboard() {
@@ -74,6 +77,7 @@ function TechnicianDashboard() {
   const [respondingRequest, setRespondingRequest] = useState("");
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [reportBooking, setReportBooking] = useState(null);
+  const [pdfReportId, setPdfReportId] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState("");
   const [testFilter, setTestFilter] = useState("");
@@ -252,8 +256,11 @@ function TechnicianDashboard() {
 
   const handleOpenReportEntry = async (booking) => {
     try {
+      const latestBookings = await getTechnicianBookings();
+      const latestBooking = latestBookings.find((item) => item._id === booking._id);
+      if (!latestBooking) throw new Error('Assigned booking is no longer available');
       const data = await startTechnicianReportEntry(booking._id);
-      const nextBooking = { ...booking, report: { ...(booking.report || {}), ...(data.report || {}) } };
+      const nextBooking = { ...latestBooking, report: { ...(latestBooking.report || {}), ...(data.report || {}) } };
       setReportBooking(nextBooking);
       replaceBooking(nextBooking);
     } catch (error) {
@@ -330,11 +337,12 @@ function TechnicianDashboard() {
             <BookingCards bookings={correctionNeeded} onView={setSelectedBooking} onReport={handleOpenReportEntry} reportLabel="Edit Report" />
           )}
           {activeView === "submitted" && (
-            <CompletedTable bookings={completedReports} onView={setSelectedBooking} onReport={setReportBooking} />
+            <CompletedTable bookings={completedReports} onView={setSelectedBooking} onReport={(booking) => setPdfReportId(booking.report._id)} />
           )}
         </section>
       </main>
 
+      {pdfReportId && <ReportPdfPreview reportId={pdfReportId} onClose={() => setPdfReportId(null)} />}
       {selectedBooking && <DetailsModal booking={selectedBooking} onClose={() => setSelectedBooking(null)} />}
       {reportBooking && <ReportModal booking={reportBooking} onClose={() => setReportBooking(null)} onDone={() => { setReportBooking(null); loadBookings(); }} />}
     </div>
@@ -479,6 +487,13 @@ function BookingCards({ bookings, onView, onReport, reportLabel }) {
 }
 
 function CompletedTable({ bookings, onView, onReport }) {
+  const [downloadingId, setDownloadingId] = useState("");
+  const downloadPdf = async (report) => {
+    setDownloadingId(report._id);
+    try { await downloadTechnicianReport(report._id); }
+    catch { alert("Unable to download report PDF. Please try again."); }
+    finally { setDownloadingId(""); }
+  };
   if (!bookings.length) return <Empty text="No submitted reports yet." />;
 
   return (
@@ -511,6 +526,9 @@ function CompletedTable({ bookings, onView, onReport }) {
               <td className="p-3 text-right">
                 <button onClick={() => onReport(booking)} className="inline-flex items-center gap-1 rounded-xl bg-emerald-700 px-3 py-2 text-xs font-black text-white shadow-sm transition hover:bg-emerald-800">
                   <FileText size={14} /> See Report
+                </button>
+                <button type="button" disabled={downloadingId === booking.report?._id} onClick={() => downloadPdf(booking.report)} className="ml-2 mt-2 rounded-xl border border-emerald-200 px-3 py-2 text-xs font-black text-emerald-800 disabled:opacity-50">
+                  {downloadingId === booking.report?._id ? "Downloading..." : "Download PDF"}
                 </button>
               </td>
             </tr>
@@ -565,7 +583,7 @@ function ReportModal({ booking, onClose, onDone }) {
       .map((row) => ({
         parameter: row.parameter.trim(),
         value: row.value.trim(),
-        normalRange: row.normalRange.trim(), unit: row.unit.trim()
+        normalRange: row.normalRange.trim(), unit: row.unit.trim(), status: row.status
       }))
       .filter((row) => row.parameter && row.value)
   });
@@ -587,6 +605,10 @@ function ReportModal({ booking, onClose, onDone }) {
   };
 
   const finalSubmit = async () => {
+    if (results.some((row) => !row.value.trim())) {
+      alert("Enter a result for every required parameter before submitting");
+      return;
+    }
     const payload = cleanPayload();
     if (!payload.results.length) {
       alert("Enter at least one result");
@@ -641,9 +663,9 @@ function ReportModal({ booking, onClose, onDone }) {
           <tbody>
             {results.map((row, index) => (
               <tr key={index} className="border-t border-slate-100">
-                <td className="p-2"><Input disabled={isLocked} placeholder="Parameter" value={row.parameter} onChange={(e) => updateResult(index, "parameter", e.target.value)} /></td>
+                <td className="p-2"><Input disabled={isLocked || templateDetails.hasTemplate} placeholder="Parameter" value={row.parameter} onChange={(e) => updateResult(index, "parameter", e.target.value)} /></td>
                 <td className="p-2"><Input disabled={isLocked} placeholder="Result" value={row.value} onChange={(e) => updateResult(index, "value", e.target.value)} /></td>
-                <td className="p-2"><Input disabled={isLocked} placeholder="Unit" value={row.unit} onChange={(e) => updateResult(index, "unit", e.target.value)} /></td><td className="p-2"><Input disabled={isLocked} placeholder="Reference range" value={row.normalRange} onChange={(e) => updateResult(index, "normalRange", e.target.value)} /></td>
+                <td className="p-2"><Input disabled={isLocked || templateDetails.hasTemplate} placeholder="Unit" value={row.unit} onChange={(e) => updateResult(index, "unit", e.target.value)} /></td><td className="p-2"><Input disabled={isLocked || templateDetails.hasTemplate} placeholder="Reference range" value={row.normalRange} onChange={(e) => updateResult(index, "normalRange", e.target.value)} /></td>
                 <td className="p-2"><select disabled={isLocked} value={row.status || "Not Set"} onChange={(e) => updateResult(index, "status", e.target.value)} className="w-full rounded-md border border-slate-200 bg-white p-2.5 outline-none focus:border-emerald-500 disabled:bg-slate-50">{["Not Set", "Normal", "Low", "High", "Abnormal", "Critical"].map((value) => <option key={value}>{value}</option>)}</select></td>
               </tr>
             ))}
@@ -651,7 +673,7 @@ function ReportModal({ booking, onClose, onDone }) {
         </table>
       </div>
 
-      {!isLocked && (
+      {!isLocked && !templateDetails.hasTemplate && (
         <button type="button" onClick={() => setResults([...results, blankResult])} className="mt-3 rounded-md border border-slate-200 px-3 py-2 text-sm font-bold hover:bg-slate-50">
           Add Parameter
         </button>

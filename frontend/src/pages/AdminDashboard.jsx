@@ -139,10 +139,14 @@ const AdminDashboard = () => {
                 alert("Add at least one required report parameter.");
                 return;
             }
+            if (templateMode && !templateTargetId) {
+                alert("Select the test or package for this template.");
+                return;
+            }
             const payload = { ...testForm, reportTemplate };
             if (templateMode && templateTargetId) {
                 const [type, id] = templateTargetId.split(':');
-                await api.put(type === 'package' ? `/api/admin/packages/${id}` : `/api/admin/test/${id}`, payload);
+                await api.put(type === 'package' ? `/api/admin/packages/${id}/template` : `/api/admin/test/${id}/template`, payload);
                 alert("Report template saved successfully.");
             } else {
                 await api.post('/api/admin/add-test', payload);
@@ -268,7 +272,7 @@ const AdminDashboard = () => {
         if (!window.confirm(`Remove the report template for ${item.testName || item.packageName}? The test/package will not be deleted.`)) return;
         try {
             const payload = { ...item, reportTemplate: [], reportLetterhead: '', reportDescription: '' };
-            await api.put(type === 'package' ? `/api/admin/packages/${item._id}` : `/api/admin/test/${item._id}`, payload);
+            await api.put(type === 'package' ? `/api/admin/packages/${item._id}/template` : `/api/admin/test/${item._id}/template`, payload);
             if (templateTargetId === `${type}:${item._id}`) {
                 setTemplateTargetId('');
                 setTemplateRows([]);

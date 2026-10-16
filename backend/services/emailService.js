@@ -66,12 +66,13 @@ const verifyTransporter = async () => {
   }
 };
 
-const sendResendEmail = async ({ to, subject, text, html }) => {
+const sendResendEmail = async ({ to, subject, text, html, attachments = [] }) => {
   try {
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY.trim()}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: process.env.EMAIL_FROM.trim(), to: Array.isArray(to) ? to : [to], subject, text, html }),
+      body: JSON.stringify({ from: process.env.EMAIL_FROM.trim(), to: Array.isArray(to) ? to : [to], subject, text, html,
+        ...(attachments.length ? { attachments: attachments.map(({ filename, content }) => ({ filename, content: Buffer.isBuffer(content) ? content.toString("base64") : content })) } : {}) }),
       signal: AbortSignal.timeout(10000)
     });
     const data = await response.json();
@@ -87,7 +88,7 @@ const sendResendEmail = async ({ to, subject, text, html }) => {
   }
 };
 
-const sendEmail = async ({ to, subject, text, html }) => {
+const sendEmail = async ({ to, subject, text, html, attachments = [] }) => {
   if (!hasMailConfig()) {
     console.log("Email configuration not found.");
     return {
@@ -95,7 +96,7 @@ const sendEmail = async ({ to, subject, text, html }) => {
     };
   }
 
-  if (getMailProvider() === "resend") return sendResendEmail({ to, subject, text, html });
+  if (getMailProvider() === "resend") return sendResendEmail({ to, subject, text, html, attachments });
 
   try {
     const config = getMailConfig();
@@ -106,7 +107,8 @@ const sendEmail = async ({ to, subject, text, html }) => {
       to,
       subject,
       text,
-      html
+      html,
+      attachments
     });
 
     const acceptedCount = info.accepted?.length || 0;

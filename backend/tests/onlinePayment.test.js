@@ -19,7 +19,7 @@ afterEach(() => {
 });
 
 const bookingData = (overrides = {}) => ({
-  _id: bookingId, userId: patientId, amount: 199.99, paymentPreference: 'online',
+  _id: bookingId, bookingDate: '2026-10-17', timeSlot: '09:00 AM', userId: patientId, amount: 199.99, paymentPreference: 'online',
   bookingStatus: 'Confirmed', paymentStatus: 'Unpaid', razorpayOrderId: 'order_test123', ...overrides
 });
 const captured = (overrides = {}) => ({
@@ -314,7 +314,7 @@ test('receptionist confirmation unlocks online eligibility and cannot later reje
   delete require.cache[require.resolve('../controllers/receptionistController')];
   const { updateBookingStatus } = require('../controllers/receptionistController');
   const booking = bookingData({ bookingStatus: 'Pending Approval' });
-  mock.method(Booking, 'findById', () => ({ populate: async () => booking }));
+  mock.method(Booking, 'findById', () => ({ populate: () => ({ lean: async () => booking }) }));
   mock.method(Booking, 'updateOne', async (query, update) => {
     assert.equal(query.bookingStatus, 'Pending Approval');
     assert.equal(update.$set.bookingStatus, 'Confirmed');

@@ -1,3 +1,4 @@
+const { renderReceiptPdf, buildPatientPdfFilename } = require("../services/patientPdfService");
 const Booking = require("../models/Booking");
 const TechnicianAssignment = require("../models/TechnicianAssignment");
 const Payment = require("../models/Payment");
@@ -5,18 +6,10 @@ const Report = require("../models/Report");
 const Test = require("../models/Test");
 const User = require("../models/User");
 const mongoose = require("mongoose");
-const PDFDocument = require("pdfkit");
-const fs = require("fs");
-const path = require("path");
+const { normalizeBookingStatus } = require('../utils/bookingStatus');
+const { notifyGeneratedReceipt } = require('../services/receiptNotificationService');
 const { sendWhatsAppMessage } = require("../services/whatsappService");
 const { notifyBookingConfirmed, notifyPaymentReceived } = require("../services/patientNotifications");
-
-const letterheadImagePath = path.join(__dirname, "..", "assets", "indipath-letterhead.png");
-const pdfLayout = {
-  left: 56,
-  right: 506,
-  contentTop: 124
-};
 
 const generatePatientCode = () => `PID${Date.now().toString().slice(-8)}${Math.floor(10 + Math.random() * 90)}`;
 const generateReceiptId = () => `RCT${Date.now().toString().slice(-8)}${Math.floor(10 + Math.random() * 90)}`;
@@ -32,120 +25,10 @@ const ensurePatientCode = async (booking) => {
   return booking;
 };
 
-const safeFilePart = (value) => String(value || "patient").trim().replace(/[^a-z0-9-_]+/gi, "-").replace(/^-+|-+$/g, "") || "patient";
-
-const buildPatientPdfFilename = (name, patientCode, documentType = "RCT") => `${safeFilePart(name)}-${safeFilePart(patientCode || "pending-patient-id")}-${safeFilePart(documentType).toUpperCase()}.pdf`;
-
-const formatDateTime = (value) => value ? new Date(value).toLocaleString("en-IN") : "N/A";
-const formatCurrency = (value) => `INR ${Number(value || 0).toLocaleString("en-IN")}`;
-
-const drawLetterhead = (doc) => {
-  if (!fs.existsSync(letterheadImagePath)) {
-    doc.y = 72;
-    return false;
-  }
-
-  doc.image(letterheadImagePath, 0, 0, {
-    cover: [doc.page.width, doc.page.height],
-    align: "center",
-    valign: "center"
-  });
-  doc.y = pdfLayout.contentTop;
-  return true;
-};
-
-const drawTitleBlock = (doc, title, subtitle) => {
-  const top = doc.y;
-  doc.roundedRect(pdfLayout.left, top, pdfLayout.right - pdfLayout.left, 38, 4).fill("#173b8f");
-  doc.fillColor("#ffffff").fontSize(16).font("Helvetica-Bold").text(title, pdfLayout.left + 10, top + 10, { width: 430, align: "center" });
-  doc.fillColor("#dff7ea").fontSize(7.5).font("Helvetica-Bold").text(subtitle, pdfLayout.left + 10, top + 28, { width: 430, align: "center" });
-  doc.y = top + 52;
-};
-
-const drawInfoGrid = (doc, title, rows) => {
-  const width = pdfLayout.right - pdfLayout.left;
-  const left = pdfLayout.left;
-  const startY = doc.y;
-  const rowHeight = 22;
-  const headerHeight = 22;
-  const bodyHeight = Math.ceil(rows.length / 2) * rowHeight;
-
-  doc.roundedRect(left, startY, width, headerHeight + bodyHeight + 10, 5).fill("#ffffff").strokeColor("#cfe4d8").stroke();
-  doc.rect(left, startY, width, headerHeight).fill("#187b4b");
-  doc.fillColor("#ffffff").fontSize(9).font("Helvetica-Bold").text(title, left + 12, startY + 7);
-
-  rows.forEach(([label, value], index) => {
-    const column = index % 2;
-    const row = Math.floor(index / 2);
-    const x = column ? 284 : left + 12;
-    const y = startY + headerHeight + 11 + (row * rowHeight);
-    doc.fillColor("#173b8f").fontSize(7.5).font("Helvetica-Bold").text(label.toUpperCase(), x, y, { width: 82 });
-    doc.fillColor("#1f2937").fontSize(8.8).font("Helvetica").text(String(value || "N/A"), x + 86, y, { width: 128, height: 18, ellipsis: true });
-  });
-
-  doc.y = startY + headerHeight + bodyHeight + 24;
-};
-
-const drawReceiptBox = (doc, rows) => {
-  const left = 80;
-  const top = doc.y;
-  const width = 395;
-  const rowHeight = 28;
-
-  doc.roundedRect(left, top, width, (rows.length * rowHeight) + 20, 6).fill("#ffffff").strokeColor("#cfe4d8").stroke();
-  rows.forEach(([label, value], index) => {
-    const y = top + 12 + (index * rowHeight);
-    if (index) doc.moveTo(left + 16, y - 7).lineTo(left + width - 16, y - 7).strokeColor("#edf7f1").stroke();
-    doc.fillColor("#64748b").fontSize(8).font("Helvetica-Bold").text(label.toUpperCase(), left + 20, y, { width: 140 });
-    doc.fillColor("#111827").fontSize(10).font("Helvetica-Bold").text(String(value || "N/A"), left + 180, y - 1, { width: 200, align: "right" });
-  });
-
-  doc.y = top + (rows.length * rowHeight) + 36;
-};
-
-const drawResultsTable = (doc, results, onNewPage) => {
-  const columns = [56, 190, 270, 330, 430];
-  const widths = [134, 80, 60, 100, 76];
-  const headings = ["PARAMETER", "RESULT", "UNIT", "REFERENCE RANGE", "STATUS"];
-  const drawHeader = (top) => {
-    doc.rect(pdfLayout.left, top, pdfLayout.right - pdfLayout.left, 21).fill("#187b4b");
-    headings.forEach((heading, index) => doc.fillColor("#ffffff").fontSize(7.5).font("Helvetica-Bold").text(heading, columns[index] + 5, top + 7, { width: widths[index] - 8 }));
-    return top + 21;
-  };
-
-  if (!results.length) {
-    doc.roundedRect(pdfLayout.left, doc.y, pdfLayout.right - pdfLayout.left, 48, 5).fill("#f8fafc").strokeColor("#dbe5e1").stroke();
-    doc.fillColor("#64748b").fontSize(10).font("Helvetica").text("Test results are not available yet.", pdfLayout.left + 15, doc.y + 18, { width: 420, align: "center" });
-    doc.y += 64;
-    return;
-  }
-
-  let rowTop = drawHeader(doc.y);
-  results.forEach((result, index) => {
-    if (rowTop > 620) {
-      doc.addPage();
-      onNewPage();
-      rowTop = drawHeader(doc.y);
-    }
-    doc.rect(pdfLayout.left, rowTop, pdfLayout.right - pdfLayout.left, 24).fill(index % 2 ? "#f2faf5" : "#ffffff");
-    doc.strokeColor("#cfe4d8").rect(pdfLayout.left, rowTop, pdfLayout.right - pdfLayout.left, 24).stroke();
-    [result.parameter, result.value, result.unit || "", result.normalRange || result.referenceRange || "N/A", result.status || "Not Set"].forEach((value, column) => {
-      doc.fillColor("#1f2937").fontSize(8.2).font(column === 0 || column === 4 ? "Helvetica-Bold" : "Helvetica").text(String(value ?? "N/A"), columns[column] + 5, rowTop + 7, { width: widths[column] - 8, height: 14, ellipsis: true });
-    });
-    rowTop += 24;
-  });
-  doc.y = rowTop + 18;
-};
-
 const notifyPatient = async (booking, event, lines, parameters = []) => {
   const phone = booking.phone || booking.userId?.phone;
   if (!phone) return;
-  await sendWhatsAppMessage({
-    to: phone,
-    body: lines.filter(Boolean).join("\n"),
-    event,
-    parameters
-  });
+  await sendWhatsAppMessage({ to: phone, body: lines.filter(Boolean).join('\n'), event, parameters });
 };
 
 const getPendingBookings = async (req, res) => {
@@ -174,6 +57,7 @@ const getAllBookings = async (req, res) => {
 
     const bookings = await Booking.find(query)
       .populate("userId", "name email phone")
+      .populate("assignedTechnician", "name")
       .sort({ createdAt: -1 });
     const bookingsWithPatientIds = await Promise.all(bookings.map((booking) => ensurePatientCode(booking)));
     res.json(bookingsWithPatientIds);
@@ -353,17 +237,29 @@ const updateBookingStatus = async (req, res) => {
       return res.status(400).json({ message: "Invalid booking status" });
     }
 
-    const booking = await Booking.findById(req.params.id).populate("userId", "name email phone");
+    const booking = await Booking.findById(req.params.id).populate("userId", "name email phone").lean();
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
     }
 
-    const currentStatus = booking.bookingStatus || booking.status;
+    // Read stored fields without schema defaults so legacy bookings can be updated.
+    const currentStatus = normalizeBookingStatus(booking);
+    const statusSnapshot = { _id: booking._id, bookingStatus: booking.bookingStatus ?? null, status: booking.status ?? null };
     if ((["Confirmed", "Rejected"].includes(status) && currentStatus !== "Pending Approval")
-      || (status === "Arrived" && currentStatus !== "Confirmed")) {
+      || (status === "Arrived" && !["Confirmed", "Technician Assigned"].includes(currentStatus))) {
       return res.status(409).json({ message: "This booking has already progressed. Refresh the booking list." });
     }
-    if (status === "Confirmed" && booking.bookingStatus === "Pending Approval") {
+    const appointmentUpdate = {};
+    if (status === "Confirmed" && (!booking.timeSlot || !booking.bookingDate)) {
+      const bookingDate = String(req.body.bookingDate || '').trim();
+      const timeSlot = String(req.body.timeSlot || '').trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(bookingDate) || !Number.isFinite(Date.parse(`${bookingDate}T12:00:00Z`)) || !timeSlot || timeSlot.length > 100) {
+        return res.status(400).json({ message: "This older booking needs an appointment date and time slot before confirmation." });
+      }
+      Object.assign(appointmentUpdate, { bookingDate, date: bookingDate, timeSlot });
+      Object.assign(booking, appointmentUpdate);
+    }
+    if (status === "Confirmed" && currentStatus === "Pending Approval") {
       const [technicianCount, reservedBookingCount] = await Promise.all([
         User.countDocuments({ role: "technician" }),
         Booking.countDocuments({
@@ -379,7 +275,7 @@ const updateBookingStatus = async (req, res) => {
         booking.rejectionReason = !technicianCount
           ? "No laboratory technician is currently available."
           : "The selected appointment slot is full. Please choose another date or time.";
-        const rejection = await Booking.updateOne({ _id: booking._id, bookingStatus: "Pending Approval" }, { $set: {
+        const rejection = await Booking.updateOne(statusSnapshot, { $set: {
           bookingStatus: "Rejected", status: "Rejected", rejectionReason: booking.rejectionReason
         } });
         if (!rejection.modifiedCount) return res.status(409).json({ message: "Booking changed. Refresh and try again." });
@@ -394,9 +290,10 @@ const updateBookingStatus = async (req, res) => {
       }
     }
 
-    const previousStatus = booking.bookingStatus;
-    booking.bookingStatus = status;
-    booking.status = status;
+    const previousStatus = currentStatus;
+    const nextStatus = status === "Arrived" && currentStatus === "Technician Assigned" ? currentStatus : status;
+    booking.bookingStatus = nextStatus;
+    booking.status = nextStatus;
     if (["Confirmed", "Arrived"].includes(status) && !booking.patientCode) {
       booking.patientCode = generatePatientCode();
     }
@@ -405,12 +302,13 @@ const updateBookingStatus = async (req, res) => {
     }
     if (status === "Sample Collected") {
       booking.sampleStatus = "Collected";
+      booking.sampleCollectedAt ||= new Date();
     }
     if (status === "Rejected") {
       booking.rejectionReason = rejectionReason || "No reason provided";
     }
-    const statusUpdate = await Booking.updateOne({ _id: booking._id, bookingStatus: currentStatus }, { $set: {
-      bookingStatus: status, status,
+    const statusUpdate = await Booking.updateOne(statusSnapshot, { $set: {
+      bookingStatus: nextStatus, status: nextStatus, ...appointmentUpdate,
       ...(booking.patientCode ? { patientCode: booking.patientCode } : {}),
       ...(status === "Arrived" ? { patientArrived: true } : {}),
       ...(status === "Rejected" ? { rejectionReason: booking.rejectionReason } : {})
@@ -461,12 +359,16 @@ const assignTechnician = async (req, res) => {
       return res.status(404).json({ message: "Booking not found" });
     }
 
-    if ((!booking.patientArrived && booking.bookingStatus !== "Arrived") || booking.paymentStatus !== "Paid") {
-      return res.status(400).json({ message: "Patient must be arrived and payment must be paid before assigning technician" });
+    if (booking.paymentStatus !== "Paid") {
+      return res.status(400).json({ message: "Payment must be paid before assigning a technician" });
     }
 
     if (booking.assignedTechnician || await TechnicianAssignment.exists({ booking: booking._id, status: "ACCEPTED" })) {
       return res.status(409).json({ message: "The assignment has already been accepted by a technician." });
+    }
+
+    if (!["Confirmed", "Arrived"].includes(normalizeBookingStatus(booking))) {
+      return res.status(409).json({ message: "Only confirmed or arrived bookings can receive a new technician request." });
     }
 
     const pending = await TechnicianAssignment.findOne({ booking: booking._id, status: "PENDING" });
@@ -590,87 +492,15 @@ const downloadReceptionistReceipt = async (req, res) => {
       );
     }
 
-    const report = await Report.findOne({ bookingId: booking._id })
-      .sort({ createdAt: -1 })
-      .populate("approvedBy", "name qualification registrationNumber signatureUrl");
-    const pathologistName = report?.approvedPathologistName || report?.approvedBy?.name || report?.pathologistSignature || "Pending";
-
-    const doc = new PDFDocument({ size: "A4", margin: 50 });
     const filename = buildPatientPdfFilename(booking.name, booking.patientCode, "RCT");
-
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
-
-    doc.pipe(res);
-    drawLetterhead(doc);
-    drawTitleBlock(doc, "TEST RECEIPT", "Patient test, billing and laboratory status receipt");
-    drawInfoGrid(doc, "PATIENT DETAILS", [
-      ["Patient Name", booking.name],
-      ["Patient ID", booking.patientCode || "Pending"],
-      ["Age / Gender", `${booking.age || "N/A"} / ${booking.gender || "N/A"}`],
-      ["Phone", booking.phone || "N/A"]
-    ]);
-    drawInfoGrid(doc, "TEST DETAILS", [
-      ["Test / Package", booking.testName],
-      ["Booking Type", booking.bookingType || "Test"],
-      ["Booking ID", booking.bookingCode],
-      ["Appointment", `${booking.bookingDate || booking.date || "N/A"} | ${booking.timeSlot || "N/A"}`],
-      ["Sample Type", booking.sampleType || "N/A"],
-      ["Collection", booking.collectionType || "Visit Lab"],
-      ["Sample Status", booking.sampleStatus || "Not Collected"],
-      ["Report Status", report?.reportStatus || report?.status || "Pending"],
-      ["Pathologist Name", pathologistName],
-      ["Booking Status", booking.bookingStatus || booking.status || "Pending"]
-    ]);
-    drawReceiptBox(doc, [
-      ["Receipt ID", booking.receiptId || booking.receiptNumber],
-      ["Total Amount", formatCurrency(booking.amount)],
-      ["Payment Method", String(booking.paymentMethod || "N/A").toUpperCase()],
-      ["Payment Mode", booking.razorpayMode === "test" ? "TEST - No real money received" : "Offline / Live"],
-      ["Payment Status", booking.paymentStatus],
-      ["Payment Date", formatDateTime(booking.paidAt)]
-    ]);
-    const acknowledgementTop = doc.y;
-    doc.roundedRect(80, acknowledgementTop, 395, 46, 6).fill("#f0fdf4").strokeColor("#bbf7d0").stroke();
-    doc.fillColor("#166534").fontSize(11).font("Helvetica-Bold").text("Payment received successfully.", 100, acknowledgementTop + 11, { width: 355, align: "center" });
-    doc.fillColor("#334155").fontSize(8.5).font("Helvetica").text("Thank you for choosing INDIPATH Super Speciality Pathology Lab.", 100, acknowledgementTop + 28, { width: 355, align: "center" });
-
-    doc.addPage();
-    drawLetterhead(doc);
-    drawTitleBlock(doc, "TEST RESULTS", `${booking.testName} | ${booking.bookingCode || "N/A"}`);
-    const drawContinuation = () => {
-      drawLetterhead(doc);
-      drawTitleBlock(doc, "TEST RESULTS", "Continued");
-    };
-    drawResultsTable(doc, Array.isArray(report?.results) ? report.results : [], drawContinuation);
-
-    if (doc.y > 545) {
-      doc.addPage();
-      drawContinuation();
-    }
-    const signatureTop = doc.y + 8;
-    const signatureUrl = report?.pathologistSignatureImage || report?.approvedBy?.signatureUrl || "";
-    const isDataImage = signatureUrl.startsWith("data:image");
-    const signatureFilename = isDataImage ? "" : path.basename(signatureUrl);
-    const signaturePath = signatureFilename ? path.join(__dirname, "..", "uploads", "signatures", signatureFilename) : "";
-    doc.fillColor("#173b8f").fontSize(8).font("Helvetica-Bold").text("AUTHORIZED SIGNATURE", 345, signatureTop, { width: 160, align: "center" });
-    if ((signatureFilename && fs.existsSync(signaturePath)) || isDataImage) {
-      try {
-        const signatureImage = isDataImage ? Buffer.from(signatureUrl.split(",")[1], "base64") : signaturePath;
-        doc.image(signatureImage, 365, signatureTop + 14, { fit: [120, 45], align: "center", valign: "center" });
-      } catch (error) {
-        doc.fillColor("#64748b").fontSize(8).font("Helvetica").text("Signature unavailable", 365, signatureTop + 30, { width: 120, align: "center" });
-      }
-    } else {
-      doc.fillColor("#64748b").fontSize(8).font("Helvetica").text("Pending approval", 365, signatureTop + 30, { width: 120, align: "center" });
-    }
-    const qualification = report?.approvedPathologistQualification || report?.approvedBy?.qualification || "";
-    const registrationNumber = report?.approvedPathologistRegistrationNumber || report?.approvedBy?.registrationNumber || "";
-    doc.fillColor("#173b8f").fontSize(9).font("Helvetica-Bold").text(pathologistName, 345, signatureTop + 64, { width: 160, align: "center" });
-    doc.fillColor("#475569").fontSize(7).font("Helvetica").text([qualification, registrationNumber && `Reg. No. ${registrationNumber}`].filter(Boolean).join(" | "), 345, signatureTop + 77, { width: 160, align: "center" });
-    doc.end();
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Cache-Control", "private, no-store");
+    res.once('finish', () => { if (res.statusCode === 200) void notifyGeneratedReceipt(booking); });
+    renderReceiptPdf(booking, res);
   } catch (error) {
-    res.status(500).json({ message: "Receipt generation failed" });
+    if (!res.headersSent) res.status(500).json({ message: "Receipt generation failed" });
+    else res.destroy(error);
   }
 };
 

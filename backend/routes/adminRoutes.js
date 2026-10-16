@@ -19,6 +19,9 @@ const { protect, allowRoles } = require("../middleware/authMiddleware");
 const { getStatus: getWhatsAppStatus, sendTest: sendWhatsAppTest } = require("../controllers/whatsappController");
 
 const router = express.Router();
+const { updateTestTemplate, updatePackageTemplate } = require('../controllers/reportTemplateController');
+router.put('/test/:id/template', protect, allowRoles('admin'), updateTestTemplate);
+router.put('/packages/:id/template', protect, allowRoles('admin'), updatePackageTemplate);
 
 router.get("/tests", getTests);
 router.get("/dashboard-metrics", protect, allowRoles("admin"), getDashboardMetrics);

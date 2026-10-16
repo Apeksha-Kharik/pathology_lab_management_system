@@ -25,8 +25,8 @@ export const createWalkInBooking = async (payload) => {
   return response.data;
 };
 
-export const updateBookingStatus = async (bookingId, status, rejectionReason = "") => {
-  const response = await api.patch(`/api/receptionist/bookings/${bookingId}/status`, { status, rejectionReason });
+export const updateBookingStatus = async (bookingId, status, rejectionReason = "", appointment = {}) => {
+  const response = await api.patch(`/api/receptionist/bookings/${bookingId}/status`, { status, rejectionReason, ...appointment });
   return response.data;
 };
 

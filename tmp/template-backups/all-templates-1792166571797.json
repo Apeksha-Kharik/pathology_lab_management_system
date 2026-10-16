@@ -1,0 +1,2282 @@
+[
+  {
+    "collection": "tests",
+    "id": "69cdfa4dc07979492a1ce4b2",
+    "name": "Complete Blood Count(CBC)",
+    "before": [
+      {
+        "parameter": "Hemoglobin",
+        "value": "",
+        "unit": "g/dL",
+        "referenceRange": "Male: 13–17   Female: 12–15",
+        "_id": "6ab8c8e9e13ec9aca439e725"
+      },
+      {
+        "parameter": "RBC Count",
+        "value": "",
+        "unit": "million/µL",
+        "referenceRange": "Male: 4.5–5.9 / Female: 4.1–5.1"
+      },
+      {
+        "parameter": "WBC Count",
+        "value": "",
+        "unit": "cells/µL",
+        "referenceRange": "4,000–11,000"
+      },
+      {
+        "parameter": "Platelet Count",
+        "value": "",
+        "unit": "/µL",
+        "referenceRange": "150,000–450,000"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "Hemoglobin",
+        "unit": "g/dL",
+        "value": "",
+        "referenceRange": "Male: 13–17   Female: 12–15"
+      },
+      {
+        "parameter": "RBC Count",
+        "unit": "million/µL",
+        "value": "",
+        "referenceRange": "Male: 4.5–5.9 / Female: 4.1–5.1"
+      },
+      {
+        "parameter": "WBC Count",
+        "unit": "cells/µL",
+        "value": "",
+        "referenceRange": "4,000–11,000"
+      },
+      {
+        "parameter": "Platelet Count",
+        "unit": "/µL",
+        "value": "",
+        "referenceRange": "150,000–450,000"
+      },
+      {
+        "parameter": "Hematocrit (PCV)",
+        "unit": "%",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "MCV",
+        "unit": "fL",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "MCH",
+        "unit": "pg",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "MCHC",
+        "unit": "g/dL",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "RDW-CV",
+        "unit": "%",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "MPV",
+        "unit": "fL",
+        "value": "",
+        "referenceRange": ""
+      }
+    ]
+  },
+  {
+    "collection": "tests",
+    "id": "69cdfb1f69e470c964063b54",
+    "name": "Blood Sugar",
+    "before": [
+      {
+        "parameter": "Fasting Blood Glucose",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "70–99",
+        "_id": "6ab8c95de13ec9aca439e759"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "Fasting Blood Glucose",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "70–99"
+      }
+    ]
+  },
+  {
+    "collection": "tests",
+    "id": "69cdfb5669e470c964063b58",
+    "name": "Thyroid Function Test (TFT)",
+    "before": [
+      {
+        "parameter": "T3 T4 TSH",
+        "value": "",
+        "unit": "ng/dL",
+        "referenceRange": "80–200",
+        "_id": "6ab8c9c5e13ec9aca439e78e"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "T3",
+        "unit": "ng/dL",
+        "value": "",
+        "referenceRange": "80–200"
+      },
+      {
+        "parameter": "T4",
+        "unit": "µg/dL",
+        "value": "",
+        "referenceRange": "5.0–12.0"
+      },
+      {
+        "parameter": "TSH",
+        "unit": "µIU/mL",
+        "value": "",
+        "referenceRange": "0.4–4.0"
+      }
+    ]
+  },
+  {
+    "collection": "tests",
+    "id": "6a5a48283af2782fdeaa94e8",
+    "name": "Complete Blood Count (CBC)",
+    "before": [
+      {
+        "parameter": "hemoglobin",
+        "value": "",
+        "unit": "ml",
+        "referenceRange": "12-13",
+        "_id": "6ab9f1c28bc8537f52346e7c"
+      },
+      {
+        "parameter": "RBC Count",
+        "value": "",
+        "unit": "million/µL",
+        "referenceRange": "Male: 4.5–5.9 / Female: 4.1–5.1",
+        "_id": "6ab9f1c28bc8537f52346e7d"
+      },
+      {
+        "parameter": "WBC Count",
+        "value": "",
+        "unit": "cells/µL",
+        "referenceRange": "4,000–11,000",
+        "_id": "6ab9f1c28bc8537f52346e7e"
+      },
+      {
+        "parameter": "Platelet Count",
+        "value": "",
+        "unit": "/µL",
+        "referenceRange": "150,000–450,000",
+        "_id": "6ab9f1c28bc8537f52346e7f"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "Hemoglobin",
+        "unit": "g/dL",
+        "value": "",
+        "referenceRange": "Male: 13–17   Female: 12–15"
+      },
+      {
+        "parameter": "RBC Count",
+        "unit": "million/µL",
+        "value": "",
+        "referenceRange": "Male: 4.5–5.9 / Female: 4.1–5.1"
+      },
+      {
+        "parameter": "WBC Count",
+        "unit": "cells/µL",
+        "value": "",
+        "referenceRange": "4,000–11,000"
+      },
+      {
+        "parameter": "Platelet Count",
+        "unit": "/µL",
+        "value": "",
+        "referenceRange": "150,000–450,000"
+      },
+      {
+        "parameter": "Hematocrit (PCV)",
+        "unit": "%",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "MCV",
+        "unit": "fL",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "MCH",
+        "unit": "pg",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "MCHC",
+        "unit": "g/dL",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "RDW-CV",
+        "unit": "%",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "MPV",
+        "unit": "fL",
+        "value": "",
+        "referenceRange": ""
+      }
+    ]
+  },
+  {
+    "collection": "tests",
+    "id": "6ab2761e919d55245e08925f",
+    "name": "Blood Glucose / Blood Sugar",
+    "before": [
+      {
+        "parameter": "Postprandial Glucose",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "<140",
+        "_id": "6ab9f2408bc8537f52346ed5"
+      },
+      {
+        "parameter": "Fasting Blood Glucose (FBS)",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "70–99",
+        "_id": "6ab9f2408bc8537f52346ed6"
+      },
+      {
+        "parameter": "Random Blood Glucose (RBS)",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "Typically <200",
+        "_id": "6ab9f2408bc8537f52346ed7"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "Postprandial Glucose",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "<140"
+      },
+      {
+        "parameter": "Fasting Blood Glucose (FBS)",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "70–99"
+      },
+      {
+        "parameter": "Random Blood Glucose (RBS)",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "Typically <200"
+      }
+    ]
+  },
+  {
+    "collection": "tests",
+    "id": "6ab2761e919d55245e089261",
+    "name": "Lipid Profile",
+    "before": [
+      {
+        "parameter": "Total Cholesterol",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "<200",
+        "_id": "6ab8cc68e13ec9aca439e91d"
+      },
+      {
+        "parameter": "HDL Cholesterol",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "> 40"
+      },
+      {
+        "parameter": "LDL Cholesterol",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "< 100"
+      },
+      {
+        "parameter": "Triglycerides",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "< 150"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "Total Cholesterol",
+        "unit": "mg/dL",
+        "value": "",
+        "referenceRange": "<200"
+      },
+      {
+        "parameter": "HDL Cholesterol",
+        "unit": "mg/dL",
+        "value": "",
+        "referenceRange": "> 40"
+      },
+      {
+        "parameter": "LDL Cholesterol",
+        "unit": "mg/dL",
+        "value": "",
+        "referenceRange": "< 100"
+      },
+      {
+        "parameter": "Triglycerides",
+        "unit": "mg/dL",
+        "value": "",
+        "referenceRange": "< 150"
+      },
+      {
+        "parameter": "VLDL Cholesterol",
+        "unit": "mg/dL",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Non-HDL Cholesterol",
+        "unit": "mg/dL",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Total Cholesterol / HDL Ratio",
+        "unit": "",
+        "value": "",
+        "referenceRange": ""
+      }
+    ]
+  },
+  {
+    "collection": "tests",
+    "id": "6ab2761e919d55245e08926a",
+    "name": "Dengue NS1 / IgM / IgG",
+    "before": [
+      {
+        "parameter": "Dengue NS1 Antigen",
+        "value": "",
+        "unit": "-",
+        "referenceRange": "negative / positive",
+        "_id": "6ab9f2e28bc8537f52346f2e"
+      },
+      {
+        "parameter": "Dengue IgM Antibody",
+        "value": "",
+        "unit": "-",
+        "referenceRange": "negative / positive",
+        "_id": "6ab9f2e28bc8537f52346f2f"
+      },
+      {
+        "parameter": "Dengue IgG Antibody",
+        "value": "",
+        "unit": "-",
+        "referenceRange": "negative / positive",
+        "_id": "6ab9f2e28bc8537f52346f30"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "Dengue NS1 Antigen",
+        "value": "",
+        "unit": "-",
+        "referenceRange": "negative / positive"
+      },
+      {
+        "parameter": "Dengue IgM Antibody",
+        "value": "",
+        "unit": "-",
+        "referenceRange": "negative / positive"
+      },
+      {
+        "parameter": "Dengue IgG Antibody",
+        "value": "",
+        "unit": "-",
+        "referenceRange": "negative / positive"
+      }
+    ]
+  },
+  {
+    "collection": "tests",
+    "id": "6ab2761e919d55245e08926d",
+    "name": "Typhoid Test",
+    "before": [
+      {
+        "parameter": "Salmonella Typhi IgM",
+        "value": "positive / negative",
+        "unit": "-",
+        "referenceRange": "Negative",
+        "_id": "6ab9ef248bc8537f52346cac"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "Salmonella Typhi IgM",
+        "value": "",
+        "unit": "-",
+        "referenceRange": "Negative"
+      }
+    ]
+  },
+  {
+    "collection": "tests",
+    "id": "6ab2761e919d55245e08925e",
+    "name": "Blood Group & Rh",
+    "before": [
+      {
+        "parameter": "Rh Factor",
+        "value": "",
+        "unit": "-",
+        "referenceRange": "Positive/Negative",
+        "_id": "6ab8cb78e13ec9aca439e86c"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "ABO Blood Group",
+        "unit": "",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Rh Factor",
+        "unit": "",
+        "value": "",
+        "referenceRange": "Positive/Negative"
+      }
+    ]
+  },
+  {
+    "collection": "tests",
+    "id": "6ab2761e919d55245e089266",
+    "name": "Urine Routine & Microscopy",
+    "before": [
+      {
+        "parameter": "colour",
+        "value": "",
+        "unit": "-",
+        "referenceRange": "Pale Yellow–Yellow",
+        "_id": "6ab8ceefe13ec9aca439ea58"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "Colour",
+        "unit": "",
+        "value": "",
+        "referenceRange": "Pale Yellow–Yellow"
+      },
+      {
+        "parameter": "Appearance",
+        "unit": "",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Specific Gravity",
+        "unit": "",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "pH",
+        "unit": "",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Protein",
+        "unit": "",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Glucose",
+        "unit": "",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Ketones",
+        "unit": "",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Bilirubin",
+        "unit": "",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Urobilinogen",
+        "unit": "",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Blood",
+        "unit": "",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Nitrite",
+        "unit": "",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Leukocyte Esterase",
+        "unit": "",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Pus Cells (WBC)",
+        "unit": "/HPF",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Red Blood Cells",
+        "unit": "/HPF",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Epithelial Cells",
+        "unit": "/HPF",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Casts",
+        "unit": "",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Crystals",
+        "unit": "",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Bacteria",
+        "unit": "",
+        "value": "",
+        "referenceRange": ""
+      }
+    ]
+  },
+  {
+    "collection": "tests",
+    "id": "6ab2761e919d55245e08926e",
+    "name": "HIV Test",
+    "before": [
+      {
+        "parameter": "HIV 1 & 2 Antigen/Antibody",
+        "value": "",
+        "unit": "Reactive / Non-Reactive",
+        "referenceRange": "Non-Reactive",
+        "_id": "6ab9ef8b8bc8537f52346cf5"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "HIV 1 & 2 Antigen/Antibody",
+        "value": "",
+        "unit": "Reactive / Non-Reactive",
+        "referenceRange": "Non-Reactive"
+      }
+    ]
+  },
+  {
+    "collection": "tests",
+    "id": "6ab2761e919d55245e08925b",
+    "name": "CBC — Complete Blood Count",
+    "before": [
+      {
+        "parameter": "Platelet Count",
+        "value": "",
+        "unit": "/µL",
+        "referenceRange": "150,000–450,000",
+        "_id": "6ab8ca41e13ec9aca439e7c4"
+      },
+      {
+        "parameter": "Hemoglobin",
+        "value": "",
+        "unit": "g/dL",
+        "referenceRange": "Male: 13–17 / Female: 12–15"
+      },
+      {
+        "parameter": "RBC Count",
+        "value": "",
+        "unit": "million/µL",
+        "referenceRange": "Male: 4.5–5.9 / Female: 4.1–5.1"
+      },
+      {
+        "parameter": "WBC Count",
+        "value": "",
+        "unit": "cells/µL",
+        "referenceRange": "4,000–11,000"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "Hemoglobin",
+        "unit": "g/dL",
+        "value": "",
+        "referenceRange": "Male: 13–17 / Female: 12–15"
+      },
+      {
+        "parameter": "RBC Count",
+        "unit": "million/µL",
+        "value": "",
+        "referenceRange": "Male: 4.5–5.9 / Female: 4.1–5.1"
+      },
+      {
+        "parameter": "WBC Count",
+        "unit": "cells/µL",
+        "value": "",
+        "referenceRange": "4,000–11,000"
+      },
+      {
+        "parameter": "Platelet Count",
+        "unit": "/µL",
+        "value": "",
+        "referenceRange": "150,000–450,000"
+      },
+      {
+        "parameter": "Hematocrit (PCV)",
+        "unit": "%",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "MCV",
+        "unit": "fL",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "MCH",
+        "unit": "pg",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "MCHC",
+        "unit": "g/dL",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "RDW-CV",
+        "unit": "%",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "MPV",
+        "unit": "fL",
+        "value": "",
+        "referenceRange": ""
+      }
+    ]
+  },
+  {
+    "collection": "tests",
+    "id": "6ab2761e919d55245e08925c",
+    "name": "Hb — Hemoglobin",
+    "before": [
+      {
+        "parameter": "Hemoglobin (Hb)",
+        "value": "",
+        "unit": "g/dL",
+        "referenceRange": "Male: 13–17 / Female: 12–15",
+        "_id": "6ab8caa8e13ec9aca439e7fb"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "Hemoglobin (Hb)",
+        "value": "",
+        "unit": "g/dL",
+        "referenceRange": "Male: 13–17 / Female: 12–15"
+      }
+    ]
+  },
+  {
+    "collection": "tests",
+    "id": "6ab2761e919d55245e089262",
+    "name": "Liver Function Test (LFT)",
+    "before": [
+      {
+        "parameter": "Total Bilirubin",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "0.2–1.2",
+        "_id": "6ab8ccebe13ec9aca439e95a"
+      },
+      {
+        "parameter": "SGPT",
+        "value": "",
+        "unit": "U/L",
+        "referenceRange": "7 - 56"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "Total Bilirubin",
+        "unit": "mg/dL",
+        "value": "",
+        "referenceRange": "0.2–1.2"
+      },
+      {
+        "parameter": "Direct Bilirubin",
+        "unit": "mg/dL",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Indirect Bilirubin",
+        "unit": "mg/dL",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "SGPT",
+        "unit": "U/L",
+        "value": "",
+        "referenceRange": "7 - 56"
+      },
+      {
+        "parameter": "SGOT (AST)",
+        "unit": "U/L",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Alkaline Phosphatase (ALP)",
+        "unit": "U/L",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "GGT",
+        "unit": "U/L",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Total Protein",
+        "unit": "g/dL",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Albumin",
+        "unit": "g/dL",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Globulin",
+        "unit": "g/dL",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Albumin / Globulin Ratio",
+        "unit": "",
+        "value": "",
+        "referenceRange": ""
+      }
+    ]
+  },
+  {
+    "collection": "tests",
+    "id": "6ab2761e919d55245e089263",
+    "name": "Kidney/Renal Function Test (KFT/RFT)",
+    "before": [
+      {
+        "parameter": "Blood Urea",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "15–45",
+        "_id": "6ab9f1288bc8537f52346e28"
+      },
+      {
+        "parameter": "Serum Creatinine",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "0.6–1.3",
+        "_id": "6ab9f1288bc8537f52346e29"
+      },
+      {
+        "parameter": "Uric Acid",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "Male: 3.4–7.0 / Female: 2.4–6.0",
+        "_id": "6ab9f1288bc8537f52346e2a"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "Blood Urea",
+        "unit": "mg/dL",
+        "value": "",
+        "referenceRange": "15–45"
+      },
+      {
+        "parameter": "Serum Creatinine",
+        "unit": "mg/dL",
+        "value": "",
+        "referenceRange": "0.6–1.3"
+      },
+      {
+        "parameter": "Uric Acid",
+        "unit": "mg/dL",
+        "value": "",
+        "referenceRange": "Male: 3.4–7.0 / Female: 2.4–6.0"
+      },
+      {
+        "parameter": "Sodium",
+        "unit": "mmol/L",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Potassium",
+        "unit": "mmol/L",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Chloride",
+        "unit": "mmol/L",
+        "value": "",
+        "referenceRange": ""
+      }
+    ]
+  },
+  {
+    "collection": "tests",
+    "id": "6ab2761e919d55245e089264",
+    "name": "Thyroid Function Test (T3, T4, TSH)",
+    "before": [
+      {
+        "parameter": "TSH",
+        "value": "",
+        "unit": "µIU/mL",
+        "referenceRange": "0.4–4.0",
+        "_id": "6aba1228fe7f472cc7dc0e38"
+      },
+      {
+        "parameter": "T3",
+        "value": "",
+        "unit": "ng/dL",
+        "referenceRange": "80–200",
+        "_id": "6aba1228fe7f472cc7dc0e39"
+      },
+      {
+        "parameter": "T4",
+        "value": "",
+        "unit": "µg/dL",
+        "referenceRange": "5.0–12.0",
+        "_id": "6aba1228fe7f472cc7dc0e3a"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "T3",
+        "unit": "ng/dL",
+        "value": "",
+        "referenceRange": "80–200"
+      },
+      {
+        "parameter": "T4",
+        "unit": "µg/dL",
+        "value": "",
+        "referenceRange": "5.0–12.0"
+      },
+      {
+        "parameter": "TSH",
+        "unit": "µIU/mL",
+        "value": "",
+        "referenceRange": "0.4–4.0"
+      }
+    ]
+  },
+  {
+    "collection": "tests",
+    "id": "6ab2761e919d55245e08926b",
+    "name": "Malaria Test",
+    "before": [
+      {
+        "parameter": "Malaria Parasite",
+        "value": "",
+        "unit": "-",
+        "referenceRange": "not detected",
+        "_id": "6ab9ee6c8bc8537f52346c1d"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "Malaria Parasite",
+        "value": "",
+        "unit": "-",
+        "referenceRange": "not detected"
+      }
+    ]
+  },
+  {
+    "collection": "tests",
+    "id": "6ab2761e919d55245e089270",
+    "name": "HCV Test",
+    "before": [
+      {
+        "parameter": "Anti-HCV (Hepatitis C Antibody)",
+        "value": "",
+        "unit": "-",
+        "referenceRange": "Non-Reactive",
+        "_id": "6ab9f0208bc8537f52346d8a"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "Anti-HCV (Hepatitis C Antibody)",
+        "value": "",
+        "unit": "-",
+        "referenceRange": "Non-Reactive"
+      }
+    ]
+  },
+  {
+    "collection": "tests",
+    "id": "6ab2761e919d55245e089268",
+    "name": "Urine Pregnancy Test",
+    "before": [
+      {
+        "parameter": "Urine hCG",
+        "value": "",
+        "unit": "-",
+        "referenceRange": "Positive / Negative",
+        "_id": "6ab8cfb3e13ec9aca439eadd"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "Urine hCG",
+        "value": "",
+        "unit": "-",
+        "referenceRange": "Positive / Negative"
+      }
+    ]
+  },
+  {
+    "collection": "tests",
+    "id": "6ab2761e919d55245e08926c",
+    "name": "Widal Test",
+    "before": [
+      {
+        "parameter": "S. Typhi O (TO)",
+        "value": "",
+        "unit": "Titre",
+        "referenceRange": "< 1:80",
+        "_id": "6ab9eece8bc8537f52346c64"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "S. Typhi O (TO)",
+        "unit": "Titre",
+        "value": "",
+        "referenceRange": "< 1:80"
+      },
+      {
+        "parameter": "S. Typhi H (TH)",
+        "unit": "Titre",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "S. Paratyphi A (AH)",
+        "unit": "Titre",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "S. Paratyphi B (BH)",
+        "unit": "Titre",
+        "value": "",
+        "referenceRange": ""
+      }
+    ]
+  },
+  {
+    "collection": "tests",
+    "id": "6ab2761e919d55245e08925d",
+    "name": "ESR — Erythrocyte Sedimentation Rate",
+    "before": [
+      {
+        "parameter": "ESR (Erythrocyte Sedimentation Rate)",
+        "value": "",
+        "unit": "mm/hr",
+        "referenceRange": "Male: 0–15 / Female: 0–20",
+        "_id": "6ab8cb0de13ec9aca439e833"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "ESR (Erythrocyte Sedimentation Rate)",
+        "value": "",
+        "unit": "mm/hr",
+        "referenceRange": "Male: 0–15 / Female: 0–20"
+      }
+    ]
+  },
+  {
+    "collection": "tests",
+    "id": "6ab2761e919d55245e089265",
+    "name": "CRP — C-Reactive Protein",
+    "before": [
+      {
+        "parameter": "CRP",
+        "value": "",
+        "unit": "mg/L",
+        "referenceRange": "< 5",
+        "_id": "6ab8ce53e13ec9aca439ea17"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "CRP",
+        "value": "",
+        "unit": "mg/L",
+        "referenceRange": "< 5"
+      }
+    ]
+  },
+  {
+    "collection": "tests",
+    "id": "6ab2761e919d55245e089260",
+    "name": "HbA1c",
+    "before": [
+      {
+        "parameter": "HbA1c",
+        "value": "",
+        "unit": "%",
+        "referenceRange": "<5.7",
+        "_id": "6ab8cc32e13ec9aca439e8e1"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "HbA1c",
+        "value": "",
+        "unit": "%",
+        "referenceRange": "<5.7"
+      }
+    ]
+  },
+  {
+    "collection": "tests",
+    "id": "6ab2761e919d55245e089267",
+    "name": "Urine Culture",
+    "before": [
+      {
+        "parameter": "Culture Result",
+        "value": "",
+        "unit": "CFU/mL",
+        "referenceRange": "No Growth",
+        "_id": "6ab8cf50e13ec9aca439ea9a"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "Culture Result",
+        "unit": "",
+        "value": "",
+        "referenceRange": "No Growth"
+      },
+      {
+        "parameter": "Organism Isolated",
+        "unit": "",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Colony Count",
+        "unit": "CFU/mL",
+        "value": "",
+        "referenceRange": ""
+      }
+    ]
+  },
+  {
+    "collection": "tests",
+    "id": "6ab2761e919d55245e089269",
+    "name": "24-hour Urine Protein",
+    "before": [
+      {
+        "parameter": "Total Urine Volume",
+        "value": "",
+        "unit": "mL/24 hr",
+        "referenceRange": "800–2000",
+        "_id": "6ab8d02ce13ec9aca439eb21"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "Total Urine Volume",
+        "unit": "mL/24 hr",
+        "value": "",
+        "referenceRange": "800–2000"
+      },
+      {
+        "parameter": "24-hour Urine Protein",
+        "unit": "mg/24 hr",
+        "value": "",
+        "referenceRange": ""
+      }
+    ]
+  },
+  {
+    "collection": "tests",
+    "id": "6ab2761e919d55245e08926f",
+    "name": "HBsAg",
+    "before": [
+      {
+        "parameter": "HBsAg (Hepatitis B Surface Antigen)",
+        "value": "",
+        "unit": "-",
+        "referenceRange": "Non-Reactive",
+        "_id": "6ab9efdb8bc8537f52346d3f"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "HBsAg (Hepatitis B Surface Antigen)",
+        "value": "",
+        "unit": "-",
+        "referenceRange": "Non-Reactive"
+      }
+    ]
+  },
+  {
+    "collection": "tests",
+    "id": "6ad2410cafcac5be5358325a",
+    "name": "Vitamin D (25-Hydroxy)",
+    "before": [
+      {
+        "parameter": "Vitamin D (25-Hydroxy)",
+        "value": "",
+        "unit": "ng/mL",
+        "referenceRange": "",
+        "_id": "6ad2410cafcac5be5358325b"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "Vitamin D (25-Hydroxy)",
+        "value": "",
+        "unit": "ng/mL",
+        "referenceRange": ""
+      }
+    ]
+  },
+  {
+    "collection": "tests",
+    "id": "6ad2410cafcac5be5358325f",
+    "name": "Vitamin B12",
+    "before": [
+      {
+        "parameter": "Vitamin B12",
+        "value": "",
+        "unit": "pg/mL",
+        "referenceRange": "",
+        "_id": "6ad2410cafcac5be53583260"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "Vitamin B12",
+        "value": "",
+        "unit": "pg/mL",
+        "referenceRange": ""
+      }
+    ]
+  },
+  {
+    "collection": "tests",
+    "id": "6ad2410cafcac5be53583263",
+    "name": "Calcium (Total)",
+    "before": [
+      {
+        "parameter": "Total Calcium",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "",
+        "_id": "6ad2410cafcac5be53583264"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "Total Calcium",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": ""
+      }
+    ]
+  },
+  {
+    "collection": "packages",
+    "id": "6a5a33a49d136479362c35cf",
+    "name": "full body checkup",
+    "before": [
+      {
+        "parameter": "Complete Blood Count(CBC) - Hemoglobin",
+        "value": "",
+        "unit": "g/dL",
+        "referenceRange": "Male: 13–17   Female: 12–15"
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - RBC Count",
+        "value": "",
+        "unit": "million/µL",
+        "referenceRange": "Male: 4.5–5.9 / Female: 4.1–5.1"
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - WBC Count",
+        "value": "",
+        "unit": "cells/µL",
+        "referenceRange": "4,000–11,000"
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - Platelet Count",
+        "value": "",
+        "unit": "/µL",
+        "referenceRange": "150,000–450,000"
+      },
+      {
+        "parameter": "Blood Glucose / Blood Sugar - Postprandial Glucose",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "<140"
+      },
+      {
+        "parameter": "Blood Glucose / Blood Sugar - Fasting Blood Glucose (FBS)",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "70–99"
+      },
+      {
+        "parameter": "Blood Glucose / Blood Sugar - Random Blood Glucose (RBS)",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "Typically <200"
+      },
+      {
+        "parameter": "Lipid Profile - Total Cholesterol",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "<200"
+      },
+      {
+        "parameter": "Lipid Profile - HDL Cholesterol",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "> 40"
+      },
+      {
+        "parameter": "Lipid Profile - LDL Cholesterol",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "< 100"
+      },
+      {
+        "parameter": "Lipid Profile - Triglycerides",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "< 150"
+      },
+      {
+        "parameter": "Liver Function Test (LFT) - Total Bilirubin",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "0.2–1.2"
+      },
+      {
+        "parameter": "Liver Function Test (LFT) - SGPT",
+        "value": "",
+        "unit": "U/L",
+        "referenceRange": "7 - 56"
+      },
+      {
+        "parameter": "Kidney/Renal Function Test (KFT/RFT) - Blood Urea",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "15–45"
+      },
+      {
+        "parameter": "Kidney/Renal Function Test (KFT/RFT) - Serum Creatinine",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "0.6–1.3"
+      },
+      {
+        "parameter": "Kidney/Renal Function Test (KFT/RFT) - Uric Acid",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "Male: 3.4–7.0 / Female: 2.4–6.0"
+      },
+      {
+        "parameter": "Thyroid Function Test (T3, T4, TSH) - TSH",
+        "value": "",
+        "unit": "µIU/mL",
+        "referenceRange": "0.4–4.0"
+      },
+      {
+        "parameter": "Thyroid Function Test (T3, T4, TSH) - T3",
+        "value": "",
+        "unit": "ng/dL",
+        "referenceRange": "80–200"
+      },
+      {
+        "parameter": "Thyroid Function Test (T3, T4, TSH) - T4",
+        "value": "",
+        "unit": "µg/dL",
+        "referenceRange": "5.0–12.0"
+      },
+      {
+        "parameter": "Urine Routine & Microscopy - colour",
+        "value": "",
+        "unit": "-",
+        "referenceRange": "Pale Yellow–Yellow"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "Complete Blood Count(CBC) - Hemoglobin",
+        "unit": "g/dL",
+        "value": "",
+        "referenceRange": "Male: 13–17   Female: 12–15"
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - RBC Count",
+        "unit": "million/µL",
+        "value": "",
+        "referenceRange": "Male: 4.5–5.9 / Female: 4.1–5.1"
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - WBC Count",
+        "unit": "cells/µL",
+        "value": "",
+        "referenceRange": "4,000–11,000"
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - Platelet Count",
+        "unit": "/µL",
+        "value": "",
+        "referenceRange": "150,000–450,000"
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - Hematocrit (PCV)",
+        "unit": "%",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - MCV",
+        "unit": "fL",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - MCH",
+        "unit": "pg",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - MCHC",
+        "unit": "g/dL",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - RDW-CV",
+        "unit": "%",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - MPV",
+        "unit": "fL",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Blood Glucose / Blood Sugar - Postprandial Glucose",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "<140"
+      },
+      {
+        "parameter": "Blood Glucose / Blood Sugar - Fasting Blood Glucose (FBS)",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "70–99"
+      },
+      {
+        "parameter": "Blood Glucose / Blood Sugar - Random Blood Glucose (RBS)",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "Typically <200"
+      },
+      {
+        "parameter": "Lipid Profile - Total Cholesterol",
+        "unit": "mg/dL",
+        "value": "",
+        "referenceRange": "<200"
+      },
+      {
+        "parameter": "Lipid Profile - HDL Cholesterol",
+        "unit": "mg/dL",
+        "value": "",
+        "referenceRange": "> 40"
+      },
+      {
+        "parameter": "Lipid Profile - LDL Cholesterol",
+        "unit": "mg/dL",
+        "value": "",
+        "referenceRange": "< 100"
+      },
+      {
+        "parameter": "Lipid Profile - Triglycerides",
+        "unit": "mg/dL",
+        "value": "",
+        "referenceRange": "< 150"
+      },
+      {
+        "parameter": "Lipid Profile - VLDL Cholesterol",
+        "unit": "mg/dL",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Lipid Profile - Non-HDL Cholesterol",
+        "unit": "mg/dL",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Lipid Profile - Total Cholesterol / HDL Ratio",
+        "unit": "",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Liver Function Test (LFT) - Total Bilirubin",
+        "unit": "mg/dL",
+        "value": "",
+        "referenceRange": "0.2–1.2"
+      },
+      {
+        "parameter": "Liver Function Test (LFT) - Direct Bilirubin",
+        "unit": "mg/dL",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Liver Function Test (LFT) - Indirect Bilirubin",
+        "unit": "mg/dL",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Liver Function Test (LFT) - SGPT",
+        "unit": "U/L",
+        "value": "",
+        "referenceRange": "7 - 56"
+      },
+      {
+        "parameter": "Liver Function Test (LFT) - SGOT (AST)",
+        "unit": "U/L",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Liver Function Test (LFT) - Alkaline Phosphatase (ALP)",
+        "unit": "U/L",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Liver Function Test (LFT) - GGT",
+        "unit": "U/L",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Liver Function Test (LFT) - Total Protein",
+        "unit": "g/dL",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Liver Function Test (LFT) - Albumin",
+        "unit": "g/dL",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Liver Function Test (LFT) - Globulin",
+        "unit": "g/dL",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Liver Function Test (LFT) - Albumin / Globulin Ratio",
+        "unit": "",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Kidney/Renal Function Test (KFT/RFT) - Blood Urea",
+        "unit": "mg/dL",
+        "value": "",
+        "referenceRange": "15–45"
+      },
+      {
+        "parameter": "Kidney/Renal Function Test (KFT/RFT) - Serum Creatinine",
+        "unit": "mg/dL",
+        "value": "",
+        "referenceRange": "0.6–1.3"
+      },
+      {
+        "parameter": "Kidney/Renal Function Test (KFT/RFT) - Uric Acid",
+        "unit": "mg/dL",
+        "value": "",
+        "referenceRange": "Male: 3.4–7.0 / Female: 2.4–6.0"
+      },
+      {
+        "parameter": "Kidney/Renal Function Test (KFT/RFT) - Sodium",
+        "unit": "mmol/L",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Kidney/Renal Function Test (KFT/RFT) - Potassium",
+        "unit": "mmol/L",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Kidney/Renal Function Test (KFT/RFT) - Chloride",
+        "unit": "mmol/L",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Thyroid Function Test (T3, T4, TSH) - T3",
+        "unit": "ng/dL",
+        "value": "",
+        "referenceRange": "80–200"
+      },
+      {
+        "parameter": "Thyroid Function Test (T3, T4, TSH) - T4",
+        "unit": "µg/dL",
+        "value": "",
+        "referenceRange": "5.0–12.0"
+      },
+      {
+        "parameter": "Thyroid Function Test (T3, T4, TSH) - TSH",
+        "unit": "µIU/mL",
+        "value": "",
+        "referenceRange": "0.4–4.0"
+      },
+      {
+        "parameter": "Urine Routine & Microscopy - Colour",
+        "unit": "",
+        "value": "",
+        "referenceRange": "Pale Yellow–Yellow"
+      },
+      {
+        "parameter": "Urine Routine & Microscopy - Appearance",
+        "unit": "",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Urine Routine & Microscopy - Specific Gravity",
+        "unit": "",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Urine Routine & Microscopy - pH",
+        "unit": "",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Urine Routine & Microscopy - Protein",
+        "unit": "",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Urine Routine & Microscopy - Glucose",
+        "unit": "",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Urine Routine & Microscopy - Ketones",
+        "unit": "",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Urine Routine & Microscopy - Bilirubin",
+        "unit": "",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Urine Routine & Microscopy - Urobilinogen",
+        "unit": "",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Urine Routine & Microscopy - Blood",
+        "unit": "",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Urine Routine & Microscopy - Nitrite",
+        "unit": "",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Urine Routine & Microscopy - Leukocyte Esterase",
+        "unit": "",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Urine Routine & Microscopy - Pus Cells (WBC)",
+        "unit": "/HPF",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Urine Routine & Microscopy - Red Blood Cells",
+        "unit": "/HPF",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Urine Routine & Microscopy - Epithelial Cells",
+        "unit": "/HPF",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Urine Routine & Microscopy - Casts",
+        "unit": "",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Urine Routine & Microscopy - Crystals",
+        "unit": "",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Urine Routine & Microscopy - Bacteria",
+        "unit": "",
+        "value": "",
+        "referenceRange": ""
+      }
+    ]
+  },
+  {
+    "collection": "packages",
+    "id": "6a8308d1ba20afff1d1201c8",
+    "name": "Women Hormone Wellness Panel",
+    "before": [
+      {
+        "parameter": "TSH",
+        "unit": "uIU/mL",
+        "referenceRange": "0.4 - 4.0",
+        "_id": "6a8308d1ba20afff1d1201c9"
+      },
+      {
+        "parameter": "Vitamin D",
+        "unit": "ng/mL",
+        "referenceRange": "30 - 100",
+        "_id": "6a8308d1ba20afff1d1201ca"
+      },
+      {
+        "parameter": "Vitamin B12",
+        "unit": "pg/mL",
+        "referenceRange": "200 - 900",
+        "_id": "6a8308d1ba20afff1d1201cb"
+      },
+      {
+        "parameter": "Hemoglobin",
+        "unit": "g/dL",
+        "referenceRange": "12.0 - 15.5",
+        "_id": "6a8308d1ba20afff1d1201cc"
+      },
+      {
+        "parameter": "Ferritin",
+        "unit": "ng/mL",
+        "referenceRange": "13 - 150",
+        "_id": "6a8308d1ba20afff1d1201cd"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "TSH",
+        "value": "",
+        "unit": "uIU/mL",
+        "referenceRange": "0.4 - 4.0"
+      },
+      {
+        "parameter": "Vitamin D",
+        "value": "",
+        "unit": "ng/mL",
+        "referenceRange": "30 - 100"
+      },
+      {
+        "parameter": "Vitamin B12",
+        "value": "",
+        "unit": "pg/mL",
+        "referenceRange": "200 - 900"
+      },
+      {
+        "parameter": "Hemoglobin",
+        "value": "",
+        "unit": "g/dL",
+        "referenceRange": "12.0 - 15.5"
+      },
+      {
+        "parameter": "Ferritin",
+        "value": "",
+        "unit": "ng/mL",
+        "referenceRange": "13 - 150"
+      }
+    ]
+  },
+  {
+    "collection": "packages",
+    "id": "6a8308d1ba20afff1d1201ce",
+    "name": "Senior Preventive Care Plus",
+    "before": [
+      {
+        "parameter": "Fasting Blood Sugar",
+        "unit": "mg/dL",
+        "referenceRange": "70 - 100",
+        "_id": "6a8308d1ba20afff1d1201cf"
+      },
+      {
+        "parameter": "HbA1c",
+        "unit": "%",
+        "referenceRange": "< 5.7",
+        "_id": "6a8308d1ba20afff1d1201d0"
+      },
+      {
+        "parameter": "Creatinine",
+        "unit": "mg/dL",
+        "referenceRange": "0.6 - 1.3",
+        "_id": "6a8308d1ba20afff1d1201d1"
+      },
+      {
+        "parameter": "SGPT",
+        "unit": "U/L",
+        "referenceRange": "7 - 56",
+        "_id": "6a8308d1ba20afff1d1201d2"
+      },
+      {
+        "parameter": "TSH",
+        "unit": "uIU/mL",
+        "referenceRange": "0.4 - 4.0",
+        "_id": "6a8308d1ba20afff1d1201d3"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "Fasting Blood Sugar",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "70 - 100"
+      },
+      {
+        "parameter": "HbA1c",
+        "value": "",
+        "unit": "%",
+        "referenceRange": "< 5.7"
+      },
+      {
+        "parameter": "Creatinine",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "0.6 - 1.3"
+      },
+      {
+        "parameter": "SGPT",
+        "value": "",
+        "unit": "U/L",
+        "referenceRange": "7 - 56"
+      },
+      {
+        "parameter": "TSH",
+        "value": "",
+        "unit": "uIU/mL",
+        "referenceRange": "0.4 - 4.0"
+      }
+    ]
+  },
+  {
+    "collection": "packages",
+    "id": "6a8308d1ba20afff1d1201da",
+    "name": "Lifestyle Fitness Check",
+    "before": [
+      {
+        "parameter": "Complete Blood Count(CBC) - Hemoglobin",
+        "value": "",
+        "unit": "g/dL",
+        "referenceRange": "Male: 13–17   Female: 12–15"
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - RBC Count",
+        "value": "",
+        "unit": "million/µL",
+        "referenceRange": "Male: 4.5–5.9 / Female: 4.1–5.1"
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - WBC Count",
+        "value": "",
+        "unit": "cells/µL",
+        "referenceRange": "4,000–11,000"
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - Platelet Count",
+        "value": "",
+        "unit": "/µL",
+        "referenceRange": "150,000–450,000"
+      },
+      {
+        "parameter": "Blood Sugar - Fasting Blood Glucose",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "70–99"
+      },
+      {
+        "parameter": "Thyroid Function Test (TFT) - T3 T4 TSH",
+        "value": "",
+        "unit": "ng/dL",
+        "referenceRange": "80–200"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "Complete Blood Count(CBC) - Hemoglobin",
+        "unit": "g/dL",
+        "value": "",
+        "referenceRange": "Male: 13–17   Female: 12–15"
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - RBC Count",
+        "unit": "million/µL",
+        "value": "",
+        "referenceRange": "Male: 4.5–5.9 / Female: 4.1–5.1"
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - WBC Count",
+        "unit": "cells/µL",
+        "value": "",
+        "referenceRange": "4,000–11,000"
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - Platelet Count",
+        "unit": "/µL",
+        "value": "",
+        "referenceRange": "150,000–450,000"
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - Hematocrit (PCV)",
+        "unit": "%",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - MCV",
+        "unit": "fL",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - MCH",
+        "unit": "pg",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - MCHC",
+        "unit": "g/dL",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - RDW-CV",
+        "unit": "%",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - MPV",
+        "unit": "fL",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Blood Sugar - Fasting Blood Glucose",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "70–99"
+      },
+      {
+        "parameter": "Thyroid Function Test (TFT) - T3",
+        "unit": "ng/dL",
+        "value": "",
+        "referenceRange": "80–200"
+      },
+      {
+        "parameter": "Thyroid Function Test (TFT) - T4",
+        "unit": "µg/dL",
+        "value": "",
+        "referenceRange": "5.0–12.0"
+      },
+      {
+        "parameter": "Thyroid Function Test (TFT) - TSH",
+        "unit": "µIU/mL",
+        "value": "",
+        "referenceRange": "0.4–4.0"
+      }
+    ]
+  },
+  {
+    "collection": "packages",
+    "id": "6a8308d1ba20afff1d1201c2",
+    "name": "Advanced Cardiac Risk Profile",
+    "before": [
+      {
+        "parameter": "Total Cholesterol",
+        "unit": "mg/dL",
+        "referenceRange": "< 200",
+        "_id": "6a8308d1ba20afff1d1201c3"
+      },
+      {
+        "parameter": "HDL Cholesterol",
+        "unit": "mg/dL",
+        "referenceRange": "> 40",
+        "_id": "6a8308d1ba20afff1d1201c4"
+      },
+      {
+        "parameter": "LDL Cholesterol",
+        "unit": "mg/dL",
+        "referenceRange": "< 100",
+        "_id": "6a8308d1ba20afff1d1201c5"
+      },
+      {
+        "parameter": "Triglycerides",
+        "unit": "mg/dL",
+        "referenceRange": "< 150",
+        "_id": "6a8308d1ba20afff1d1201c6"
+      },
+      {
+        "parameter": "hs-CRP",
+        "unit": "mg/L",
+        "referenceRange": "< 3.0",
+        "_id": "6a8308d1ba20afff1d1201c7"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "Total Cholesterol",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "< 200"
+      },
+      {
+        "parameter": "HDL Cholesterol",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "> 40"
+      },
+      {
+        "parameter": "LDL Cholesterol",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "< 100"
+      },
+      {
+        "parameter": "Triglycerides",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "< 150"
+      },
+      {
+        "parameter": "hs-CRP",
+        "value": "",
+        "unit": "mg/L",
+        "referenceRange": "< 3.0"
+      }
+    ]
+  },
+  {
+    "collection": "packages",
+    "id": "6a8308d1ba20afff1d1201d4",
+    "name": "Fever Infection Complete Panel",
+    "before": [
+      {
+        "parameter": "Complete Blood Count(CBC) - Hemoglobin",
+        "value": "",
+        "unit": "g/dL",
+        "referenceRange": "Male: 13–17   Female: 12–15"
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - RBC Count",
+        "value": "",
+        "unit": "million/µL",
+        "referenceRange": "Male: 4.5–5.9 / Female: 4.1–5.1"
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - WBC Count",
+        "value": "",
+        "unit": "cells/µL",
+        "referenceRange": "4,000–11,000"
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - Platelet Count",
+        "value": "",
+        "unit": "/µL",
+        "referenceRange": "150,000–450,000"
+      },
+      {
+        "parameter": "Blood Sugar - Fasting Blood Glucose",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "70–99"
+      },
+      {
+        "parameter": "Thyroid Function Test (TFT) - T3 T4 TSH",
+        "value": "",
+        "unit": "ng/dL",
+        "referenceRange": "80–200"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "Complete Blood Count(CBC) - Hemoglobin",
+        "unit": "g/dL",
+        "value": "",
+        "referenceRange": "Male: 13–17   Female: 12–15"
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - RBC Count",
+        "unit": "million/µL",
+        "value": "",
+        "referenceRange": "Male: 4.5–5.9 / Female: 4.1–5.1"
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - WBC Count",
+        "unit": "cells/µL",
+        "value": "",
+        "referenceRange": "4,000–11,000"
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - Platelet Count",
+        "unit": "/µL",
+        "value": "",
+        "referenceRange": "150,000–450,000"
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - Hematocrit (PCV)",
+        "unit": "%",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - MCV",
+        "unit": "fL",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - MCH",
+        "unit": "pg",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - MCHC",
+        "unit": "g/dL",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - RDW-CV",
+        "unit": "%",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Complete Blood Count(CBC) - MPV",
+        "unit": "fL",
+        "value": "",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Blood Sugar - Fasting Blood Glucose",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "70–99"
+      },
+      {
+        "parameter": "Thyroid Function Test (TFT) - T3",
+        "unit": "ng/dL",
+        "value": "",
+        "referenceRange": "80–200"
+      },
+      {
+        "parameter": "Thyroid Function Test (TFT) - T4",
+        "unit": "µg/dL",
+        "value": "",
+        "referenceRange": "5.0–12.0"
+      },
+      {
+        "parameter": "Thyroid Function Test (TFT) - TSH",
+        "unit": "µIU/mL",
+        "value": "",
+        "referenceRange": "0.4–4.0"
+      }
+    ]
+  },
+  {
+    "collection": "packages",
+    "id": "6ad2410dafcac5be53583267",
+    "name": "Vitamin D & B12 Panel",
+    "before": [
+      {
+        "parameter": "Vitamin D (25-Hydroxy)",
+        "value": "",
+        "unit": "ng/mL",
+        "referenceRange": "",
+        "_id": "6ad2410dafcac5be53583268"
+      },
+      {
+        "parameter": "Vitamin B12",
+        "value": "",
+        "unit": "pg/mL",
+        "referenceRange": "",
+        "_id": "6ad2410dafcac5be53583269"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "Vitamin D (25-Hydroxy) - Vitamin D (25-Hydroxy)",
+        "value": "",
+        "unit": "ng/mL",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Vitamin B12 - Vitamin B12",
+        "value": "",
+        "unit": "pg/mL",
+        "referenceRange": ""
+      }
+    ]
+  },
+  {
+    "collection": "packages",
+    "id": "6ad2410dafcac5be5358326c",
+    "name": "Vitamin D, B12 & Calcium Panel",
+    "before": [
+      {
+        "parameter": "Vitamin D (25-Hydroxy)",
+        "value": "",
+        "unit": "ng/mL",
+        "referenceRange": "",
+        "_id": "6ad2410dafcac5be5358326d"
+      },
+      {
+        "parameter": "Vitamin B12",
+        "value": "",
+        "unit": "pg/mL",
+        "referenceRange": "",
+        "_id": "6ad2410dafcac5be5358326e"
+      },
+      {
+        "parameter": "Total Calcium",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": "",
+        "_id": "6ad2410dafcac5be5358326f"
+      }
+    ],
+    "after": [
+      {
+        "parameter": "Vitamin D (25-Hydroxy) - Vitamin D (25-Hydroxy)",
+        "value": "",
+        "unit": "ng/mL",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Vitamin B12 - Vitamin B12",
+        "value": "",
+        "unit": "pg/mL",
+        "referenceRange": ""
+      },
+      {
+        "parameter": "Calcium (Total) - Total Calcium",
+        "value": "",
+        "unit": "mg/dL",
+        "referenceRange": ""
+      }
+    ]
+  }
+]

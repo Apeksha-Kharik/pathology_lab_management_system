@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { normalizeBookingStatus } = require('../utils/bookingStatus');
 
 const bookingSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
@@ -27,6 +28,7 @@ const bookingSchema = new mongoose.Schema({
   doctorNotes: { type: String },
   sampleType: { type: String },
   sampleId: { type: String },
+  sampleCollectedAt: { type: Date },
   rejectionReason: { type: String },
   sampleStatus: {
     type: String,
@@ -67,8 +69,15 @@ const bookingSchema = new mongoose.Schema({
   paidAt: { type: Date },
   receiptNumber: { type: String },
   receiptId: { type: String },
+  receiptReadyNotifiedAt: { type: Date },
+  receiptReadyNotificationLockUntil: { type: Date },
   patientCode: { type: String },
   bookingCode: { type: String, unique: true }
 }, { timestamps: true });
+
+// Resolve legacy status before Mongoose inserts its default bookingStatus.
+bookingSchema.pre('init', function (data) {
+  data.bookingStatus = normalizeBookingStatus(data);
+});
 
 module.exports = mongoose.model("Booking", bookingSchema);

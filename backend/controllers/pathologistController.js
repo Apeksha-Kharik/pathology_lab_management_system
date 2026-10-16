@@ -2,7 +2,6 @@ const Booking = require("../models/Booking");
 const Report = require("../models/Report");
 const User = require("../models/User");
 const fs = require("fs");
-const { sendEmail } = require("../config/email");
 const { writeAuditLog } = require("../utils/auditLogger");
 const { notifyReportReady } = require("../services/patientNotifications");
 
@@ -253,14 +252,6 @@ const approveReport = async (req, res) => {
       details: { bookingId: report.bookingId._id, patientId: report.userId?._id }
     });
 
-    const reportEmail = report.userId?.email || report.bookingId?.email;
-    if (reportEmail) {
-      sendEmail({
-        to: reportEmail,
-        subject: "Your report is ready",
-        text: "Your report is ready.\nPlease login to dashboard to download report."
-      }).catch((error) => console.error("Report notification email failed:", error.message));
-    }
     await notifyReportReady(report);
 
     await report.populate("approvedBy", signerFields);

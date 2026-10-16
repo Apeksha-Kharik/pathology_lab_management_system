@@ -1,3 +1,4 @@
+import ReportPdfPreview from "../components/ReportPdfPreview";
 import React, { useEffect, useMemo, useState } from "react";
 import { AlertCircle, BarChart3, CheckCircle2, Eye, FileImage, FileText, LogOut, Search, ShieldCheck, Upload, XCircle } from "lucide-react";
 import { useAuth } from "../context/useAuth";
@@ -451,6 +452,7 @@ function ReportModal({ report, onClose, onApprove, onReject }) {
   const canReview = ["Pending Approval", "Pending Review"].includes(report.status);
   const [pathologistRemarks, setPathologistRemarks] = useState(report.pathologistRemarks || "");
   const [rejectionReason, setRejectionReason] = useState(report.rejectionReason || "");
+  const [showPdf, setShowPdf] = useState(false);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-emerald-950/40 p-4 backdrop-blur-md">
@@ -462,7 +464,8 @@ function ReportModal({ report, onClose, onApprove, onReject }) {
             <p className="text-sm font-black text-emerald-700">Report ID: {report.reportId || "N/A"}</p>
             <p className="text-sm text-slate-500">Patient: {report.userId?.name || report.bookingId?.name || "N/A"}</p>
           </div>
-          <button onClick={onClose} className="rounded-xl px-3 py-2 text-sm font-black text-slate-500 transition hover:bg-emerald-50 hover:text-emerald-800">Close</button>
+          <div className="flex gap-2"><button type="button" onClick={() => setShowPdf(true)} className="rounded-xl bg-emerald-700 px-3 py-2 text-sm font-bold text-white">View PDF</button><button onClick={onClose} className="rounded-xl px-3 py-2 text-sm font-black text-slate-500 transition hover:bg-emerald-50 hover:text-emerald-800">Close</button></div>
+          {showPdf && <ReportPdfPreview reportId={report._id} onClose={() => setShowPdf(false)} />}
         </div>
 
         <div className="mb-5 grid gap-3 text-sm md:grid-cols-3">
@@ -475,6 +478,7 @@ function ReportModal({ report, onClose, onApprove, onReject }) {
           <Detail label="Submitted Date" value={formatDate(report.submittedAt || report.updatedAt)} />
         </div>
 
+        {report.reviewWarnings?.length > 0 && <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950"><p className="font-bold">Laboratory review required</p><ul className="mt-2 list-disc space-y-1 pl-5">{report.reviewWarnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul></div>}
         <div className="overflow-x-auto rounded-2xl border border-emerald-100">
           <table className="w-full text-left text-sm">
             <thead className="bg-emerald-50 text-xs uppercase tracking-[0.12em] text-emerald-900">
@@ -488,7 +492,7 @@ function ReportModal({ report, onClose, onApprove, onReject }) {
               {report.results.map((row, index) => (
                 <tr key={index} className="border-t border-emerald-100">
                   <td className="p-3 font-bold text-slate-800">{row.parameter}</td>
-                  <td className="p-3">{row.value} {row.unit}</td>
+                  <td className={`p-3 ${['Low', 'High', 'Abnormal', 'Critical'].includes(row.status) ? 'font-bold text-red-700' : ''}`}>{row.value} {row.unit}{['Low', 'High', 'Abnormal', 'Critical'].includes(row.status) && <span className="ml-2">[{row.status}]</span>}</td>
                   <td className="p-3">{row.normalRange || row.referenceRange || "N/A"}</td>
                 </tr>
               ))}

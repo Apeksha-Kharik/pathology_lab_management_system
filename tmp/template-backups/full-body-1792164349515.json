@@ -1,0 +1,15 @@
+{
+  "_id": "6a5a33a49d136479362c35cf",
+  "packageName": "full body checkup",
+  "category": "Health Checkup",
+  "price": 5500,
+  "description": "A complete health screening package that evaluates your overall health and helps detect potential health issues at an early stage.",
+  "imageUrl": "https://www.google.com/imgres?q=full%20body%20checkup&imgurl=https%3A%2F%2Fhealthcareoffers.in%2Fwp-content%2Fuploads%2F2025%2F10%2FFull-Body-Checkup-Test-List-930x620.jpg&imgrefurl=https%3A%2F%2Fhealthcareoffers.in%2Farticle%2Ffull-body-checkup-list%2F&docid=ibpHOjYS3XUk5M&tbnid=Xe6hMmqTR2DQLM&vet=12ahUKEwid1p3_59mVAxW1dvUHHX6NLPYQnPAOegUI0gMQAA..i&w=930&h=620&hcb=2&ved=2ahUKEwid1p3_59mVAxW1dvUHHX6NLPYQnPAOegUI0gMQAA",
+  "includedTests": [],
+  "parametersCount": 9,
+  "homeCollection": true,
+  "isActive": true,
+  "createdAt": "2026-07-17T13:52:37.019Z",
+  "updatedAt": "2026-07-17T13:52:37.019Z",
+  "__v": 0
+}

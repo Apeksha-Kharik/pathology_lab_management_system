@@ -1,5 +1,17 @@
 import api from "./api";
 
+export const downloadTechnicianReport = async (reportId) => {
+  const response = await api.get(`/api/technician/reports/${reportId}/pdf`, { responseType: 'blob' });
+  const url = URL.createObjectURL(response.data);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = response.headers['content-disposition']?.match(/filename="([^"]+)"/)?.[1] || 'submitted-report.pdf';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
 export const getTechnicianBookings = async () => {
   const response = await api.get("/api/technician/bookings");
   return response.data;
