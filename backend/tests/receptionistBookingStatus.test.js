@@ -103,3 +103,39 @@ test('receptionist can complete legacy appointment and confirm with the same ato
   });
   assert.equal((await invoke({ bookingDate: '2026-10-18', timeSlot: '09:00 AM - 11:00 AM' })).code, 200);
 });
+
+test('confirmation unlocks payment when appointment capacity is available', async t => {
+  const stored = { _id: '507f1f77bcf86cd799439011', bookingDate: '2026-10-17', timeSlot: '09:00 AM', bookingStatus: 'Pending Approval', status: 'Pending Approval', paymentPreference: 'online', paymentStatus: 'Unpaid' };
+  t.mock.method(Booking, 'findById', () => ({ populate: () => ({ lean: async () => ({ ...stored }) }) }));
+  t.mock.method(User, 'countDocuments', async () => 2);
+  t.mock.method(Booking, 'countDocuments', async () => 1);
+  t.mock.method(Booking, 'updateOne', async (query, update) => {
+    assert.equal(update.$set.bookingStatus, 'Confirmed');
+    assert.equal(update.$set.status, 'Confirmed');
+    return { modifiedCount: 1 };
+  });
+  const res = await invoke();
+  assert.equal(res.code, 200);
+  assert.equal(res.body.booking.bookingStatus, 'Confirmed');
+  assert.equal(res.body.booking.paymentPreference, 'online');
+  assert.equal(res.body.booking.paymentStatus, 'Unpaid');
+});
+
+for (const [technicians, reserved] of [[0, 0], [1, 1], [2, 3]]) {
+  test(`confirmation blocks unavailable appointment capacity (${technicians}, ${reserved})`, async t => {
+    const stored = { _id: '507f1f77bcf86cd799439011', bookingDate: '2026-10-22', timeSlot: '10:00 AM', bookingStatus: 'Pending Approval' };
+    t.mock.method(Booking, 'findById', () => ({ populate: () => ({ lean: async () => ({ ...stored }) }) }));
+    t.mock.method(User, 'countDocuments', async () => technicians);
+    t.mock.method(Booking, 'countDocuments', async query => {
+      assert.equal(query.bookingDate, stored.bookingDate);
+      assert.equal(query.timeSlot, stored.timeSlot);
+      assert.deepEqual(query._id, { $ne: stored._id });
+      return reserved;
+    });
+    t.mock.method(Booking, 'updateOne', async () => assert.fail('clashing booking must not be confirmed or rejected automatically'));
+    const res = await invoke();
+    assert.equal(res.code, 409);
+    assert.match(res.body.message, /Cannot confirm/);
+    assert.match(res.body.message, /remains pending/);
+  });
+}

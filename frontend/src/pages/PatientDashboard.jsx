@@ -325,7 +325,6 @@ function PatientDashboard() {
   };
 
   useEffect(() => {
-    if (patientView !== "history") return undefined;
     let disposed = false;
     let pending = false;
     const refreshBookings = async () => {

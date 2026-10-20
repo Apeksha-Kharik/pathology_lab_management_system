@@ -259,7 +259,9 @@ const updateBookingStatus = async (req, res) => {
       Object.assign(appointmentUpdate, { bookingDate, date: bookingDate, timeSlot });
       Object.assign(booking, appointmentUpdate);
     }
-    if (status === "Confirmed" && currentStatus === "Pending Approval") {
+    // Reserve appointment capacity at approval; assignment remains a separate
+    // paid-booking request that takes effect only when a technician accepts.
+    if (status === "Confirmed") {
       const [technicianCount, reservedBookingCount] = await Promise.all([
         User.countDocuments({ role: "technician" }),
         Booking.countDocuments({
@@ -270,23 +272,9 @@ const updateBookingStatus = async (req, res) => {
         })
       ]);
       if (!technicianCount || reservedBookingCount >= technicianCount) {
-        booking.bookingStatus = "Rejected";
-        booking.status = "Rejected";
-        booking.rejectionReason = !technicianCount
-          ? "No laboratory technician is currently available."
-          : "The selected appointment slot is full. Please choose another date or time.";
-        const rejection = await Booking.updateOne(statusSnapshot, { $set: {
-          bookingStatus: "Rejected", status: "Rejected", rejectionReason: booking.rejectionReason
-        } });
-        if (!rejection.modifiedCount) return res.status(409).json({ message: "Booking changed. Refresh and try again." });
-        await notifyPatient(booking, "booking_rejected", [
-          "INDIPATH booking request rejected.",
-          "",
-          `Booking ID: ${booking.bookingCode}`,
-          `Test: ${booking.testName}`,
-          `Reason: ${booking.rejectionReason}`
-        ], [booking.name, booking.bookingCode, booking.testName, booking.rejectionReason]);
-        return res.json({ message: `Booking automatically rejected: ${booking.rejectionReason}`, booking, autoRejected: true });
+        return res.status(409).json({ message: !technicianCount
+          ? "Cannot confirm this appointment: no laboratory technician is available. The request remains pending."
+          : "Cannot confirm this appointment: the selected date and time slot are full. Choose another appointment slot. The request remains pending." });
       }
     }
 
@@ -316,7 +304,7 @@ const updateBookingStatus = async (req, res) => {
     if (!statusUpdate.modifiedCount) return res.status(409).json({ message: "Booking changed. Refresh and try again." });
 
     if (status === "Confirmed" && previousStatus !== status) {
-      await notifyBookingConfirmed(booking);
+      void notifyBookingConfirmed(booking);
     }
 
     if (status === "Rejected" && previousStatus !== status) {

@@ -1,7 +1,7 @@
 .reception-dashboard {
   --desk-ink: #18352e;
   --desk-green: #08745b;
-  background: #f4f7f7;
+  background: #f6fbf8;
   font-feature-settings: "cv11", "ss01";
 }
 .reception-dashboard button,
@@ -23,7 +23,7 @@
 .desk-page-heading h1 { color: var(--desk-ink); font-weight: 650; letter-spacing: -0.035em; }
 .desk-page-heading > div > p:last-child { margin-top: 8px; color: #71827b; }
 .desk-page-heading > button { min-height: 43px; padding-inline: 18px; border-radius: 9px; background: var(--desk-green); box-shadow: 0 3px 8px #124f3914; }
-.desk-stat { position: relative; padding: 20px 22px; border-color: #e0e9e5; border-radius: 14px; box-shadow: 0 2px 3px #19392a03; transition: border-color 160ms, box-shadow 160ms; }
+.desk-stat { position: relative; padding: 20px 22px; border-color: #e0e9e5; border-radius: 24px; box-shadow: 0 2px 3px #19392a03; transition: border-color 160ms, box-shadow 160ms; }
 .desk-stat:hover { border-color: #6fae96; box-shadow: 0 5px 14px #19392a08; }
 .desk-stat > div > span:first-child { color: #5d7167; font-size: 13px; font-weight: 600; }
 .desk-stat-icon { display: grid; place-items: center; width: 41px; height: 41px; border-radius: 12px; background: #e7f4ed; color: #168064; }
@@ -31,7 +31,7 @@
 .desk-stat-payments .desk-stat-icon { background: #fff3e1; color: #b68b40; }
 .desk-stat-value { margin-top: 5px; font-size: 34px; font-weight: 650; color: var(--desk-ink); font-variant-numeric: tabular-nums; }
 .desk-stat-caption { margin-top: 6px; color: #6c7d73; }
-.desk-workspace { border-color: #e0e8e4; border-radius: 14px; box-shadow: 0 3px 12px #19392a04; }
+.desk-workspace { border-color: #e0e8e4; border-radius: 24px; box-shadow: 0 3px 12px #19392a04; }
 .desk-mobile-nav { background: #fcfdfc; }
 .desk-task-panel { padding: 24px; }
 .desk-table-heading h2 { color: #243e33; font-size: 19px; font-weight: 650; letter-spacing: -0.025em; }
@@ -62,33 +62,6 @@
 @media (min-width: 640px) {
   .desk-date { display: inline-flex; }
   .desk-account > div { display: block; }
-}
-@media (min-width: 1280px) {
-  .desk-sidebar { position: fixed; inset: 0 auto 0 0; z-index: 35; display: flex; width: 240px; flex-direction: column; background: #123e31; color: #d8e9df; }
-  .desk-sidebar-brand { display: flex; align-items: center; gap: 11px; min-height: 88px; padding: 20px 24px; border-bottom: 1px solid #ffffff0d; }
-  .desk-brand-mark { display: grid; place-items: center; width: 36px; height: 40px; border-radius: 10px; background: white; padding: 5px; }
-  .desk-brand-mark img { width: 30px; }
-  .desk-sidebar-brand p { font-size: 17px; font-weight: 650; letter-spacing: 0.045em; color: #fff; }
-  .desk-sidebar-brand div > span { font-size: 10px; color: #88ab99; }
-  .desk-sidebar-caption { margin: 29px 24px 13px; font-size: 9px; font-weight: 600; letter-spacing: 0.13em; color: #789f89; }
-  .desk-sidebar-nav { padding: 0 13px; }
-  .desk-sidebar-nav button { position: relative; display: flex; width: 100%; align-items: center; gap: 11px; min-height: 46px; margin-bottom: 5px; padding: 11px 12px; border: 1px solid transparent; border-radius: 9px; color: #a9c3b4; text-align: left; transition: background 150ms; }
-  .desk-sidebar-nav button > span { flex: 1; font-size: 12px; font-weight: 500; }
-  .desk-sidebar-nav button small { padding: 2px 6px; border-radius: 5px; background: #ffffff09; font-size: 10px; font-variant-numeric: tabular-nums; }
-  .desk-sidebar-nav button:hover { background: #ffffff08; color: #fff; }
-  .desk-sidebar-nav button[aria-selected="true"] { border-color: #ffffff0c; background: #ffffff0e; color: #fff; }
-  .desk-sidebar-nav button[aria-selected="true"]::before { position: absolute; inset: 12px auto 12px -13px; width: 3px; border-radius: 0 3px 3px 0; background: #76cba8; content: ""; }
-  .desk-sidebar-nav button[aria-selected="true"] svg { color: #8fd7b5; }
-  .desk-sidebar-nav button:focus-visible { outline: 2px solid #8fd7b5; outline-offset: 2px; }
-  .desk-sidebar-footer { display: flex; align-items: center; gap: 10px; margin-top: auto; padding: 22px; border-top: 1px solid #ffffff0d; }
-  .desk-footer-mark { font-size: 28px; font-weight: 300; color: #8ab8a0; }
-  .desk-sidebar-footer strong { font-size: 10px; font-weight: 500; color: #bfd7c9; }
-  .desk-sidebar-footer p { margin-top: 3px; font-size: 9px; color: #6e9b83; }
-  .desk-topbar, .desk-shell { margin-left: 240px; }
-  .desk-topbar > div { max-width: none; padding-inline: 30px; }
-  .desk-shell { max-width: none; padding: 30px; }
-  .desk-breadcrumb { display: flex; }
-  .desk-topbar-brand, .desk-mobile-nav { display: none; }
 }
 @media (max-width: 639px) {
   .desk-shell { padding-top: 23px; }
