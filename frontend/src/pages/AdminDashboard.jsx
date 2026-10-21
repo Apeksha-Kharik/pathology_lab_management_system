@@ -131,6 +131,11 @@ const AdminDashboard = () => {
 
     const handleAddTest = async (e) => {
         e.preventDefault();
+        if (!templateMode && (!testForm.testName.trim() || !testForm.category.trim() || !testForm.description.trim() || !Number.isFinite(Number(testForm.price)) || Number(testForm.price) <= 0)) {
+            setTestFormStep("details");
+            alert("Enter the test name, a price greater than zero, category and description before publishing.");
+            return;
+        }
         try {
             const reportTemplate = templateRows
                 .map((row) => ({ parameter: row.parameter.trim(), value: row.value.trim(), unit: row.unit.trim(), referenceRange: row.referenceRange.trim() }))
@@ -344,7 +349,19 @@ const AdminDashboard = () => {
                         <SidebarBtn active={view === 'dashboard'} onClick={() => setView('dashboard')} icon={<LayoutDashboard className="w-5 h-5" />} text="Dashboard" />
                         <SidebarBtn active={view === 'availableTests'} onClick={() => setView('availableTests')} icon={<FlaskConical className="w-5 h-5" />} text="Available Tests" />
                         <SidebarBtn active={view === 'addTest' && !templateMode} onClick={() => { setTemplateMode(false); setTemplateTargetId(""); setTestFormStep("details"); setView('addTest'); }} icon={<TestTube2 className="w-5 h-5" />} text="Add New Test" />
-                        <SidebarBtn active={view === 'addTest' && templateMode} onClick={() => { setTemplateMode(true); setTemplateTargetId(""); setTestForm({ testName: '', price: '', category: '', conditions: '', description: '', sampleType: '', turnaroundTime: '', reportDescription: '', reportLetterhead: '', isActive: true }); setTemplateRows([]); setTestFormStep("template"); setView('addTest'); }} icon={<ClipboardList className="w-5 h-5" />} text="Report Templates" />
+                        <SidebarBtn active={view === 'addTest' && templateMode} onClick={() => {
+                            if (!templateMode && !testForm._id && testForm.testName.trim()) {
+                                setTestFormStep("template");
+                                setView('addTest');
+                                return;
+                            }
+                            setTemplateMode(true);
+                            setTemplateTargetId("");
+                            setTestForm({ testName: '', price: '', category: '', conditions: '', description: '', sampleType: '', turnaroundTime: '', reportDescription: '', reportLetterhead: '', isActive: true });
+                            setTemplateRows([]);
+                            setTestFormStep("template");
+                            setView('addTest');
+                        }} icon={<ClipboardList className="w-5 h-5" />} text="Report Templates" />
                         <SidebarBtn active={view === 'availablePackages'} onClick={() => setView('availablePackages')} icon={<Boxes className="w-5 h-5" />} text="Health Packages" />
                         <SidebarBtn active={view === 'addPackage'} onClick={openCreatePackage} icon={<PackagePlus className="w-5 h-5" />} text="Add New Package" />
                         <SidebarBtn active={view === 'addUser'} onClick={openAddUser} icon={<UserPlus className="w-5 h-5" />} text="Add User" />
@@ -548,7 +565,7 @@ const AdminDashboard = () => {
                     <div className="mx-auto max-w-5xl space-y-8">
                         <header className="text-center">
                             <h1 className="text-3xl font-bold text-emerald-950">{templateMode ? 'Create Test Report Template' : 'Create Lab Test'}</h1>
-                            <p className="mt-2 text-slate-500">Fill patient-visible test details first, then configure the technician report template.</p>
+                            <p className="mt-2 text-slate-500">{templateMode ? 'Select an existing test or package to update its report template.' : 'Enter test details and report parameters, then publish them together.'}</p>
                         </header>
                         <div className="grid gap-3 rounded-2xl border border-emerald-100 bg-white p-3 shadow-sm sm:grid-cols-2">
                             <button type="button" onClick={() => setTestFormStep("details")} className={`rounded-xl px-4 py-3 text-left font-bold transition ${testFormStep === "details" ? "bg-emerald-700 text-white" : "bg-emerald-50 text-emerald-900 hover:bg-emerald-100"}`}>Patient Visible Details</button>
@@ -592,6 +609,7 @@ const AdminDashboard = () => {
                                         <h2 className="text-xl font-bold text-emerald-950">Report Template</h2>
                                         <p className="text-sm text-slate-500">These rows appear for the technician while entering report values.</p>
                                     </div>
+                                    {!templateMode && <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-950"><p className="font-bold">Test: {testForm.testName || 'New test'}</p><p className="mt-1 text-sm">Publish Test saves this test and its report template together. You do not need to select an existing test.</p><button type="button" onClick={() => setTestFormStep("details")} className="mt-2 text-sm font-bold underline">Back to test details</button></div>}
                                     <div className="space-y-2"><label className="text-xs font-bold uppercase tracking-widest text-slate-400">Report Letterhead</label><textarea className="h-24 w-full rounded-xl border border-slate-200 bg-slate-50 p-4 outline-none focus:ring-2 focus:ring-emerald-500" value={testForm.reportLetterhead || ''} onChange={(e) => setTestForm({...testForm, reportLetterhead: e.target.value})} placeholder={'INDIPATH DIAGNOSTIC LAB\n22 Mahapurush Complex, Kankavali\nPhone: 02367-231970'} /></div>
                                     <div className="space-y-2"><label className="text-xs font-bold uppercase tracking-widest text-slate-400">Report Description</label><textarea className="h-24 w-full rounded-xl border border-slate-200 bg-slate-50 p-4 outline-none focus:ring-2 focus:ring-emerald-500" value={testForm.reportDescription} onChange={(e) => setTestForm({...testForm, reportDescription: e.target.value})} placeholder="This description appears above the result table." /></div>
                                     <TemplateRows rows={templateRows} setRows={setTemplateRows} />
